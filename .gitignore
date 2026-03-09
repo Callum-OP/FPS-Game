@@ -16,3 +16,10 @@
 
 *.blend1
 *.blend1.meta
+
+Crashes/
+crash.dmp
+*.dmp
+[Rr]ecovery/
+*.recovery
+_Recovery
