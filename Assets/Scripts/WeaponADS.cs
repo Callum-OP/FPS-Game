@@ -4,8 +4,8 @@ using UnityEngine.InputSystem;
 public class WeaponADS : MonoBehaviour
 {
     [Header("Positions")]
-    public Vector3 hipPosition = new Vector3(0f, -0.2f, 0f);
-    public Vector3 adsPosition = new Vector3(0f, 0.2f, 0.2f);
+    public Vector3 hipPosition = new Vector3(0f, 0.1f, 0f);
+    public Vector3 adsPosition = new Vector3(0f, 0.3f, 0.2f);
 
     [Header("Rotations")]
     public Vector3 hipRotation = new Vector3(0f, 0f, 35f);
@@ -47,6 +47,13 @@ public class WeaponADS : MonoBehaviour
         Vector3 targetRot = isAiming ? adsRotation : hipRotation;
         float   speed     = isAiming ? adsSpeed    : hipSpeed;
 
+        // Get camera look angle
+        float xRotation = fpCamera.transform.localEulerAngles.x;
+        if (xRotation > 180f) xRotation -= 360f;
+
+        // For looking up and down
+        targetRot.x += xRotation * 1f;
+
         transform.localPosition = Vector3.Lerp(
             transform.localPosition, targetPos, speed * Time.deltaTime);
 
@@ -55,7 +62,6 @@ public class WeaponADS : MonoBehaviour
             Quaternion.Euler(targetRot),
             speed * Time.deltaTime);
 
-        // Smoothly zoom FOV
         fpCamera.fieldOfView = Mathf.Lerp(
             fpCamera.fieldOfView,
             isAiming ? adsFOV : hipFOV,

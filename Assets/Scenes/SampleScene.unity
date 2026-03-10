@@ -1338,8 +1338,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9a38ad043d189342a96126048654387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  hipPosition: {x: 0, y: -0.2, z: 0}
-  adsPosition: {x: 0, y: 0.2, z: 0.2}
+  hipPosition: {x: 0, y: 0.1, z: 0}
+  adsPosition: {x: 0, y: 0.3, z: 0.2}
   hipRotation: {x: 0, y: 0, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
