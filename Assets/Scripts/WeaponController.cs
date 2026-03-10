@@ -27,7 +27,7 @@ public class WeaponController : MonoBehaviour
     {
         if (fpCamera == null) fpCamera = Camera.main;
 
-        fireAction   = new InputAction("Fire",   binding: "<Mouse>/leftButton");
+        fireAction = new InputAction("Fire",   binding: "<Mouse>/leftButton");
         reloadAction = new InputAction("Reload", binding: "<Keyboard>/r");
         fireAction.Enable();
         reloadAction.Enable();
