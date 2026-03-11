@@ -5,7 +5,7 @@ using UnityEngine.AI;
 [RequireComponent(typeof(Health))]
 public class EnemyAI : MonoBehaviour
 {
-    public enum State { Idle, Investigate, Chase, Attack, Dead }
+    public enum State { Patrol, Idle, Investigate, Chase, Attack, Dead }
 
     [Header("Detection")]
     public float sightRange = 20f;
@@ -25,6 +25,11 @@ public class EnemyAI : MonoBehaviour
     public float chaseSpeed = 5f;
     public float turnSpeed = 8f;
 
+    [Header("Patrol")]
+    public Transform[] waypoints; // Assign patrol points in Inspector
+    public float waypointWaitTime = 2f;
+    public bool loopPatrol = true;
+
     [Header("Shooting (optional)")]
     public bool canShoot = false;
     public GameObject bulletPrefab;
@@ -32,7 +37,7 @@ public class EnemyAI : MonoBehaviour
     public float bulletSpeed = 40f;
 
     // State
-    private State currentState = State.Idle;
+    private State currentState = State.Patrol;
     private NavMeshAgent agent;
     private Health health;
     private Transform player;
@@ -41,7 +46,13 @@ public class EnemyAI : MonoBehaviour
     private Vector3 lastKnownPlayerPos;
     private float investigateTimer;
     private float attackTimer;
+    private float waypointWaitTimer;
     private bool playerInSight;
+
+    // Patrol
+    private int currentWaypointIndex = 0;
+    private bool patrolForward = true;
+    private bool isWaiting = false;
 
     void Start()
     {
@@ -55,10 +66,15 @@ public class EnemyAI : MonoBehaviour
             playerHealth = playerObj.GetComponent<Health>();
         }
 
-        // Hook into health events
+        // Connect to health events
         health.onDeath.AddListener(OnDeath);
-
         agent.speed = walkSpeed;
+
+        // Start patrolling if waypoints are set, otherwise idle
+        if (waypoints != null && waypoints.Length > 0)
+            EnterPatrol();
+        else
+            EnterIdle();
     }
 
     void Update()
@@ -73,6 +89,7 @@ public class EnemyAI : MonoBehaviour
 
         switch (currentState)
         {
+            case State.Patrol:      HandlePatrol();      break;
             case State.Idle:        HandleIdle();        break;
             case State.Investigate: HandleInvestigate(); break;
             case State.Chase:       HandleChase();       break;
@@ -80,16 +97,52 @@ public class EnemyAI : MonoBehaviour
         }
     }
 
-    // State Hnadlers
+    // State handlers
+    void HandlePatrol()
+    {
+        agent.isStopped = false;
+        agent.speed = walkSpeed;
+
+        // Immediately chase if player spotted
+        if (playerInSight) { EnterChase(); return; }
+
+        // Hearing check
+        float distToPlayer = Vector3.Distance(transform.position, player.position);
+        if (distToPlayer <= hearingRange)
+        {
+            lastKnownPlayerPos = player.position;
+            EnterInvestigate();
+            return;
+        }
+
+        if (waypoints.Length == 0) { EnterIdle(); return; }
+
+        if (isWaiting)
+        {
+            // Wait at waypoint before moving to next
+            waypointWaitTimer -= Time.deltaTime;
+            if (waypointWaitTimer <= 0f)
+            {
+                isWaiting = false;
+                MoveToNextWaypoint();
+            }
+            return;
+        }
+
+        // Check if reached current waypoint
+        if (ReachedDestination())
+        {
+            isWaiting = true;
+            waypointWaitTimer = waypointWaitTime;
+            return;
+        }
+    }
+
     void HandleIdle()
     {
         agent.isStopped = true;
 
-        if (playerInSight)
-        {
-            EnterChase();
-            return;
-        }
+        if (playerInSight) { EnterChase(); return; }
 
         // Hearing check (detect nearby player)
         float distToPlayer = Vector3.Distance(transform.position, player.position);
@@ -106,16 +159,18 @@ public class EnemyAI : MonoBehaviour
         agent.speed = walkSpeed;
         agent.SetDestination(lastKnownPlayerPos);
 
-        if (playerInSight)
-        {
-            EnterChase();
-            return;
-        }
+        if (playerInSight) { EnterChase(); return; }
 
-        // Give up after set time
+        // Give up searching after set time
         investigateTimer -= Time.deltaTime;
         if (investigateTimer <= 0f || ReachedDestination())
-            EnterIdle();
+        {
+            // Return to patrol if waypoints exist, otherwise idle
+            if (waypoints != null && waypoints.Length > 0)
+                EnterPatrol();
+            else
+                EnterIdle();
+        }
     }
 
     void HandleChase()
@@ -127,11 +182,7 @@ public class EnemyAI : MonoBehaviour
         float dist = Vector3.Distance(transform.position, player.position);
 
         // Switch to attack if close enough
-        if (dist <= attackRange)
-        {
-            EnterAttack();
-            return;
-        }
+        if (dist <= attackRange) { EnterAttack(); return; }
 
         // Shoot if in range and has sight
         if (canShoot && dist <= shootRange && playerInSight)
@@ -144,9 +195,7 @@ public class EnemyAI : MonoBehaviour
 
         // Lost sight
         if (!playerInSight)
-        {
             EnterInvestigate();
-        }
     }
 
     void HandleAttack()
@@ -156,14 +205,8 @@ public class EnemyAI : MonoBehaviour
 
         float dist = Vector3.Distance(transform.position, player.position);
 
-        // Chase player
-        if (dist > attackRange * 1.5f)
-        {
-            EnterChase();
-            return;
-        }
+        if (dist > attackRange * 1.5f) { EnterChase(); return; }
 
-        // Attack cooldown
         attackTimer -= Time.deltaTime;
         if (attackTimer <= 0f)
         {
@@ -174,6 +217,15 @@ public class EnemyAI : MonoBehaviour
     }
 
     // States
+    void EnterPatrol()
+    {
+        currentState = State.Patrol;
+        agent.isStopped = false;
+        agent.speed = walkSpeed;
+        agent.SetDestination(waypoints[currentWaypointIndex].position);
+        Debug.Log($"{name} → Patrolling");
+    }
+
     void EnterIdle()
     {
         currentState = State.Idle;
@@ -199,9 +251,37 @@ public class EnemyAI : MonoBehaviour
     void EnterAttack()
     {
         currentState = State.Attack;
-        attackTimer = 0f;  // Attack immediately
+        attackTimer = 0f; // Attack immediately
         agent.isStopped = true;
         Debug.Log($"{name} → Attacking");
+    }
+
+    // Patrol
+    void MoveToNextWaypoint()
+    {
+        if (loopPatrol)
+        {
+            // Loop: 0 → 1 → 2 → 3 → 0 → 1...
+            currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Length;
+        }
+        else
+        {
+            // Back and forward: 0 → 1 → 2 → 3 → 2 → 1 → 0...
+            if (patrolForward)
+            {
+                currentWaypointIndex++;
+                if (currentWaypointIndex >= waypoints.Length - 1)
+                    patrolForward = false;
+            }
+            else
+            {
+                currentWaypointIndex--;
+                if (currentWaypointIndex <= 0)
+                    patrolForward = true;
+            }
+        }
+
+        agent.SetDestination(waypoints[currentWaypointIndex].position);
     }
 
     // Detection
@@ -232,6 +312,7 @@ public class EnemyAI : MonoBehaviour
             }
         }
 
+        // Nothing blocking line of sight to player
         Debug.DrawRay(transform.position + Vector3.up * 1.5f,
             dirToPlayer.normalized * dist, Color.green);
         return true;
@@ -287,12 +368,11 @@ public class EnemyAI : MonoBehaviour
     {
         currentState = State.Dead;
         agent.isStopped = true;
-
+        
         // Disable collider
         foreach (Collider col in GetComponentsInChildren<Collider>())
             col.enabled = false;
 
-        Debug.Log($"{name} died");
         Destroy(gameObject, 2f);
     }
 
@@ -301,11 +381,23 @@ public class EnemyAI : MonoBehaviour
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, sightRange);
-
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
-
         Gizmos.color = Color.blue;
         Gizmos.DrawWireSphere(transform.position, hearingRange);
+
+        // Draw patrol route in editor
+        if (waypoints == null || waypoints.Length < 2) return;
+        Gizmos.color = Color.white;
+        for (int i = 0; i < waypoints.Length; i++)
+        {
+            if (waypoints[i] == null) continue;
+            Gizmos.DrawSphere(waypoints[i].position, 0.2f);
+            int next = loopPatrol
+                ? (i + 1) % waypoints.Length
+                : Mathf.Min(i + 1, waypoints.Length - 1);
+            if (waypoints[next] != null)
+                Gizmos.DrawLine(waypoints[i].position, waypoints[next].position);
+        }
     }
 }
