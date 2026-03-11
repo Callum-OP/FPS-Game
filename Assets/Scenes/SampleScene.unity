@@ -2013,6 +2013,11 @@ MonoBehaviour:
   bulletPrefab: {fileID: 4598212022487192858, guid: 9046df2f69dd06b40870ea927989d7f6, type: 3}
   muzzlePoint: {fileID: 1458775515}
   bulletSpeed: 40
+  baseInaccuracy: 5
+  maxInaccuracy: 15
+  aimDownTime: 1.5
+  movingInaccuracyBonus: 5
+  alertInaccuracyBonus: 5
 --- !u!1 &2019340142
 GameObject:
   m_ObjectHideFlags: 0

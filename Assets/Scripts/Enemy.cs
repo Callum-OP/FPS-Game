@@ -36,6 +36,18 @@ public class EnemyAI : MonoBehaviour
     public Transform muzzlePoint;
     public float bulletSpeed = 40f;
 
+    [Header("Accuracy")]
+    public float baseInaccuracy = 5f;
+    public float maxInaccuracy = 15f;
+    public float aimDownTime = 1.5f; // Time to reach full accuracy
+    public float movingInaccuracyBonus = 5f; // More inaccurate when moving
+    public float alertInaccuracyBonus = 5f; // More inaccurate when freshly alerted
+
+    private float currentAimTime = 0f; // How long enemy has been aiming
+    private bool justSpottedPlayer = false; // Recently alerted
+    private float alertTimer = 0f;
+    private float alertDuration = 4f;
+
     // State
     private State currentState = State.Patrol;
     private NavMeshAgent agent;
@@ -245,6 +257,12 @@ public class EnemyAI : MonoBehaviour
     {
         currentState = State.Chase;
         agent.speed = chaseSpeed;
+
+        // Just spotted player
+        justSpottedPlayer = true;
+        alertTimer = alertDuration;
+        currentAimTime = 0f;
+
         Debug.Log($"{name} → Chasing");
     }
 
@@ -337,18 +355,52 @@ public class EnemyAI : MonoBehaviour
 
         attackTimer = attackCooldown;
 
+        // Build up aim time while stationary and in sight
+        if (agent.isStopped)
+            currentAimTime += attackCooldown;
+        else
+            currentAimTime = Mathf.Max(0f, currentAimTime - Time.deltaTime);
+
+        // Tick down alert penalty
+        if (justSpottedPlayer)
+        {
+            alertTimer -= attackCooldown;
+            if (alertTimer <= 0f)
+                justSpottedPlayer = false;
+        }
+
+        // Calculate final inaccuracy
+        // Better accuracy the longer they aim
+        float aimAccuracyBonus = Mathf.Lerp(0f, maxInaccuracy - baseInaccuracy,
+            Mathf.Clamp01(currentAimTime / aimDownTime));
+
+        float inaccuracy = baseInaccuracy
+            + (agent.velocity.magnitude > 0.1f ? movingInaccuracyBonus : 0f)
+            + (justSpottedPlayer ? alertInaccuracyBonus : 0f)
+            - aimAccuracyBonus;
+
+        inaccuracy = Mathf.Max(0f, inaccuracy);
+
+        // Apply random spread
+        Vector3 direction = (player.position - muzzlePoint.position).normalized;
+        direction = Quaternion.Euler(
+            Random.Range(-inaccuracy, inaccuracy),
+            Random.Range(-inaccuracy, inaccuracy),
+            0f) * direction;
+
+        // Spawn bullet
         GameObject bullet = Instantiate(bulletPrefab,
             muzzlePoint.position + muzzlePoint.forward * 0.3f,
             muzzlePoint.rotation);
 
-        bullet.transform.forward = (player.position - muzzlePoint.position).normalized;
+        bullet.transform.forward = direction;
 
         Rigidbody rb = bullet.GetComponent<Rigidbody>();
         if (rb != null)
         {
             rb.useGravity = false;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-            rb.linearVelocity = bullet.transform.forward * bulletSpeed;
+            rb.linearVelocity = direction * bulletSpeed;
         }
 
         // Stop them hitting themself
