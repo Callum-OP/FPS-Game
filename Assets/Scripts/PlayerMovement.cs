@@ -15,6 +15,10 @@ public class PlayerMovement : MonoBehaviour
     public float mouseSensitivity = 0.2f;
     public Transform cameraTransform;
 
+    [Header("Cant")]
+    public WeaponCant weaponCant;
+    public float cantSpeedMultiplier = 0.5f;  // 50% speed when canted
+
     private CharacterController controller;
     private Vector3 velocity;
     private float xRotation = 0f;
@@ -87,6 +91,11 @@ public class PlayerMovement : MonoBehaviour
         bool isSprinting  = sprintAction.ReadValue<float>() > 0.5f;
 
         float speed = isSprinting ? runSpeed : walkSpeed;
+
+        // Slow down when canted
+        if (weaponCant != null && Mathf.Abs(weaponCant.GetCantFraction()) > 0.1f)
+            speed *= cantSpeedMultiplier;
+
         Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
         controller.Move(move * speed * Time.deltaTime);
 

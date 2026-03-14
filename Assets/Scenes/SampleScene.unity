@@ -1292,6 +1292,8 @@ MonoBehaviour:
   gravity: -19.62
   mouseSensitivity: 0.2
   cameraTransform: {fileID: 330585546}
+  weaponCant: {fileID: 1413745213}
+  cantSpeedMultiplier: 0.5
 --- !u!143 &469436035
 CharacterController:
   m_ObjectHideFlags: 0
