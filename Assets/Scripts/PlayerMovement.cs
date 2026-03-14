@@ -67,7 +67,14 @@ public class PlayerMovement : MonoBehaviour
         xRotation -= lookInput.y * mouseSensitivity;
         xRotation = Mathf.Clamp(xRotation, -85f, 85f);
 
-        cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        // Preserve camera lean angle
+        float currentZ = cameraTransform.localEulerAngles.z;
+        float currentY = cameraTransform.localEulerAngles.y;
+
+        if (currentZ > 180f) currentZ -= 360f;
+        if (currentY > 180f) currentY -= 360f;
+
+        cameraTransform.localRotation = Quaternion.Euler(xRotation, currentY, currentZ);
         transform.Rotate(Vector3.up * lookInput.x * mouseSensitivity);
     }
 
