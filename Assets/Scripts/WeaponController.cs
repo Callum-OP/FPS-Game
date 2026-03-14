@@ -13,6 +13,10 @@ public class WeaponController : MonoBehaviour
     public float reloadTime = 1.5f;
     public bool isAutomatic = false;
 
+    [Header("Recoil")]
+    public CameraRecoil cameraRecoil;
+    public WeaponRecoil weaponRecoil;
+
     // HUD
     public System.Action<int, int> onAmmoChanged;
     public System.Action onReloadStart;
@@ -67,13 +71,17 @@ public class WeaponController : MonoBehaviour
         currentAmmo--;
         onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
 
+        // Fire recoil on both camera and gun
+        cameraRecoil?.ApplyRecoil();
+        weaponRecoil?.ApplyRecoil();
+
         // Get crosshair target
         Ray ray = fpCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
         Vector3 targetPoint = Physics.Raycast(ray, out RaycastHit hit, 300f)
             ? hit.point
             : ray.GetPoint(300f);
 
-        // Spawn bullet pushed forward slightly
+        // Spawn bullet
         Vector3 spawnPos = muzzlePoint.position + muzzlePoint.forward * 0.5f;
         GameObject bullet = Instantiate(bulletPrefab, spawnPos, muzzlePoint.rotation);
         bullet.transform.forward = (targetPoint - spawnPos).normalized;
