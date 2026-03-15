@@ -1,9 +1,8 @@
 # Features to consider
 
-Change canted mode so it a toggle?
+New weapon types that can be dropped and picked up, like full auto rifle, shotgun and grenades
+
+Crouch and stealth with option to do takedown on enemies if you manage to sneak up on them
 
 # Issues
 
-Speed while canted is slowed (which is correct) but not while aiming (incorrect)
-
-If you go canted left and then normal and then aim the gun will still be angled as if canted.
