@@ -52,11 +52,20 @@ public class WeaponADS : MonoBehaviour
 
         // Get cant fraction from WeaponCant
         float cantFraction = weaponCant != null ? weaponCant.GetCantFraction() : 0f;
-        float cantAngle    = weaponCant != null ? weaponCant.cantAngle : 0f;
+        bool  isCanted     = weaponCant != null && weaponCant.IsCanted();
 
-        // Reduces hip fire rotation when canting left
-        if (cantFraction > 0f)
-            targetRot.z = Mathf.Lerp(hipRotation.z, 0f, cantFraction);
+        if (isAiming)
+        {
+            // Only apply cant if actually canted
+            targetRot.z = isCanted ? 0f : 0f;
+        }
+        else
+        {
+            // Reduces hip fire rotation when canting left
+            targetRot.z = isCanted && cantFraction > 0f
+                ? Mathf.Lerp(hipRotation.z, 0f, cantFraction)
+                : hipRotation.z;
+        }
 
         // For looking up and down
         transform.localPosition = Vector3.Lerp(

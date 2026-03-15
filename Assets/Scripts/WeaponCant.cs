@@ -9,12 +9,16 @@ public class WeaponCant : MonoBehaviour
 
     [Header("ADS")]
     public WeaponADS weaponADS;
-    public float adsCantMultiplier = 0.5f;  // Reduce cant angle when aiming
+    public float adsCantMultiplier = 0.5f; // Reduce cant angle when aiming
 
     private InputAction cantLeftAction;
     private InputAction cantRightAction;
     private float currentCantAngle = 0f;
     private float targetCantAngle  = 0f;
+
+    // Toggle state
+    private bool cantedLeft  = false;
+    private bool cantedRight = false;
 
     void Awake()
     {
@@ -26,12 +30,37 @@ public class WeaponCant : MonoBehaviour
 
     void Update()
     {
-        bool cantingLeft  = cantLeftAction.ReadValue<float>()  > 0.5f;
-        bool cantingRight = cantRightAction.ReadValue<float>() > 0.5f;
+        // Toggle left
+        if (cantLeftAction.WasPressedThisFrame())
+        {
+            if (cantedLeft)
+            {
+                cantedLeft = false;
+            }
+            else
+            {
+                cantedLeft  = true;
+                cantedRight = false;
+            }
+        }
 
-        if (cantingLeft && !cantingRight)
+        // Toggle right
+        if (cantRightAction.WasPressedThisFrame())
+        {
+            if (cantedRight)
+            {
+                cantedRight = false;
+            }
+            else
+            {
+                cantedRight = true;
+                cantedLeft  = false;
+            }
+        }
+
+        if (cantedLeft)
             targetCantAngle = cantAngle;
-        else if (cantingRight && !cantingLeft)
+        else if (cantedRight)
             targetCantAngle = -cantAngle;
         else
             targetCantAngle = 0f;
@@ -39,8 +68,8 @@ public class WeaponCant : MonoBehaviour
         currentCantAngle = Mathf.Lerp(currentCantAngle, targetCantAngle,
             cantSpeed * Time.deltaTime);
 
-        // Reduce physical cant rotation when aiming
-        bool isAiming = weaponADS != null && weaponADS.IsAiming();
+        // Reduce physical cant when aiming
+        bool isAiming  = weaponADS != null && weaponADS.IsAiming();
         float appliedAngle = isAiming
             ? currentCantAngle * adsCantMultiplier
             : currentCantAngle;
@@ -50,6 +79,9 @@ public class WeaponCant : MonoBehaviour
 
     public float GetCantFraction() =>
         cantAngle != 0 ? currentCantAngle / cantAngle : 0f;
+
+    // Returns true if any cant is active
+    public bool IsCanted() => cantedLeft || cantedRight;
 
     void OnDestroy()
     {

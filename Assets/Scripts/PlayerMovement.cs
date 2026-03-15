@@ -93,7 +93,7 @@ public class PlayerMovement : MonoBehaviour
         float speed = isSprinting ? runSpeed : walkSpeed;
 
         // Slow down when canted
-        if (weaponCant != null && Mathf.Abs(weaponCant.GetCantFraction()) > 0.1f)
+        if (weaponCant != null && weaponCant.IsCanted())
             speed *= cantSpeedMultiplier;
 
         Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
