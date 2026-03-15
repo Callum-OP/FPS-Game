@@ -35,7 +35,7 @@ public class PlayerMovement : MonoBehaviour
         moveAction   = new InputAction("Move",   binding: "<Keyboard>/w");
         lookAction   = new InputAction("Look",   binding: "<Mouse>/delta");
         jumpAction   = new InputAction("Jump",   binding: "<Keyboard>/space");
-        sprintAction = new InputAction("Sprint", binding: "<Keyboard>/leftShift");
+        sprintAction = new InputAction("Sprint", binding: "<Keyboard>/f");
 
         // WASD
         moveAction = new InputAction("Move");
