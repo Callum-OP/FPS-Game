@@ -17,6 +17,8 @@ public class WeaponController : MonoBehaviour
     public CameraRecoil cameraRecoil;
     public WeaponRecoil weaponRecoil;
 
+    public CasingEjector casingEjector;
+
     // HUD
     public System.Action<int, int> onAmmoChanged;
     public System.Action onReloadStart;
@@ -85,6 +87,9 @@ public class WeaponController : MonoBehaviour
         Vector3 spawnPos = muzzlePoint.position + muzzlePoint.forward * 0.5f;
         GameObject bullet = Instantiate(bulletPrefab, spawnPos, muzzlePoint.rotation);
         bullet.transform.forward = (targetPoint - spawnPos).normalized;
+
+        // Spawn casing
+        casingEjector.Eject();
 
         // Ignore player colliders
         Collider bulletCol = bullet.GetComponent<Collider>();

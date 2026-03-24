@@ -3,7 +3,7 @@ using UnityEngine;
 public class CameraLean : MonoBehaviour
 {
     [Header("Lean Settings")]
-    public float leanAngle = 35f; // Tilt
+    public float leanAngle = 25f; // Tilt
     public float leanYAngle = 10f;
     public float leanShift = 0.5f;
     public float leanSpeed = 6f;

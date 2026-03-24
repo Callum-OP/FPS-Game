@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 public class WeaponCant : MonoBehaviour
 {
     [Header("Cant Settings")]
-    public float cantAngle = 35f;
+    public float cantAngle = 25f;
     public float cantSpeed = 8f;
 
     [Header("ADS")]
