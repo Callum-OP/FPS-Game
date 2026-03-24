@@ -53,7 +53,7 @@ public class EnemyAI : MonoBehaviour
     private NavMeshAgent agent;
     private Health health;
     private Transform player;
-    private Health playerHealth;
+    private PlayerHealth playerHealth;
 
     private Vector3 lastKnownPlayerPos;
     private float investigateTimer;
@@ -75,7 +75,7 @@ public class EnemyAI : MonoBehaviour
         if (playerObj != null)
         {
             player       = playerObj.transform;
-            playerHealth = playerObj.GetComponent<Health>();
+            playerHealth = playerObj.GetComponent<PlayerHealth>();
         }
 
         // Connect to health events
@@ -223,7 +223,7 @@ public class EnemyAI : MonoBehaviour
         if (attackTimer <= 0f)
         {
             attackTimer = attackCooldown;
-            playerHealth?.TakeDamage(attackDamage);
+            playerHealth.TakeDamage(attackDamage);
             Debug.Log($"{name} attacked player for {attackDamage} damage");
         }
     }
