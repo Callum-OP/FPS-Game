@@ -5556,18 +5556,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Glock
       objectReference: {fileID: 0}
-    - target: {fileID: 8478530549928335133, guid: 0cec2e6f1358deb4aa3353026caf6001, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0.047
-      objectReference: {fileID: 0}
-    - target: {fileID: 8478530549928335133, guid: 0cec2e6f1358deb4aa3353026caf6001, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.083
-      objectReference: {fileID: 0}
-    - target: {fileID: 8478530549928335133, guid: 0cec2e6f1358deb4aa3353026caf6001, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0.11
-      objectReference: {fileID: 0}
     - target: {fileID: 8896027694836095892, guid: 0cec2e6f1358deb4aa3353026caf6001, type: 3}
       propertyPath: fpCamera
       value: 
@@ -5579,8 +5567,36 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5757596387133068881, guid: 0cec2e6f1358deb4aa3353026caf6001, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5524774948989388134}
   m_SourcePrefab: {fileID: 100100000, guid: 0cec2e6f1358deb4aa3353026caf6001, type: 3}
+--- !u!1 &5524774948989388133 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5757596387133068881, guid: 0cec2e6f1358deb4aa3353026caf6001, type: 3}
+  m_PrefabInstance: {fileID: 5295329212501315829}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5524774948989388134
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5524774948989388133}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba323454735e4d548a90aa12eec2d51c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  loweredPosition: {x: 0, y: -0.4, z: 0.3}
+  loweredRotation: {x: 30, y: 0, z: 0}
+  lowerSpeed: 8
+  raisedSpeed: 10
+  fastWalkMultiplier: 1.5
+  playerMovement: {fileID: 469436034}
+  weaponADS: {fileID: 1116629486051919613}
+  weaponController: {fileID: 2707417925753392772}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

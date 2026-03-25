@@ -11,6 +11,8 @@ public class PlayerMovement : MonoBehaviour
     public float jumpHeight = 1.5f;
     public float gravity = -19.62f;
 
+    private float speedMultiplier = 1f;
+
     [Header("Mouse Look")]
     public float mouseSensitivity = 0.2f;
     public Transform cameraTransform;
@@ -64,6 +66,11 @@ public class PlayerMovement : MonoBehaviour
         HandleMovement();
     }
 
+    public void SetSpeedMultiplier(float multiplier)
+    {
+        speedMultiplier = multiplier;
+    }
+
     void HandleMouseLook()
     {
         Vector2 lookInput = lookAction.ReadValue<Vector2>();
@@ -91,6 +98,9 @@ public class PlayerMovement : MonoBehaviour
         bool isSprinting  = sprintAction.ReadValue<float>() > 0.5f;
 
         float speed = isSprinting ? runSpeed : walkSpeed;
+
+        // Apply all multipliers
+        speed *= speedMultiplier;
 
         // Slow down when canted
         if (weaponCant != null && weaponCant.IsCanted())
