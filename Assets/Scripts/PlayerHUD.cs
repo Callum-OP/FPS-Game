@@ -103,7 +103,7 @@ public class PlayerHUD : MonoBehaviour
         gameOverScreen.SetActive(true);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-        Time.timeScale = 0.3f;  // dramatic slow down on death
+        Time.timeScale = 0.3f;  // Slow down on death
     }
 
     public void RestartGame()
@@ -117,15 +117,15 @@ public class PlayerHUD : MonoBehaviour
         if (playerHealth != null)
         {
             playerHealth.onHealthChanged -= UpdateHealthBar;
-            playerHealth.onDamaged       -= TriggerDamageFlash;
-            playerHealth.onDeath         -= TriggerGameOver;
+            playerHealth.onDamaged -= TriggerDamageFlash;
+            playerHealth.onDeath -= TriggerGameOver;
         }
 
         if (weaponController != null)
         {
-            weaponController.onAmmoChanged  -= UpdateAmmo;
-            weaponController.onReloadStart  -= ShowReloading;
-            weaponController.onReloadEnd    -= HideReloading;
+            weaponController.onAmmoChanged -= UpdateAmmo;
+            weaponController.onReloadStart -= ShowReloading;
+            weaponController.onReloadEnd -= HideReloading;
         }
     }
 }

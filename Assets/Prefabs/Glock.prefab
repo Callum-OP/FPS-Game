@@ -302,6 +302,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4722052728427975811}
+  - component: {fileID: 3029241607278015854}
   m_Layer: 0
   m_Name: GunHolder
   m_TagString: Untagged
@@ -327,6 +328,26 @@ Transform:
   - {fileID: 8478530549928335133}
   m_Father: {fileID: 2997449947652762849}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3029241607278015854
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5757596387133068881}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba323454735e4d548a90aa12eec2d51c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  loweredPosition: {x: 0, y: -0.4, z: 0.3}
+  loweredRotation: {x: 30, y: 0, z: 0}
+  lowerSpeed: 8
+  raisedSpeed: 10
+  fastWalkMultiplier: 1.5
+  playerMovement: {fileID: 0}
+  weaponADS: {fileID: 3005799825063372924}
+  weaponController: {fileID: 8896027694836095892}
 --- !u!1 &5819590082487473703
 GameObject:
   m_ObjectHideFlags: 0
@@ -437,9 +458,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   casingPrefab: {fileID: 8122246384690150535, guid: 0ac39c155019f8e4a8c54642002580e8, type: 3}
   ejectionPoint: {fileID: 8478530549928335133}
-  ejectionForce: 5
-  upwardForce: 2
-  torqueForce: 10
+  ejectionForce: 3
+  upwardForce: 1
+  torqueForce: 4
   destroyDelay: 5
 --- !u!1 &5878039580499291862
 GameObject:

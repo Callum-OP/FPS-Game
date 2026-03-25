@@ -5,9 +5,9 @@ public class CasingEjector : MonoBehaviour
     [Header("Settings")]
     public GameObject casingPrefab;
     public Transform ejectionPoint;
-    public float ejectionForce = 5f;
-    public float upwardForce = 2f;
-    public float torqueForce = 10f;
+    public float ejectionForce = 3f;
+    public float upwardForce = 1f;
+    public float torqueForce = 4f;
     public float destroyDelay = 5f;
 
     public void Eject()

@@ -23,14 +23,13 @@ public class WeaponSway : MonoBehaviour
 
     void Start()
     {
-        initialPosition = transform.localPosition;
+        initialPosition = Vector3.zero;
     }
 
     void Update()
     {
         Vector2 lookInput = lookAction.ReadValue<Vector2>();
 
-        // Reduce sway when aiming
         float multiplier = (weaponADS != null && weaponADS.IsAiming())
             ? adsSwayMultiplier : 1f;
 
@@ -39,7 +38,8 @@ public class WeaponSway : MonoBehaviour
         float swayY = Mathf.Clamp(-lookInput.y * swayAmount * multiplier,
             -maxSwayAmount, maxSwayAmount);
 
-        Vector3 targetSwayPos = initialPosition + new Vector3(swayX, swayY, 0f);
+        // Sway offsets from zero
+        Vector3 targetSwayPos = new Vector3(swayX, swayY, 0f);
 
         transform.localPosition = Vector3.Lerp(
             transform.localPosition, targetSwayPos, swaySmooth * Time.deltaTime);
