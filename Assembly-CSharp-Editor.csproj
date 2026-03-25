@@ -50,6 +50,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\TutorialInfo\Scripts\Editor\ReadmeEditor.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\polygonShader_UI.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\PolygonShaderGUI.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\SyntyPackageHelper\Editor\SyntyPackageHelper.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\SyntyPackageHelper\Editor\SyntyPackageHelperConfig.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\polygonShaderTransparent_UI.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\PolygonTransparencyShaderGUI.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

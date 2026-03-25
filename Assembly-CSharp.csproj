@@ -52,10 +52,12 @@
     <Compile Include="Assets\Materials\Placeholder\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Inspector\MaterialHiderManager.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextEventHandler.cs" />
     <Compile Include="Assets\Scripts\WeaponCant.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\PolygonGeneric\Scripts\Generic_SimpleRotate.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\EnvMapAnimator.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextSelector_A.cs" />
     <Compile Include="Assets\Materials\Placeholder\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Inspector\MaterialHider.cs" />
     <Compile Include="Assets\Scripts\LowerWeapon.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\PolygonGeneric\Scripts\Generic_WaterBob.cs" />
     <Compile Include="Assets\Materials\Placeholder\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Rotatable.cs" />
     <Compile Include="Assets\Scripts\CameraRecoil.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\Benchmark02.cs" />
@@ -81,6 +83,7 @@
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\SkewTextExample.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\WarpTextExample.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\ShaderPropAnimator.cs" />
+    <Compile Include="Assets\Materials\Placeholder\Synty\PolygonGeneric\Scripts\Generic_SimpleTranslate.cs" />
     <Compile Include="Assets\Scripts\AmmoHUD.cs" />
     <Compile Include="Assets\Materials\Placeholder\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\FenceData.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextInfoDebugTool.cs" />
