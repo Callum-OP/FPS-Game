@@ -29,6 +29,11 @@ public class WeaponController : MonoBehaviour
     private int currentAmmo;
     private bool isReloading;
 
+    [Header("Audio")]
+    public AudioClip gunshotClip;
+    public AudioClip reloadClip;
+    public AudioClip emptyClickClip;
+
     void Awake()
     {
         if (fpCamera == null) fpCamera = Camera.main;
@@ -73,6 +78,9 @@ public class WeaponController : MonoBehaviour
         currentAmmo--;
         onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
 
+        // Gunshot sound
+        AudioManager.Instance?.Play(gunshotClip);
+
         // Fire recoil on both camera and gun
         cameraRecoil?.ApplyRecoil();
         weaponRecoil?.ApplyRecoil();
@@ -115,6 +123,9 @@ public class WeaponController : MonoBehaviour
         onReloadEnd?.Invoke();
         onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
         Debug.Log("Reloaded!");
+
+        // Gunshot sound
+        AudioManager.Instance?.Play(reloadClip);
     }
 
     public int  GetCurrentAmmo()  => currentAmmo;

@@ -15,6 +15,13 @@ public class PlayerHealth : MonoBehaviour
     private float regenTimer;
     private bool isDead = false;
 
+    [Header("Audio")]
+    public AudioClip[] hurtClips;
+    public AudioClip deathClip;
+
+    private float lastHurtTime = -999f;
+    public float hurtSoundCooldown = 1.5f;
+
     // Events for HUD
     public System.Action<float> onHealthChanged;
     public System.Action onDeath;
@@ -46,6 +53,7 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    // Player is hit
     public void TakeDamage(float amount)
     {
         if (isDead) return;
@@ -56,10 +64,17 @@ public class PlayerHealth : MonoBehaviour
         onHealthChanged?.Invoke(currentHealth / maxHealth);
         onDamaged?.Invoke();
 
-        Debug.Log($"Player took {amount} damage — {currentHealth} HP remaining");
+        // Play random hurt sound with cooldown
+        if (Time.time - lastHurtTime >= hurtSoundCooldown)
+        {
+            lastHurtTime = Time.time;
+            if (hurtClips.Length > 0)
+                AudioManager.Instance?.Play(
+                    hurtClips[Random.Range(0, hurtClips.Length)]);
+        }
 
-        if (currentHealth <= 0f) Die();
-    }
+            if (currentHealth <= 0f) Die();
+        }
 
     public void Heal(float amount)
     {
@@ -68,11 +83,14 @@ public class PlayerHealth : MonoBehaviour
         onHealthChanged?.Invoke(currentHealth / maxHealth);
     }
 
+    // Player is dead
     void Die()
     {
         isDead = true;
         onDeath?.Invoke();
-        Debug.Log("Player died!");
+
+        // Play dead sound
+        AudioManager.Instance?.Play(deathClip);
     }
 
     public float GetHealthFraction() => currentHealth / maxHealth;

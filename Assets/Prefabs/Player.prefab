@@ -370,6 +370,11 @@ MonoBehaviour:
   canRegen: 1
   regenDelay: 5
   regenRate: 5
+  hurtClips:
+  - {fileID: 8300000, guid: 601c8fc5e65e94a4e82ae1eb479361b8, type: 3}
+  - {fileID: 8300000, guid: 25d6e308102bcb3498a9e0c17933e4b4, type: 3}
+  deathClip: {fileID: 8300000, guid: ea3d6b45e3c435646bdd04ac8f8b77ba, type: 3}
+  hurtSoundCooldown: 1.5
 --- !u!1001 &7899955056430023538
 PrefabInstance:
   m_ObjectHideFlags: 0
