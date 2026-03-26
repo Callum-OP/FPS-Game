@@ -8,6 +8,8 @@
 
 [Aa]ssets/Plugins/Editor/JetBrains*
 Assets/Materials/Placeholder
+Assets/Resources/3DObjects
+Assets/Resources/Audio
 
 *.DotSettings.user
 
