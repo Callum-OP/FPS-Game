@@ -13,10 +13,19 @@ Has audio for shooting, reloading and damage and deaths, audio is unique to each
 
 A basic map layout, with the first scene being a club style location.
 
-# Features to consider
+# Features to complete
+Each gun should have limited mag counts.
+Mags may be lying around the world and can be picked up, with enemies dropping relevant mag types as well as guns upon death.
+
+Change pickups to show button to be pressed, only when the weapon or mag in front of player crosshair. As well as ideally pickup weapon at crosshair first, over any other weapons including closer ones.
+
+Need to create an animation of emptying mag and reloading.
+
+The slide of gun needs to move back when shooting and go all back when empty.
 
 Grenades.
 
+# Features to consider
 Crouch and stealth with option to do takedown on enemies if you manage to sneak up on them.
 
 Add unlockable extras? such as:
