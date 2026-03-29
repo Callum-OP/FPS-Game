@@ -9,13 +9,26 @@ public class WeaponController : MonoBehaviour
     public Transform muzzlePoint;
 
     [Header("Ammo")]
+    public float fireRate = 0.1f;
     public int maxAmmo = 30;
     public float reloadTime = 1.5f;
     public bool isAutomatic = false;
 
+    [Header("Shotgun")]
+    public bool isShotgun = false;
+    public int pelletCount = 8;
+    public float spreadAngle = 10f;
+
+    protected float nextFireTime;
+
     [Header("Recoil")]
     public CameraRecoil cameraRecoil;
     public WeaponRecoil weaponRecoil;
+
+    [Header("Audio")]
+    public AudioClip gunshotClip;
+    public AudioClip reloadClip;
+    public AudioClip emptyClickClip;
 
     public CasingEjector casingEjector;
 
@@ -29,16 +42,18 @@ public class WeaponController : MonoBehaviour
     private int currentAmmo;
     private bool isReloading;
 
-    [Header("Audio")]
-    public AudioClip gunshotClip;
-    public AudioClip reloadClip;
-    public AudioClip emptyClickClip;
-
     void Awake()
     {
+        // Auto find camera
         if (fpCamera == null) fpCamera = Camera.main;
 
-        fireAction = new InputAction("Fire",   binding: "<Mouse>/leftButton");
+        // Auto find recoil scripts if not assigned
+        if (cameraRecoil == null)
+            cameraRecoil = fpCamera.GetComponent<CameraRecoil>();
+        if (weaponRecoil == null)
+            weaponRecoil = GetComponentInChildren<WeaponRecoil>();
+
+        fireAction   = new InputAction("Fire",   binding: "<Mouse>/leftButton");
         reloadAction = new InputAction("Reload", binding: "<Keyboard>/r");
         fireAction.Enable();
         reloadAction.Enable();
@@ -58,6 +73,13 @@ public class WeaponController : MonoBehaviour
 
         if (currentAmmo <= 0)
         {
+            // Play empty click when trying to fire
+            bool tryingToFire = isAutomatic
+                ? fireAction.ReadValue<float>() > 0.5f
+                : fireAction.WasPressedThisFrame();
+            if (tryingToFire)
+                AudioManager.Instance?.Play(emptyClickClip);
+
             StartCoroutine(Reload());
             return;
         }
@@ -66,8 +88,11 @@ public class WeaponController : MonoBehaviour
             ? fireAction.ReadValue<float>() > 0.5f
             : fireAction.WasPressedThisFrame();
 
-        if (shouldFire)
+        if (shouldFire && Time.time >= nextFireTime)
+        {
+            nextFireTime = Time.time + fireRate;
             Shoot();
+        }
     }
 
     void Shoot()
@@ -78,12 +103,11 @@ public class WeaponController : MonoBehaviour
         currentAmmo--;
         onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
 
-        // Gunshot sound
         AudioManager.Instance?.Play(gunshotClip);
 
-        // Fire recoil on both camera and gun
-        cameraRecoil?.ApplyRecoil();
+        // Apply weapon recoil first, then camera recoil scales with it
         weaponRecoil?.ApplyRecoil();
+        cameraRecoil?.ApplyRecoil();
 
         // Get crosshair target
         Ray ray = fpCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
@@ -91,23 +115,85 @@ public class WeaponController : MonoBehaviour
             ? hit.point
             : ray.GetPoint(300f);
 
-        // Spawn bullet
+        if (isShotgun)
+            FireShotgun(targetPoint);
+        else
+            FireBullet(targetPoint);
+
+        casingEjector?.Eject();
+    }
+
+    void FireBullet(Vector3 targetPoint)
+    {
         Vector3 spawnPos = muzzlePoint.position + muzzlePoint.forward * 0.5f;
         GameObject bullet = Instantiate(bulletPrefab, spawnPos, muzzlePoint.rotation);
-        bullet.transform.forward = (targetPoint - spawnPos).normalized;
+        Vector3 aimDir = (targetPoint - fpCamera.transform.position).normalized;
+        bullet.transform.forward = aimDir;
 
-        // Spawn casing
-        casingEjector.Eject();
+        SetupBullet(bullet, aimDir);
+        IgnorePlayerColliders(bullet);
+    }
 
-        // Ignore player colliders
-        Collider bulletCol = bullet.GetComponent<Collider>();
-        if (bulletCol != null)
+    void FireShotgun(Vector3 targetPoint)
+    {
+        // Spawn several bullets like shotgun pellets
+        for (int i = 0; i < pelletCount; i++)
         {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-                foreach (Collider col in player.GetComponentsInChildren<Collider>())
-                    Physics.IgnoreCollision(bulletCol, col);
+            // Same spawn position and direction as normal bullet
+            Vector3 spawnPos = muzzlePoint.position + muzzlePoint.forward * 0.5f;
+            Vector3 aimDir = (targetPoint - fpCamera.transform.position).normalized;
+
+            // Add random spread on top
+            aimDir += new Vector3(
+                Random.Range(-spreadAngle, spreadAngle) * 0.01f,
+                Random.Range(-spreadAngle, spreadAngle) * 0.01f,
+                0f);
+            aimDir.Normalize();
+
+            // Spawn bullet
+            GameObject bullet = Instantiate(bulletPrefab, spawnPos, muzzlePoint.rotation);
+            bullet.transform.forward = aimDir;
+
+            Rigidbody rb = bullet.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.useGravity = false;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rb.linearVelocity = aimDir * 80f;
+            }
+
+            // Ignore player colliders
+            Collider bulletCol = bullet.GetComponent<Collider>();
+            if (bulletCol != null)
+            {
+                GameObject player = GameObject.FindGameObjectWithTag("Player");
+                if (player != null)
+                    foreach (Collider col in player.GetComponentsInChildren<Collider>())
+                        Physics.IgnoreCollision(bulletCol, col);
+            }
         }
+    }
+
+    void SetupBullet(GameObject bullet, Vector3 aimDir)
+    {
+        Rigidbody rb = bullet.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.useGravity = false;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            rb.linearVelocity = aimDir * 80f;
+        }
+    }
+
+    void IgnorePlayerColliders(GameObject bullet)
+    {
+        Collider bulletCol = bullet.GetComponent<Collider>();
+        if (bulletCol == null) return;
+
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+            foreach (Collider col in player.GetComponentsInChildren<Collider>())
+                Physics.IgnoreCollision(bulletCol, col);
     }
 
     IEnumerator Reload()
@@ -122,15 +208,12 @@ public class WeaponController : MonoBehaviour
         isReloading = false;
         onReloadEnd?.Invoke();
         onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
-        Debug.Log("Reloaded!");
-
-        // Gunshot sound
         AudioManager.Instance?.Play(reloadClip);
     }
 
-    public int  GetCurrentAmmo()  => currentAmmo;
-    public int  GetMaxAmmo()      => maxAmmo;
-    public bool GetIsReloading()  => isReloading;
+    public int   GetCurrentAmmo()  => currentAmmo;
+    public int   GetMaxAmmo()      => maxAmmo;
+    public bool  GetIsReloading()  => isReloading;
 
     void OnDestroy()
     {

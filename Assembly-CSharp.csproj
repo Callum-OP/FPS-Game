@@ -87,7 +87,9 @@
     <Compile Include="Assets\Scripts\AmmoHUD.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextInfoDebugTool.cs" />
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Inspector\AnInspector.cs" />
+    <Compile Include="Assets\Scripts\PlayerSetup.cs" />
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Inspector\MaterialHiderManager.cs" />
+    <Compile Include="Assets\Scripts\WeaponPickup.cs" />
     <Compile Include="Assets\Scripts\PlayerHUD.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\VertexShakeA.cs" />
     <Compile Include="Assets\Resources\3DObjects\Synty\PolygonGeneric\Scripts\Generic_SimpleTranslate.cs" />
@@ -122,6 +124,7 @@
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\RotatableObject.cs" />
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\ShiftableObject.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TextMeshProFloatingText.cs" />
+    <Compile Include="Assets\Scripts\WeaponDrop.cs" />
     <Compile Include="Assets\Resources\3DObjects\Synty\PolygonGeneric\Scripts\Generic_SimpleRotate.cs" />
   </ItemGroup>
   <ItemGroup>

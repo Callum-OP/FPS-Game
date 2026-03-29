@@ -23,24 +23,30 @@ public class PlayerHUD : MonoBehaviour
     public PlayerHealth playerHealth;
     public WeaponController weaponController;
 
+
     void Start()
     {
         // Subscribe to health events
         playerHealth.onHealthChanged += UpdateHealthBar;
-        playerHealth.onDamaged       += TriggerDamageFlash;
-        playerHealth.onDeath         += TriggerGameOver;
+        playerHealth.onDamaged += TriggerDamageFlash;
+        playerHealth.onDeath += TriggerGameOver;
 
-        // Subscribe to weapon events
-        weaponController.onAmmoChanged  += UpdateAmmo;
-        weaponController.onReloadStart  += ShowReloading;
-        weaponController.onReloadEnd    += HideReloading;
+        // Only wire weapon if one exists
+        if (weaponController != null)
+        {
+            // Subscribe to weapon events
+            weaponController.onAmmoChanged += UpdateAmmo;
+            weaponController.onReloadStart += ShowReloading;
+            weaponController.onReloadEnd += HideReloading;
+        }
+        else
+        {
+            ammoText.text = "--";
+        }
 
-        // Init
         gameOverScreen.SetActive(false);
         damageFlash.color = Color.clear;
-
         UpdateHealthBar(1f);
-        UpdateAmmo(weaponController.GetCurrentAmmo(), weaponController.GetMaxAmmo());
     }
 
     // Health
@@ -76,16 +82,16 @@ public class PlayerHUD : MonoBehaviour
     }
 
     // Ammo
-    void UpdateAmmo(int current, int max) =>
-        ammoText.text = $"{current} / {max}";
+    public void UpdateAmmo(int current, int max)
+        => ammoText.text = $"{current} / {max}";
 
-    void ShowReloading()
+    public void ShowReloading()
     {
         if (reloadText != null) reloadText.gameObject.SetActive(true);
         ammoText.text = "";
     }
 
-    void HideReloading()
+    public void HideReloading()
     {
         if (reloadText != null) reloadText.gameObject.SetActive(false);
         UpdateAmmo(weaponController.GetCurrentAmmo(), weaponController.GetMaxAmmo());

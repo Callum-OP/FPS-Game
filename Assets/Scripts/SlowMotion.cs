@@ -5,7 +5,7 @@ public class SlowMotion : MonoBehaviour
 {
     [Header("Settings")]
     public float slowScale = 0.1f;
-    public float slowDuration = 3f;
+    public float slowDuration = 5f;
     public float recoverSpeed = 2f;
 
     private InputAction slowMoAction;
