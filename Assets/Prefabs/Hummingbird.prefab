@@ -77,8 +77,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   kickBack: 0
-  kickUp: -0.02
-  rotationKick: 3
+  kickUp: 0
+  rotationKick: 0
   recoverySpeed: 35
   weaponADS: {fileID: 6147061816424425655}
   adsRecoilMultiplier: 0.3
@@ -200,7 +200,7 @@ MonoBehaviour:
   casingPrefab: {fileID: 8122246384690150535, guid: 0ac39c155019f8e4a8c54642002580e8, type: 3}
   ejectionPoint: {fileID: 6915021934541660955}
   ejectionForce: 3
-  upwardForce: 1
+  upwardForce: 0
   torqueForce: 4
   destroyDelay: 5
 --- !u!1 &5983984030253052907

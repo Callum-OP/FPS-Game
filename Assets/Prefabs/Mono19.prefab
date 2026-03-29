@@ -98,7 +98,7 @@ MonoBehaviour:
   kickUp: 0.06
   rotationKick: 18
   recoverySpeed: 10
-  weaponADS: {fileID: 4050036281214266132}
+  weaponADS: {fileID: 0}
   adsRecoilMultiplier: 0.3
 --- !u!1 &4070604163643981487
 GameObject:
@@ -236,7 +236,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5051726488920959248
 Transform:
   m_ObjectHideFlags: 0
@@ -307,15 +307,19 @@ MonoBehaviour:
   fpCamera: {fileID: 0}
   bulletPrefab: {fileID: 4598212022487192858, guid: 9046df2f69dd06b40870ea927989d7f6, type: 3}
   muzzlePoint: {fileID: 8886264841183267939}
+  fireRate: 0.1
   maxAmmo: 15
   reloadTime: 1
   isAutomatic: 0
+  isShotgun: 0
+  pelletCount: 8
+  spreadAngle: 10
   cameraRecoil: {fileID: 0}
   weaponRecoil: {fileID: 1724659169839354462}
-  casingEjector: {fileID: 8062613760908901136}
   gunshotClip: {fileID: 8300000, guid: ff63e44af37214e44942f3c1f8d806c2, type: 3}
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
+  casingEjector: {fileID: 8062613760908901136}
 --- !u!114 &8062613760908901136
 MonoBehaviour:
   m_ObjectHideFlags: 0

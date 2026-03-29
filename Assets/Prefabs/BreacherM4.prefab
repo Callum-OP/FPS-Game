@@ -105,7 +105,7 @@ Transform:
   m_GameObject: {fileID: 1915732997041258800}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.006, y: 0.045, z: 0.786}
+  m_LocalPosition: {x: -0.006, y: 0.045, z: 0.826}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -305,7 +305,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponController
   fpCamera: {fileID: 0}
-  bulletPrefab: {fileID: 4598212022487192858, guid: 9046df2f69dd06b40870ea927989d7f6, type: 3}
+  bulletPrefab: {fileID: 1419992393118297956, guid: b12083c72e62959458d5b786f732cf30, type: 3}
   muzzlePoint: {fileID: 7822128958796435203}
   fireRate: 0.1
   maxAmmo: 8
@@ -332,7 +332,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6feaa9f9b94634640a12f72fec5257d7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  casingPrefab: {fileID: 8122246384690150535, guid: 0ac39c155019f8e4a8c54642002580e8, type: 3}
+  casingPrefab: {fileID: 6573978681752998840, guid: 20847e505208a774d91134a8674ea0a0, type: 3}
   ejectionPoint: {fileID: 5311319321076708714}
   ejectionForce: 3
   upwardForce: 1

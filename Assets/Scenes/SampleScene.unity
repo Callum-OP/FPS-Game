@@ -3928,7 +3928,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1118620770691677480, guid: 94da89d0446a7d548a00ad91176e4cdd, type: 3}
       propertyPath: m_Name
-      value: Handgun9Pickup
+      value: Mono19Pickup
       objectReference: {fileID: 0}
     - target: {fileID: 1802281273970817162, guid: 94da89d0446a7d548a00ad91176e4cdd, type: 3}
       propertyPath: m_Size.x
@@ -17488,7 +17488,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2646546962369989747, guid: db365bd36170f3d45865a3e38899ff3e, type: 3}
       propertyPath: m_Name
-      value: SMG45Pickup
+      value: HummingbirdPickup
       objectReference: {fileID: 0}
     - target: {fileID: 3673599093087707525, guid: db365bd36170f3d45865a3e38899ff3e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -17842,6 +17842,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   fpCamera: {fileID: 1832091816822013624}
   activeWeapon: {fileID: 141740878889191493}
+  playerMovement: {fileID: 0}
+  playerHealth: {fileID: 0}
+  cameraRecoil: {fileID: 0}
+  weaponRecoil: {fileID: 0}
+  weaponADS: {fileID: 0}
+  weaponSway: {fileID: 0}
+  weaponCant: {fileID: 0}
+  cameraLean: {fileID: 0}
+  lowerWeapon: {fileID: 0}
+  playerHUD: {fileID: 0}
+  ammoHUD: {fileID: 0}
 --- !u!114 &9090692332938233529
 MonoBehaviour:
   m_ObjectHideFlags: 0

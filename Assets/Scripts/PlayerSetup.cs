@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections;
 
 public class PlayerSetup : MonoBehaviour
 {
@@ -8,22 +7,25 @@ public class PlayerSetup : MonoBehaviour
     public WeaponController activeWeapon;
 
     // Auto found
-    private PlayerMovement playerMovement;
-    private PlayerHealth playerHealth;
-    private CameraRecoil cameraRecoil;
-    private WeaponRecoil weaponRecoil;
-    private WeaponADS weaponADS;
-    private WeaponSway weaponSway;
-    private WeaponCant weaponCant;
-    private CameraLean cameraLean;
-    private LowerWeapon lowerWeapon;
-    private PlayerHUD playerHUD;
-    private AmmoHUD ammoHUD;
+    [HideInInspector] public PlayerMovement playerMovement;
+    [HideInInspector] public PlayerHealth playerHealth;
+    [HideInInspector] public CameraRecoil cameraRecoil;
+    [HideInInspector] public WeaponRecoil weaponRecoil;
+    [HideInInspector] public WeaponADS weaponADS;
+    [HideInInspector] public WeaponSway weaponSway;
+    [HideInInspector] public WeaponCant weaponCant;
+    [HideInInspector] public CameraLean cameraLean;
+    [HideInInspector] public LowerWeapon lowerWeapon;
+    [HideInInspector] public PlayerHUD playerHUD;
+    [HideInInspector] public AmmoHUD ammoHUD;
 
     void Awake()
     {
         GatherComponents();
-        WireEverything();
+        WireStatic();
+
+        if (activeWeapon != null)
+            WireWeapon(activeWeapon);
     }
 
     void GatherComponents()
@@ -32,75 +34,89 @@ public class PlayerSetup : MonoBehaviour
 
         playerMovement = GetComponent<PlayerMovement>();
         playerHealth = GetComponent<PlayerHealth>();
-        cameraRecoil = fpCamera.GetComponent<CameraRecoil>();
-        weaponRecoil = fpCamera.GetComponentInChildren<WeaponRecoil>();
-        weaponADS = fpCamera.GetComponentInChildren<WeaponADS>();
-        weaponSway = fpCamera.GetComponentInChildren<WeaponSway>();
-        weaponCant = fpCamera.GetComponentInChildren<WeaponCant>();
-        cameraLean = fpCamera.GetComponent<CameraLean>();
-        lowerWeapon = fpCamera.GetComponentInChildren<LowerWeapon>();
 
-        // Find HUD scripts anywhere in scene
+        // These are on the camera itself
+        cameraRecoil = fpCamera.GetComponent<CameraRecoil>();
+        cameraLean = fpCamera.GetComponent<CameraLean>();
+
         playerHUD = FindFirstObjectByType<PlayerHUD>();
         ammoHUD = FindFirstObjectByType<AmmoHUD>();
 
-        // Log what was found
-        Debug.Log($"PlayerSetup found — " +
-            $"Movement:{playerMovement != null} " +
-            $"Health:{playerHealth != null} " +
-            $"CameraRecoil:{cameraRecoil != null} " +
-            $"WeaponRecoil:{weaponRecoil != null} " +
-            $"ADS:{weaponADS != null} " +
-            $"HUD:{playerHUD != null}");
-    }
-
-    void WireEverything()
-    {
-        WireCamera();
-        WireMovement();
-        WireHUD();
-
+        // Weapon specific components gathered from active weapon
         if (activeWeapon != null)
-            WireWeapon(activeWeapon);
+            GatherWeaponComponents(activeWeapon);
     }
 
-    void WireCamera()
+    void GatherWeaponComponents(WeaponController weapon)
+    {
+        // All these live in the weapon hierarchy
+        weaponCant = weapon.GetComponentInChildren<WeaponCant>(true);
+        weaponRecoil = weapon.GetComponentInChildren<WeaponRecoil>(true);
+        weaponADS = weapon.GetComponentInChildren<WeaponADS>(true);
+        weaponSway = weapon.GetComponentInChildren<WeaponSway>(true);
+        lowerWeapon = weapon.GetComponentInChildren<LowerWeapon>(true);
+
+        Debug.Log($"Gathered from weapon {weapon.name} — " +
+            $"Cant:{weaponCant != null} " +
+            $"Recoil:{weaponRecoil != null} " +
+            $"ADS:{weaponADS != null}");
+    }
+
+    // Things that never change regardless of weapon
+    void WireStatic()
     {
         if (playerMovement != null)
             playerMovement.cameraTransform = fpCamera.transform;
 
-        if (weaponADS != null)
+        if (playerHUD != null)
+            playerHUD.playerHealth = playerHealth;
+    }
+
+    // Everything that needs rewiring when weapon changes
+    void WireDynamic(WeaponController weapon)
+    {
+        // PlayerMovement
+        if (playerMovement != null)
         {
-            weaponADS.fpCamera = fpCamera;
-            weaponADS.weaponCant = weaponCant;
+            playerMovement.weaponCant = weaponCant;
         }
 
+        // CameraRecoil
+        if (cameraRecoil != null)
+            cameraRecoil.weaponADS = weaponADS;
+
+        // CameraLean
+        if (cameraLean != null)
+        {
+            cameraLean.weaponCant = weaponCant;
+            cameraLean.weaponHolder = weapon.transform;
+        }
+
+        // WeaponCant
+        if (weaponCant != null)
+            weaponCant.weaponADS = weaponADS;
+
+        // WeaponSway
         if (weaponSway != null)
             weaponSway.weaponADS = weaponADS;
 
-        if (cameraLean != null)
-            cameraLean.weaponCant = weaponCant;
+        // WeaponRecoil
+        if (weaponRecoil != null)
+            weaponRecoil.weaponADS = weaponADS;
 
+        // LowerWeapon
         if (lowerWeapon != null)
         {
             lowerWeapon.playerMovement = playerMovement;
             lowerWeapon.weaponADS = weaponADS;
         }
 
-        if (cameraRecoil != null)
-            cameraRecoil.weaponADS = weaponADS;
-    }
-
-    void WireMovement()
-    {
-        if (playerMovement == null) return;
-        playerMovement.weaponCant = weaponCant;
-    }
-
-    void WireHUD()
-    {
-        if (playerHUD != null)
-            playerHUD.playerHealth = playerHealth;
+        // WeaponADS
+        if (weaponADS != null)
+        {
+            weaponADS.fpCamera = fpCamera;
+            weaponADS.weaponCant = weaponCant;
+        }
     }
 
     public void WireWeapon(WeaponController weapon)
@@ -117,30 +133,32 @@ public class PlayerSetup : MonoBehaviour
 
         activeWeapon = weapon;
 
-        // Wire weapon to player systems
-        weapon.fpCamera     = fpCamera;
+        // Regather weapon components from NEW weapon
+        GatherWeaponComponents(weapon);
+
+        // Wire weapon core
+        weapon.fpCamera = fpCamera;
         weapon.cameraRecoil = cameraRecoil;
         weapon.weaponRecoil = weaponRecoil;
 
-        // Wire weapon to HUD
+        // Rewire everything with fresh references
+        WireDynamic(weapon);
+
+        // Wire HUD
         if (playerHUD != null)
         {
             weapon.onAmmoChanged += playerHUD.UpdateAmmo;
             weapon.onReloadStart += playerHUD.ShowReloading;
             weapon.onReloadEnd += playerHUD.HideReloading;
-            weapon.onAmmoChanged?.Invoke(
-                weapon.GetCurrentAmmo(), weapon.GetMaxAmmo());
+            playerHUD.UpdateAmmo(weapon.GetCurrentAmmo(), weapon.GetMaxAmmo());
         }
 
         if (ammoHUD != null)
             ammoHUD.weapon = weapon;
-
-        Debug.Log($"PlayerSetup: Wired {weapon.name}");
     }
 
     public void SwapWeapon(WeaponController newWeapon)
     {
-        // Drop current weapon if holding one
         if (activeWeapon != null)
         {
             WeaponDrop drop = GetComponent<WeaponDrop>();

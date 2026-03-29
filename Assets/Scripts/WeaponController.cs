@@ -134,45 +134,66 @@ public class WeaponController : MonoBehaviour
         IgnorePlayerColliders(bullet);
     }
 
-    void FireShotgun(Vector3 targetPoint)
+void FireShotgun(Vector3 targetPoint)
+{
+    // Arrange pellets in a circle around muzzle point
+    for (int i = 0; i < pelletCount; i++)
     {
-        // Spawn several bullets like shotgun pellets
-        for (int i = 0; i < pelletCount; i++)
+        // Space pellets evenly in a circle
+        float angle = (360f / pelletCount) * i;
+        float radius = 0.05f; // How spread out the spawn points are
+
+        Vector3 offset = new Vector3(
+            Mathf.Cos(angle * Mathf.Deg2Rad) * radius,
+            Mathf.Sin(angle * Mathf.Deg2Rad) * radius,
+            0f);
+
+        Vector3 spawnPos = muzzlePoint.position
+            + muzzlePoint.forward * 0.5f
+            + muzzlePoint.TransformDirection(offset);
+
+        // Base aim direction toward crosshair
+        Vector3 aimDir = (targetPoint - fpCamera.transform.position).normalized;
+
+        // Add directional spread per pellet
+        aimDir += new Vector3(
+            Random.Range(-spreadAngle, spreadAngle) * 0.01f,
+            Random.Range(-spreadAngle, spreadAngle) * 0.01f,
+            0f);
+        aimDir.Normalize();
+
+        GameObject bullet = Instantiate(bulletPrefab, spawnPos, muzzlePoint.rotation);
+        bullet.transform.forward = aimDir;
+
+        Rigidbody rb = bullet.GetComponent<Rigidbody>();
+        if (rb != null)
         {
-            // Same spawn position and direction as normal bullet
-            Vector3 spawnPos = muzzlePoint.position + muzzlePoint.forward * 0.5f;
-            Vector3 aimDir = (targetPoint - fpCamera.transform.position).normalized;
+            rb.useGravity = false;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            rb.linearVelocity = aimDir * 80f;
+        }
 
-            // Add random spread on top
-            aimDir += new Vector3(
-                Random.Range(-spreadAngle, spreadAngle) * 0.01f,
-                Random.Range(-spreadAngle, spreadAngle) * 0.01f,
-                0f);
-            aimDir.Normalize();
+        Collider bulletCol = bullet.GetComponent<Collider>();
+        if (bulletCol != null)
+        {
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+                foreach (Collider col in player.GetComponentsInChildren<Collider>())
+                    Physics.IgnoreCollision(bulletCol, col);
 
-            // Spawn bullet
-            GameObject bullet = Instantiate(bulletPrefab, spawnPos, muzzlePoint.rotation);
-            bullet.transform.forward = aimDir;
+            foreach (Collider col in fpCamera.GetComponentsInChildren<Collider>())
+                Physics.IgnoreCollision(bulletCol, col);
 
-            Rigidbody rb = bullet.GetComponent<Rigidbody>();
-            if (rb != null)
+            // Ignore other pellets from this shot
+            foreach (GameObject other in GameObject.FindGameObjectsWithTag("Bullet"))
             {
-                rb.useGravity = false;
-                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-                rb.linearVelocity = aimDir * 80f;
-            }
-
-            // Ignore player colliders
-            Collider bulletCol = bullet.GetComponent<Collider>();
-            if (bulletCol != null)
-            {
-                GameObject player = GameObject.FindGameObjectWithTag("Player");
-                if (player != null)
-                    foreach (Collider col in player.GetComponentsInChildren<Collider>())
-                        Physics.IgnoreCollision(bulletCol, col);
+                Collider otherCol = other.GetComponent<Collider>();
+                if (otherCol != null)
+                    Physics.IgnoreCollision(bulletCol, otherCol);
             }
         }
     }
+}
 
     void SetupBullet(GameObject bullet, Vector3 aimDir)
     {

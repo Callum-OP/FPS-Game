@@ -21,7 +21,6 @@ public class PlayerHUD : MonoBehaviour
 
     [Header("References")]
     public PlayerHealth playerHealth;
-    public WeaponController weaponController;
 
 
     void Start()
@@ -30,19 +29,6 @@ public class PlayerHUD : MonoBehaviour
         playerHealth.onHealthChanged += UpdateHealthBar;
         playerHealth.onDamaged += TriggerDamageFlash;
         playerHealth.onDeath += TriggerGameOver;
-
-        // Only wire weapon if one exists
-        if (weaponController != null)
-        {
-            // Subscribe to weapon events
-            weaponController.onAmmoChanged += UpdateAmmo;
-            weaponController.onReloadStart += ShowReloading;
-            weaponController.onReloadEnd += HideReloading;
-        }
-        else
-        {
-            ammoText.text = "--";
-        }
 
         gameOverScreen.SetActive(false);
         damageFlash.color = Color.clear;
@@ -82,19 +68,26 @@ public class PlayerHUD : MonoBehaviour
     }
 
     // Ammo
+    private (int current, int max)? lastAmmo;
+
     public void UpdateAmmo(int current, int max)
-        => ammoText.text = $"{current} / {max}";
+    {
+        lastAmmo = (current, max);
+        ammoText.text = $"{current} / {max}";
+    }
 
     public void ShowReloading()
     {
         if (reloadText != null) reloadText.gameObject.SetActive(true);
-        ammoText.text = "";
+        ammoText.gameObject.SetActive(false);  // hide ammo text, show reload text
     }
 
     public void HideReloading()
     {
         if (reloadText != null) reloadText.gameObject.SetActive(false);
-        UpdateAmmo(weaponController.GetCurrentAmmo(), weaponController.GetMaxAmmo());
+        ammoText.gameObject.SetActive(true);   // show ammo text again
+        if (lastAmmo.HasValue)
+            UpdateAmmo(lastAmmo.Value.current, lastAmmo.Value.max);
     }
 
     // Game over
@@ -125,13 +118,6 @@ public class PlayerHUD : MonoBehaviour
             playerHealth.onHealthChanged -= UpdateHealthBar;
             playerHealth.onDamaged -= TriggerDamageFlash;
             playerHealth.onDeath -= TriggerGameOver;
-        }
-
-        if (weaponController != null)
-        {
-            weaponController.onAmmoChanged -= UpdateAmmo;
-            weaponController.onReloadStart -= ShowReloading;
-            weaponController.onReloadEnd -= HideReloading;
         }
     }
 }
