@@ -76,9 +76,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fa446ce106faa3d499ccc73cb0aa7837, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  kickBack: 0
-  kickUp: 0
-  rotationKick: 0
+  kickBack: 0.3
+  kickUp: -0.1
+  rotationKick: 4
   recoverySpeed: 35
   weaponADS: {fileID: 6147061816424425655}
   adsRecoilMultiplier: 0.3
@@ -131,8 +131,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   hipPosition: {x: 0, y: -0.54, z: 0.6}
-  adsPosition: {x: 0, y: -0.37, z: 0.6}
-  hipRotation: {x: 0, y: 0, z: 35}
+  adsPosition: {x: 0, y: -0.37, z: 0.8}
+  hipRotation: {x: -1, y: 2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
   hipSpeed: 7
@@ -181,6 +181,9 @@ MonoBehaviour:
   spreadAngle: 10
   cameraRecoil: {fileID: 0}
   weaponRecoil: {fileID: 5987997481931942040}
+  camRecoilX: -0.3
+  camRecoilY: 2
+  camRecoilZ: 0.5
   gunshotClip: {fileID: 8300000, guid: ff63e44af37214e44942f3c1f8d806c2, type: 3}
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
@@ -199,8 +202,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   casingPrefab: {fileID: 8122246384690150535, guid: 0ac39c155019f8e4a8c54642002580e8, type: 3}
   ejectionPoint: {fileID: 6915021934541660955}
-  ejectionForce: 3
-  upwardForce: 0
+  ejectionForce: 8
+  upwardForce: 2.5
   torqueForce: 4
   destroyDelay: 5
 --- !u!1 &5983984030253052907

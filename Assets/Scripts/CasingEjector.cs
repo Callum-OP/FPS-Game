@@ -20,14 +20,31 @@ public class CasingEjector : MonoBehaviour
         Rigidbody rb = casing.GetComponent<Rigidbody>();
         if (rb != null)
         {
-            // Calculate direction (Right of the ejection point and a bit of up)
-            Vector3 forceDirection = (ejectionPoint.right * ejectionForce) + (ejectionPoint.up * upwardForce);
-            
-            // Apply physical forces
+                        // Randomise ejection force and upward force slightly
+            float randomEjection = ejectionForce + Random.Range(-0.5f, 0.5f);
+            float randomUpward   = upwardForce   + Random.Range(-0.3f, 0.3f);
+
+            // Randomise direction slightly so casings don't all go same way
+            // Place right of the ejection point and a bit up
+            Vector3 randomDir = ejectionPoint.right
+                + ejectionPoint.up * 0.3f
+                + new Vector3(
+                    Random.Range(-0.1f, 0.1f),
+                    Random.Range(-0.1f, 0.1f),
+                    Random.Range(-0.1f, 0.1f));
+
+            // Calculate direction
+            Vector3 forceDirection = (randomDir.normalized * randomEjection)
+                + (ejectionPoint.up * randomUpward);
+
+            // Apply physical force
             rb.AddForce(forceDirection, ForceMode.Impulse);
-            
+
             // Add a random spin for realism
-            Vector3 randomTorque = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, 1f), Random.Range(-1f, 1f));
+            Vector3 randomTorque = new Vector3(
+                Random.Range(-1f, 1f),
+                Random.Range(-1f, 1f),
+                Random.Range(-1f, 1f));
             rb.AddTorque(randomTorque * torqueForce, ForceMode.Impulse);
         }
 

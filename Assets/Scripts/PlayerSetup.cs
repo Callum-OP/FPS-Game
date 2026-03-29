@@ -139,6 +139,11 @@ public class PlayerSetup : MonoBehaviour
         // Wire weapon core
         weapon.fpCamera = fpCamera;
         weapon.cameraRecoil = cameraRecoil;
+        if (cameraRecoil != null)
+            cameraRecoil.Configure(
+                weapon.camRecoilX,
+                weapon.camRecoilY,
+                weapon.camRecoilZ);
         weapon.weaponRecoil = weaponRecoil;
 
         // Rewire everything with fresh references

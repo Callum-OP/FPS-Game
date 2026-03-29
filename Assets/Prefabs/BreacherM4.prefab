@@ -265,9 +265,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9a38ad043d189342a96126048654387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  hipPosition: {x: 0, y: -0.32, z: 0}
-  adsPosition: {x: 0, y: -0.16, z: 0.2}
-  hipRotation: {x: 0, y: 0, z: 35}
+  hipPosition: {x: 0, y: -0.45, z: 0.6}
+  adsPosition: {x: 0, y: -0.25, z: 0.8}
+  hipRotation: {x: -1, y: 2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
   hipSpeed: 7
@@ -316,6 +316,9 @@ MonoBehaviour:
   spreadAngle: 10
   cameraRecoil: {fileID: 0}
   weaponRecoil: {fileID: 7885407584008357843}
+  camRecoilX: 2
+  camRecoilY: 0.5
+  camRecoilZ: 0.5
   gunshotClip: {fileID: 8300000, guid: ff63e44af37214e44942f3c1f8d806c2, type: 3}
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
@@ -334,8 +337,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   casingPrefab: {fileID: 6573978681752998840, guid: 20847e505208a774d91134a8674ea0a0, type: 3}
   ejectionPoint: {fileID: 5311319321076708714}
-  ejectionForce: 3
-  upwardForce: 1
+  ejectionForce: 5
+  upwardForce: 1.5
   torqueForce: 4
   destroyDelay: 5
 --- !u!1001 &4957535203750488468
@@ -346,6 +349,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7530102725102030228}
     m_Modifications:
+    - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.8
+      objectReference: {fileID: 0}
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

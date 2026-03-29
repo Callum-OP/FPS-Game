@@ -33,6 +33,13 @@ public class CameraRecoil : MonoBehaviour
             * transform.localRotation;
     }
 
+    public void Configure(float x, float y, float z)
+    {
+        recoilX = x;
+        recoilY = y;
+        recoilZ = z;
+    }
+
     public void ApplyRecoil()
     {
         float multiplier = (weaponADS != null && weaponADS.IsAiming())

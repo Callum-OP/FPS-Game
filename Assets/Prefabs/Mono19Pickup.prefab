@@ -52,7 +52,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ffd285dfd0a1b1242a46aa9c822af4af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponPickup
-  heldWeaponPrefab: {fileID: 8437210256442287075, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
+  heldWeaponPrefab: {fileID: 7210103834045770318, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
 --- !u!65 &4293954521106826125
 BoxCollider:
   m_ObjectHideFlags: 0
