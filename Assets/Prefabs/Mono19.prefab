@@ -609,9 +609,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9a38ad043d189342a96126048654387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  hipPosition: {x: 0, y: -0.35, z: 0}
-  adsPosition: {x: 0, y: -0.17, z: 0.2}
-  hipRotation: {x: -1, y: 2, z: 35}
+  hipPosition: {x: 0, y: -0.4, z: 0}
+  adsPosition: {x: 0, y: -0.19, z: 0.8}
+  hipRotation: {x: -1.2, y: 2.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
   hipSpeed: 7
@@ -711,7 +711,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0.054}
-  m_LocalScale: {x: 2, y: 1.8, z: 1.8}
+  m_LocalScale: {x: 2.08, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 390765298068436469}

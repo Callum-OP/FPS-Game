@@ -265,15 +265,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9a38ad043d189342a96126048654387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  hipPosition: {x: 0, y: -0.45, z: 0.6}
-  adsPosition: {x: 0, y: -0.25, z: 0.8}
-  hipRotation: {x: -1, y: 2, z: 35}
+  hipPosition: {x: 0, y: -0.65, z: 0.4}
+  adsPosition: {x: 0, y: -0.28, z: 0.8}
+  hipRotation: {x: -1, y: 1.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
   hipSpeed: 7
   fpCamera: {fileID: 0}
-  hipFOV: 60
-  adsFOV: 40
+  hipFOV: 55
+  adsFOV: 30
   weaponCant: {fileID: 6476236417903038231}
 --- !u!114 &1212110107197663008
 MonoBehaviour:
@@ -351,15 +351,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalScale.x
-      value: 1.8
+      value: 2.1
       objectReference: {fileID: 0}
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1.8
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalScale.z
-      value: 1.8
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalPosition.x
