@@ -265,8 +265,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9a38ad043d189342a96126048654387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  hipPosition: {x: 0, y: -0.65, z: 0.4}
-  adsPosition: {x: 0, y: -0.28, z: 0.8}
+  hipPosition: {x: 0, y: -0.72, z: 0.4}
+  adsPosition: {x: 0, y: -0.32, z: 0.8}
   hipRotation: {x: -1, y: 1.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
@@ -351,15 +351,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalScale.x
-      value: 2.1
+      value: 2.4
       objectReference: {fileID: 0}
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalScale.y
-      value: 2
+      value: 2.3
       objectReference: {fileID: 0}
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalScale.z
-      value: 2
+      value: 2.3
       objectReference: {fileID: 0}
     - target: {fileID: 2592109398234381758, guid: 01fdab2e3c9dde44191c95c192b204ed, type: 3}
       propertyPath: m_LocalPosition.x

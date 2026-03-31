@@ -609,8 +609,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9a38ad043d189342a96126048654387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  hipPosition: {x: 0, y: -0.4, z: 0}
-  adsPosition: {x: 0, y: -0.19, z: 0.8}
+  hipPosition: {x: 0, y: -0.4, z: 0.4}
+  adsPosition: {x: 0, y: -0.19, z: 1.6}
   hipRotation: {x: -1.2, y: 2.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10

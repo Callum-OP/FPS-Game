@@ -4,8 +4,8 @@ using UnityEngine.Events;
 public class Health : MonoBehaviour
 {
     public float maxHealth = 100f;
+    public bool destroyOnDeath = true;
     private float currentHealth;
-
     public UnityEvent onDeath;
     public UnityEvent<float> onDamaged;
 
@@ -33,6 +33,7 @@ public class Health : MonoBehaviour
     {
         Debug.Log($"{name} died!");
         onDeath?.Invoke();
-        Destroy(gameObject);
+        if (destroyOnDeath)
+            Destroy(gameObject);
     }
 }

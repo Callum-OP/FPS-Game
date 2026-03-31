@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -61,6 +62,8 @@ public class EnemyAI : MonoBehaviour
     private float waypointWaitTimer;
     private bool playerInSight;
 
+    private bool isStunned = false;
+
     // Patrol
     private int currentWaypointIndex = 0;
     private bool patrolForward = true;
@@ -91,7 +94,7 @@ public class EnemyAI : MonoBehaviour
 
     void Update()
     {
-        if (currentState == State.Dead) return;
+        if (currentState == State.Dead || isStunned) return;
 
         playerInSight = CanSeePlayer();
 
@@ -451,5 +454,23 @@ public class EnemyAI : MonoBehaviour
             if (waypoints[next] != null)
                 Gizmos.DrawLine(waypoints[i].position, waypoints[next].position);
         }
+    }
+
+    public void Stun(float duration)
+    {
+        if (isStunned) return;
+        StartCoroutine(StunRoutine(duration));
+    }
+
+    IEnumerator StunRoutine(float duration)
+    {
+        isStunned = true;
+        agent.isStopped = true;
+        Debug.Log($"{name} stunned for {duration}s");
+
+        yield return new WaitForSeconds(duration);
+
+        isStunned = false;
+        agent.isStopped = false;
     }
 }
