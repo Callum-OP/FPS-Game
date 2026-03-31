@@ -45,4 +45,4 @@ Maybe unlockable skills too?
     Instant takedown? (if they get close)
 
 # Issues
-
+Enemy doesn't get stunned by explosives such as fuel barrels when attacking player or take damage from explosives of any kind

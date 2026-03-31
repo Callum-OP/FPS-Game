@@ -1,11 +1,17 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Explosive : MonoBehaviour
 {
     [Header("Explosion")]
+    public bool useTimer = false;
+    public float fuseTime = 3f;
     public float explosionRadius = 8f;
-    public float explosionDamage = 75f;
     public float explosionForce = 600f;
+
+    [Header("Stun")]
+    public float stunRadius = 10f;
+    public float stunDuration = 3f;
 
     [Header("Shrapnel")]
     public bool fireShrapnel = true;
@@ -25,11 +31,14 @@ public class Explosive : MonoBehaviour
 
     void Start()
     {
+        // It explodes when Health reaches 0 if it is not timed
         Health health = GetComponent<Health>();
         if (health != null)
             health.onDeath.AddListener(Explode);
-        else
-            Debug.LogError($"{name} has no Health component!");
+
+        // If timed, start the fuse timer
+        if (useTimer)
+            Invoke(nameof(Explode), fuseTime);
     }
 
     public void Explode()
@@ -37,27 +46,22 @@ public class Explosive : MonoBehaviour
         if (hasExploded) return;
         hasExploded = true;
 
-        // 1. Spawn Visual Effects
+        // Spawn visual effects
         if (explosionEffect != null)
         {
             GameObject fx = Instantiate(explosionEffect, transform.position, Quaternion.identity);
             Destroy(fx, 3f);
         }
 
-        AudioManager.Instance?.Play(explosionSound);
+        // Play sound
+        if (explosionSound != null)
+            AudioManager.Instance?.Play(explosionSound);
 
-        // 2. Physics & Damage Radial Check
+        // Physics & damage radius check
         Collider[] hits = Physics.OverlapSphere(transform.position, explosionRadius);
         foreach (Collider hit in hits)
         {
-            if (hit.gameObject == gameObject) continue; // Don't hit self
-
-            float dist = Vector3.Distance(transform.position, hit.transform.position);
-            float falloff = 1f - Mathf.Clamp01(dist / explosionRadius);
-
-            // Damage logic
-            hit.GetComponent<Health>()?.TakeDamage(explosionDamage * falloff);
-            hit.GetComponent<PlayerHealth>()?.TakeDamage(explosionDamage * falloff);
+            if (hit.gameObject == gameObject) continue; 
 
             // Chain reaction
             if (hit.TryGetComponent(out Explosive other))
@@ -66,54 +70,72 @@ public class Explosive : MonoBehaviour
             // Push nearby objects
             if (hit.TryGetComponent(out Rigidbody rb))
                 rb.AddExplosionForce(explosionForce, transform.position, explosionRadius);
+
+            // Stun enemies
+            EnemyAI enemy = hit.GetComponent<EnemyAI>();
+            if (enemy != null)
+                enemy.Stun(stunDuration);
         }
 
-        // 3. Shrapnel Logic
-        if (fireShrapnel && shrapnelPrefab != null)
-        {
-            for (int i = 0; i < shrapnelCount; i++)
-            {
-                Vector3 dir = Random.onUnitSphere;
-                GameObject shrapnel = Instantiate(shrapnelPrefab, transform.position, Quaternion.identity);
-                shrapnel.transform.forward = dir;
+        // Fire shrapnel
+        if (fireShrapnel)
+            FireShrapnel();
 
-                if (shrapnel.TryGetComponent(out Rigidbody sRb))
-                {
-                    sRb.useGravity = false;
-                    sRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-                    sRb.linearVelocity = dir * shrapnelSpeed;
-                }
-
-                if (shrapnel.TryGetComponent(out Projectile p)) 
-                    p.damage = shrapnelDamage;
-
-                Destroy(shrapnel, 3f);
-            }
-        }
-
-        // 4. Spawn Destroyed Version & Cleanup
+        // Spawn destroyed version
         if (destroyedPrefab != null)
         {
             GameObject destroyed = Instantiate(destroyedPrefab, transform.position, transform.rotation);
-            
-            // Apply force to all pieces of the destroyed prefab
             Rigidbody[] childRbs = destroyed.GetComponentsInChildren<Rigidbody>();
             foreach (Rigidbody rb in childRbs)
             {
                 rb.AddExplosionForce(explosionForce, transform.position, explosionRadius);
             }
-            
-            // Optional: Destroy the "wreckage" after some time to save performance
-            Destroy(destroyed, 10f);
         }
 
-        // CRITICAL: Remove the original object from the scene
         Destroy(gameObject);
+    }
+
+    void FireShrapnel()
+    {
+        if (shrapnelPrefab == null) return;
+
+        // Use a list to keep track of shrapnel to ignore each other
+        List<Collider> spawnedShrapnelColliders = new List<Collider>();
+
+        for (int i = 0; i < shrapnelCount; i++)
+        {
+            Vector3 randomDir = Random.onUnitSphere;
+            // Offset spawn slightly so they don't spawn inside the grenade's collider
+            Vector3 spawnPos = transform.position + (randomDir * 0.1f); 
+            
+            GameObject shrapnel = Instantiate(shrapnelPrefab, spawnPos, Quaternion.LookRotation(randomDir));
+            Collider shrapnelCollider = shrapnel.GetComponent<Collider>();
+            
+            if (shrapnelCollider != null)
+            {
+                // Ignore other pieces in this same explosion to prevent "popcorn" bouncing
+                foreach (Collider other in spawnedShrapnelColliders)
+                {
+                    if (other != null) Physics.IgnoreCollision(shrapnelCollider, other);
+                }
+                spawnedShrapnelColliders.Add(shrapnelCollider);
+            }
+
+            // Apply stats to projectile script
+            Projectile proj = shrapnel.GetComponent<Projectile>();
+            if (proj != null)
+            {
+                proj.speed = shrapnelSpeed;
+                proj.damage = shrapnelDamage;
+            }
+        }
     }
 
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.yellow;
+        Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, explosionRadius);
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, stunRadius);
     }
 }

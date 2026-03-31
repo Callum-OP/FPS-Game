@@ -9,8 +9,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8906315266887486447}
-  - component: {fileID: 1290109166007859795}
   - component: {fileID: 6490593758270071070}
+  - component: {fileID: 1848467366757276936}
   m_Layer: 0
   m_Name: FragGrenade
   m_TagString: Untagged
@@ -34,29 +34,6 @@ Transform:
   - {fileID: 8572568944173794214}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1290109166007859795
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 167451984263851421}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5ead86985c9b7ff488a60589869b091d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Grenade
-  fuseTime: 3
-  stunRadius: 10
-  stunDuration: 3
-  shockwaveForce: 500
-  hasShrapnel: 1
-  shrapnelPrefab: {fileID: 1419992393118297956, guid: b12083c72e62959458d5b786f732cf30, type: 3}
-  shrapnelCount: 20
-  shrapnelSpeed: 40
-  shrapnelDamage: 50
-  explosionEffect: {fileID: 104829970813648393, guid: d3015b7eea383f64d8b81f965cc466e7, type: 3}
-  explosionSound: {fileID: 8300000, guid: 07345472363f7ea4ab19ffd5ca667f32, type: 3}
 --- !u!54 &6490593758270071070
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -84,6 +61,32 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &1848467366757276936
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 167451984263851421}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a704f89c205e6aa4d89ab8b62f5e8456, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Explosive
+  useTimer: 1
+  fuseTime: 3
+  explosionRadius: 8
+  explosionForce: 600
+  stunRadius: 10
+  stunDuration: 3
+  fireShrapnel: 1
+  shrapnelPrefab: {fileID: 1419992393118297956, guid: b12083c72e62959458d5b786f732cf30, type: 3}
+  shrapnelCount: 40
+  shrapnelSpeed: 40
+  shrapnelDamage: 100
+  explosionEffect: {fileID: 104829970813648393, guid: d3015b7eea383f64d8b81f965cc466e7, type: 3}
+  explosionSound: {fileID: 8300000, guid: 07345472363f7ea4ab19ffd5ca667f32, type: 3}
+  destroyedPrefab: {fileID: 0}
 --- !u!1 &298371481374024626
 GameObject:
   m_ObjectHideFlags: 0

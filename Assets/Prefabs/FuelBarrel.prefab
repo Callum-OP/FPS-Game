@@ -155,14 +155,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a704f89c205e6aa4d89ab8b62f5e8456, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Explosive
+  useTimer: 0
+  fuseTime: 3
   explosionRadius: 8
-  explosionDamage: 75
   explosionForce: 600
+  stunRadius: 10
+  stunDuration: 3
   fireShrapnel: 1
   shrapnelPrefab: {fileID: 1419992393118297956, guid: b12083c72e62959458d5b786f732cf30, type: 3}
-  shrapnelCount: 15
+  shrapnelCount: 40
   shrapnelSpeed: 40
-  shrapnelDamage: 25
+  shrapnelDamage: 100
   explosionEffect: {fileID: 7583434666778122777, guid: 0115fa89ad0d44a08054ef02d75ca945, type: 3}
   explosionSound: {fileID: 8300000, guid: 07345472363f7ea4ab19ffd5ca667f32, type: 3}
   destroyedPrefab: {fileID: 3040796165040059803, guid: a886b2918aebe334da69d4d1c21b66a1, type: 3}
