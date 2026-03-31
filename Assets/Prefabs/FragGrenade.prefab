@@ -81,9 +81,10 @@ MonoBehaviour:
   stunDuration: 3
   fireShrapnel: 1
   shrapnelPrefab: {fileID: 1419992393118297956, guid: b12083c72e62959458d5b786f732cf30, type: 3}
-  shrapnelCount: 40
-  shrapnelSpeed: 40
-  shrapnelDamage: 100
+  shrapnelCount: 300
+  shrapnelSpeed: 20
+  shrapnelDamage: 200
+  shrapnelLifetime: 2
   explosionEffect: {fileID: 104829970813648393, guid: d3015b7eea383f64d8b81f965cc466e7, type: 3}
   explosionSound: {fileID: 8300000, guid: 07345472363f7ea4ab19ffd5ca667f32, type: 3}
   destroyedPrefab: {fileID: 0}

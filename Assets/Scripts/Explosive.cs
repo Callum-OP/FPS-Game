@@ -19,6 +19,7 @@ public class Explosive : MonoBehaviour
     public int shrapnelCount = 15;
     public float shrapnelSpeed = 40f;
     public float shrapnelDamage = 25f;
+    public float shrapnelLifetime = 1.5f;
 
     [Header("Effects")]
     public GameObject explosionEffect;
@@ -99,34 +100,23 @@ public class Explosive : MonoBehaviour
     {
         if (shrapnelPrefab == null) return;
 
-        // Use a list to keep track of shrapnel to ignore each other
-        List<Collider> spawnedShrapnelColliders = new List<Collider>();
-
         for (int i = 0; i < shrapnelCount; i++)
         {
+            // Pick a random direction
             Vector3 randomDir = Random.onUnitSphere;
-            // Offset spawn slightly so they don't spawn inside the grenade's collider
-            Vector3 spawnPos = transform.position + (randomDir * 0.1f); 
+
+            // Move spawn point 0.5 meters away from center so they don't touch the grenade or each other
+            Vector3 spawnPos = transform.position + (randomDir * 0.5f); 
             
             GameObject shrapnel = Instantiate(shrapnelPrefab, spawnPos, Quaternion.LookRotation(randomDir));
-            Collider shrapnelCollider = shrapnel.GetComponent<Collider>();
-            
-            if (shrapnelCollider != null)
-            {
-                // Ignore other pieces in this same explosion to prevent "popcorn" bouncing
-                foreach (Collider other in spawnedShrapnelColliders)
-                {
-                    if (other != null) Physics.IgnoreCollision(shrapnelCollider, other);
-                }
-                spawnedShrapnelColliders.Add(shrapnelCollider);
-            }
 
-            // Apply stats to projectile script
+            // Set projectile stats
             Projectile proj = shrapnel.GetComponent<Projectile>();
             if (proj != null)
             {
                 proj.speed = shrapnelSpeed;
                 proj.damage = shrapnelDamage;
+                proj.lifetime = 1.5f;
             }
         }
     }
