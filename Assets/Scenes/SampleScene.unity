@@ -18113,6 +18113,10 @@ MonoBehaviour:
   cameraTransform: {fileID: 1969224095270235720}
   weaponCant: {fileID: 0}
   cantSpeedMultiplier: 0.5
+  footstepClips:
+  - {fileID: 8300000, guid: 3519e1b49b777a34d8674238d3c71350, type: 3}
+  footstepInterval: 0.4
+  footstepSprintInterval: 0.25
 --- !u!114 &9090692332938233528
 MonoBehaviour:
   m_ObjectHideFlags: 0

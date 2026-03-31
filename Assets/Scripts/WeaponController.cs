@@ -47,6 +47,9 @@ public class WeaponController : MonoBehaviour
     private int currentAmmo;
     private bool isReloading;
 
+    [Header("Muzzle Flash")]
+    public ParticleSystem muzzleFlash;
+
     void Awake()
     {
         // Auto find camera
@@ -130,6 +133,8 @@ public class WeaponController : MonoBehaviour
             FireBullet(targetPoint);
 
         casingEjector?.Eject();
+
+        muzzleFlash?.Play();
     }
 
     void FireBullet(Vector3 targetPoint)

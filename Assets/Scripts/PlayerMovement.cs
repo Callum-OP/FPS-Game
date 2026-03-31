@@ -31,6 +31,12 @@ public class PlayerMovement : MonoBehaviour
     private InputAction jumpAction;
     private InputAction sprintAction;
 
+    [Header("Footsteps")]
+    public AudioClip[] footstepClips;
+    public float footstepInterval = 0.4f;
+    public float footstepSprintInterval = 0.25f;
+    private float footstepTimer = 0f;
+
     void Awake()
     {
         // Define all inputs
@@ -114,6 +120,27 @@ public class PlayerMovement : MonoBehaviour
 
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
+
+        HandleFootsteps(speed, isSprinting, isGrounded);
+
+        void HandleFootsteps(float speed, bool isSprinting, bool isGrounded)
+        {
+            if (!isGrounded || moveInput.magnitude < 0.1f)
+            {
+                footstepTimer = 0f;
+                return;
+            }
+
+            footstepTimer -= Time.deltaTime;
+            if (footstepTimer <= 0f)
+            {
+                footstepTimer = isSprinting ? footstepSprintInterval : footstepInterval;
+
+                if (footstepClips.Length > 0)
+                    AudioManager.Instance?.Play(
+                        footstepClips[Random.Range(0, footstepClips.Length)]);
+            }
+        }
     }
 
     void OnDestroy()

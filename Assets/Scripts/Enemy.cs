@@ -215,6 +215,8 @@ public class EnemyAI : MonoBehaviour
 
     void HandleAttack()
     {
+        if (isStunned) return; // Cannot attack when stunned
+
         FacePlayer();
         agent.isStopped = true;
 
