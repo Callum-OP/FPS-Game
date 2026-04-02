@@ -101,6 +101,7 @@
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\SimpleScript.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\Benchmark04.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\ChatController.cs" />
+    <Compile Include="Assets\Resources\3DObjects\ExplosiveObjects\Demo\Scripts\ExplosionController.cs" />
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\LightSourceObject.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_DigitValidator.cs" />
     <Compile Include="Assets\InputSystem_Actions.cs" />
@@ -115,6 +116,7 @@
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Inspector\IgnoreInInspectorAttribute.cs" />
     <Compile Include="Assets\Scripts\PlayerMovement.cs" />
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Rotatable.cs" />
+    <Compile Include="Assets\Resources\3DObjects\ExplosiveObjects\Scripts\ExplosiveObject.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\DropdownSample.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\VertexColorCycler.cs" />
     <Compile Include="Assets\Resources\3DObjects\Easy FPS\Scripts\GunScript.cs" />
@@ -128,6 +130,7 @@
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TextConsoleSimulator.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TeleType.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextEventCheck.cs" />
+    <Compile Include="Assets\Resources\3DObjects\ExplosiveObjects\Scripts\BrokenObject.cs" />
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\RotatableObject.cs" />
     <Compile Include="Assets\Resources\3DObjects\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\ShiftableObject.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TextMeshProFloatingText.cs" />
@@ -164,6 +167,7 @@
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF Overlay.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Fonts\LiberationSans - OFL.txt" />
+    <None Include="Assets\Resources\3DObjects\ExplosiveObjects\ReadMe_SRP.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Sprite.shader" />
     <None Include="Assets\TextMesh Pro\Examples &amp; Extras\Fonts\Bangers - OFL.txt" />

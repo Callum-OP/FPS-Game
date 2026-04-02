@@ -164,13 +164,13 @@ MonoBehaviour:
   fireShrapnel: 1
   shrapnelPrefab: {fileID: 5753235990766690665, guid: 12b514016d6fec241a94fcc7c907c707, type: 3}
   shrapnelCount: 100
-  shrapnelSpeed: 14
-  shrapnelDamage: 200
+  shrapnelSpeed: 18
+  shrapnelDamage: 340
   shrapnelLifetime: 3
-  spawnRadiusOffset: 3.3
+  spawnRadiusOffset: 3.5
   randomizeSize: 1
-  minSizeScale: -0.4
-  maxSizeScale: 0.4
+  minSizeScale: -0.5
+  maxSizeScale: 0.1
   explosionEffect: {fileID: 7583434666778122777, guid: 0115fa89ad0d44a08054ef02d75ca945, type: 3}
   explosionSound: {fileID: 8300000, guid: 07345472363f7ea4ab19ffd5ca667f32, type: 3}
   destroyedPrefab: {fileID: 3040796165040059803, guid: a886b2918aebe334da69d4d1c21b66a1, type: 3}
