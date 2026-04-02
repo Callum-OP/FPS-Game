@@ -54,10 +54,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.12023922
-  m_Height: 0.24047844
+  m_Radius: 0.19655754
+  m_Height: 0.42817104
   m_Direction: 1
-  m_Center: {x: 0.20683289, y: -0.3464858, z: -0.1929696}
+  m_Center: {x: 0.20683289, y: -0.25263947, z: -0.21431343}
 --- !u!54 &7329758958738653533
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -99,6 +99,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Projectile
   speed: 80
   damage: 40
+  lifetime: 5
+  minDamagePercent: 0.1
 --- !u!1 &4611809495083290937
 GameObject:
   m_ObjectHideFlags: 0
@@ -127,7 +129,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 0.2049255, y: -0.37, z: -0.204}
-  m_LocalScale: {x: 16, y: 16, z: 16}
+  m_LocalScale: {x: 33, y: 33, z: 33}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 769143578548253288}

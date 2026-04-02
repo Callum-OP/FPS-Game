@@ -21,6 +21,12 @@ public class Explosive : MonoBehaviour
     public float shrapnelDamage = 25f;
     public float shrapnelLifetime = 1.5f;
 
+    [Header("Shrapnel Advanced")]
+    public float spawnRadiusOffset = 0.5f; // Distance from center to spawn
+    public bool randomizeSize = false; // Toggle for different sizes of shrapnel
+    public float minSizeScale = 0.5f;
+    public float maxSizeScale = 2.0f;
+
     [Header("Effects")]
     public GameObject explosionEffect;
     public AudioClip explosionSound;
@@ -104,11 +110,18 @@ public class Explosive : MonoBehaviour
         {
             // Pick a random direction
             Vector3 randomDir = Random.onUnitSphere;
-
-            // Move spawn point 0.5 meters away from center so they don't touch the grenade or each other
-            Vector3 spawnPos = transform.position + (randomDir * 0.5f); 
+            
+            // Move spawn point further away based on the slider/value
+            Vector3 spawnPos = transform.position + (randomDir * spawnRadiusOffset); 
             
             GameObject shrapnel = Instantiate(shrapnelPrefab, spawnPos, Quaternion.LookRotation(randomDir));
+
+            // Size variation
+            if (randomizeSize)
+            {
+                float randomScale = Random.Range(minSizeScale, maxSizeScale);
+                shrapnel.transform.localScale = Vector3.one * randomScale;
+            }
 
             // Set projectile stats
             Projectile proj = shrapnel.GetComponent<Projectile>();
@@ -116,7 +129,7 @@ public class Explosive : MonoBehaviour
             {
                 proj.speed = shrapnelSpeed;
                 proj.damage = shrapnelDamage;
-                proj.lifetime = 1.5f;
+                proj.lifetime = shrapnelLifetime;
             }
         }
     }

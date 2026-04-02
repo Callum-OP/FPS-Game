@@ -46,3 +46,9 @@ Maybe unlockable skills too?
 
 # Issues
 Enemy doesn't get stunned by explosives such as fuel barrels when attacking player or take damage from explosives of any kind
+
+Shrapnel for barrels should look like shrapnel and be bigger
+same with grenade but no need to be bigger
+
+Also need a way for sharpnel to spawn further away from center
+and have option for shrapnel to be different sizes

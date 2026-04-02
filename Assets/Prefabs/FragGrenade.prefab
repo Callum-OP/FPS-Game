@@ -28,7 +28,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: -0, w: 1}
   m_LocalPosition: {x: -10.27355, y: -0.12899, z: -13.06655}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8572568944173794214}
@@ -80,11 +80,15 @@ MonoBehaviour:
   stunRadius: 10
   stunDuration: 3
   fireShrapnel: 1
-  shrapnelPrefab: {fileID: 1419992393118297956, guid: b12083c72e62959458d5b786f732cf30, type: 3}
+  shrapnelPrefab: {fileID: 2455980132428313623, guid: 0dcda1264c02f76458a340c74dd0c3d7, type: 3}
   shrapnelCount: 300
   shrapnelSpeed: 20
   shrapnelDamage: 200
   shrapnelLifetime: 2
+  spawnRadiusOffset: 0.5
+  randomizeSize: 0
+  minSizeScale: 0.5
+  maxSizeScale: 2
   explosionEffect: {fileID: 104829970813648393, guid: d3015b7eea383f64d8b81f965cc466e7, type: 3}
   explosionSound: {fileID: 8300000, guid: 07345472363f7ea4ab19ffd5ca667f32, type: 3}
   destroyedPrefab: {fileID: 0}
