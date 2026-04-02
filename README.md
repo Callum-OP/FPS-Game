@@ -5,7 +5,7 @@ Can press Left Shift to aim and use Q to lean left or E to lean right (useful fo
 Can press F to sprint and R to reload.
 Can press G to drop weapon and H to pick it back up, any weapons lying in the world they can pickup (which drops current weapon).
 
-Several weapon types, so far include 9mm handgun, 45 acp SMG and 12 gauge semi auto shotgun. Each with different recoil, aim, bullet sizes and casings.
+Several weapon types, so far include 9mm handgun, 45 acp SMG and 12 gauge semi auto shotgun. Each with different recoil, aim, bullet sizes and casings. Also included frag grenade and explosive barrels that shoot shrapnel upon explosion.
 
 Enemies patrol the world and chase and shoot at player if they get too close, the player can manage to lose them if they get out of sight, enemies will investigate for a while before returning to patrol.
 
@@ -45,10 +45,3 @@ Maybe unlockable skills too?
     Instant takedown? (if they get close)
 
 # Issues
-Enemy doesn't get stunned by explosives such as fuel barrels when attacking player or take damage from explosives of any kind
-
-Shrapnel for barrels should look like shrapnel and be bigger
-same with grenade but no need to be bigger
-
-Also need a way for sharpnel to spawn further away from center
-and have option for shrapnel to be different sizes
