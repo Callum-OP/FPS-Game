@@ -403,6 +403,7 @@ GameObject:
   - component: {fileID: 2778296996996440014}
   - component: {fileID: 6950372950083577443}
   - component: {fileID: 5701282309726850959}
+  - component: {fileID: 2258003808204632572}
   m_Layer: 0
   m_Name: Pistol_B_BarrelGuard
   m_TagString: Untagged
@@ -482,6 +483,23 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &2258003808204632572
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2642159102907473054}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97dd768c7a98da24eae62c699eea6cb9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  slideBackDistance: 0.03
+  slideSpeed: 20
+  slideReturnSpeed: 5
+  lockOpenWhenEmpty: 1
+  weaponController: {fileID: 0}
 --- !u!1 &5478441039751018762
 GameObject:
   m_ObjectHideFlags: 0
@@ -668,6 +686,7 @@ MonoBehaviour:
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
   casingEjector: {fileID: 3420109757068916442}
+  gunSlide: {fileID: 0}
   muzzleFlash: {fileID: 7458598909456941772}
 --- !u!114 &3420109757068916442
 MonoBehaviour:

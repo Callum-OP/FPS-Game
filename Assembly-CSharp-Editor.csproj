@@ -49,13 +49,13 @@
     <Analyzer Include="C:\Program Files\Unity 6000.3.11f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Resources\3DObjects\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\polygonShaderTransparent_UI.cs" />
     <Compile Include="Assets\TutorialInfo\Scripts\Editor\ReadmeEditor.cs" />
-    <Compile Include="Assets\Resources\3DObjects\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\PolygonShaderGUI.cs" />
-    <Compile Include="Assets\Resources\3DObjects\Synty\SyntyPackageHelper\Editor\SyntyPackageHelper.cs" />
-    <Compile Include="Assets\Resources\3DObjects\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\polygonShader_UI.cs" />
-    <Compile Include="Assets\Resources\3DObjects\Synty\SyntyPackageHelper\Editor\SyntyPackageHelperConfig.cs" />
-    <Compile Include="Assets\Resources\3DObjects\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\PolygonTransparencyShaderGUI.cs" />
+    <Compile Include="Assets\Resources\3DObjects\Weapons\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\polygonShader_UI.cs" />
+    <Compile Include="Assets\Resources\3DObjects\Weapons\Synty\SyntyPackageHelper\Editor\SyntyPackageHelper.cs" />
+    <Compile Include="Assets\Resources\3DObjects\Weapons\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\polygonShaderTransparent_UI.cs" />
+    <Compile Include="Assets\Resources\3DObjects\Weapons\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\PolygonTransparencyShaderGUI.cs" />
+    <Compile Include="Assets\Resources\3DObjects\Weapons\Synty\PolygonGeneric\Shaders\InterfaceOverrides\Editor\PolygonShaderGUI.cs" />
+    <Compile Include="Assets\Resources\3DObjects\Weapons\Synty\SyntyPackageHelper\Editor\SyntyPackageHelperConfig.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

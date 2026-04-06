@@ -37,6 +37,9 @@ public class WeaponController : MonoBehaviour
 
     public CasingEjector casingEjector;
 
+    [Header("Slide")]
+    public GunSlide gunSlide;
+
     // HUD
     public System.Action<int, int> onAmmoChanged;
     public System.Action onReloadStart;
@@ -71,6 +74,9 @@ public class WeaponController : MonoBehaviour
         reloadAction.Enable();
 
         currentAmmo = maxAmmo;
+
+        if (gunSlide == null)
+            gunSlide = GetComponentInChildren<GunSlide>();
     }
 
     void Update()
@@ -116,6 +122,9 @@ public class WeaponController : MonoBehaviour
         onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
 
         AudioManager.Instance?.Play(gunshotClip);
+
+        // If there is a gun slide
+        gunSlide?.OnFire();
 
         // Apply weapon recoil first, then camera recoil scales with it
         weaponRecoil?.ApplyRecoil();
