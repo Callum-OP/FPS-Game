@@ -159,7 +159,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   kickBack: 0.05
   kickUp: 0.06
-  rotationKick: 18
+  rotationKick: 13
   recoverySpeed: 10
   weaponADS: {fileID: 7542695909553746342}
   adsRecoilMultiplier: 0.3
@@ -39590,13 +39590,14 @@ MonoBehaviour:
   spreadAngle: 10
   cameraRecoil: {fileID: 0}
   weaponRecoil: {fileID: 7885407584008357843}
-  camRecoilX: 2
-  camRecoilY: 0.5
-  camRecoilZ: 0.5
+  camRecoilX: 4
+  camRecoilY: 4
+  camRecoilZ: 4
   gunshotClip: {fileID: 8300000, guid: ff63e44af37214e44942f3c1f8d806c2, type: 3}
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
   casingEjector: {fileID: 171540251199544824}
+  gunSlide: {fileID: 0}
   muzzleFlash: {fileID: 3602602296311612006}
 --- !u!114 &171540251199544824
 MonoBehaviour:
@@ -39612,7 +39613,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   casingPrefab: {fileID: 6573978681752998840, guid: 20847e505208a774d91134a8674ea0a0, type: 3}
   ejectionPoint: {fileID: 5311319321076708714}
-  ejectionForce: 5
+  ejectionForce: 8
   upwardForce: 1.5
   torqueForce: 4
   destroyDelay: 5

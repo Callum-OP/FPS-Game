@@ -39446,7 +39446,7 @@ MonoBehaviour:
   fpCamera: {fileID: 0}
   bulletPrefab: {fileID: 4598212022487192858, guid: 9046df2f69dd06b40870ea927989d7f6, type: 3}
   muzzlePoint: {fileID: 1159390435798029048}
-  fireRate: 0.06
+  fireRate: 0.04
   maxAmmo: 25
   reloadTime: 2
   isAutomatic: 1
@@ -39462,6 +39462,7 @@ MonoBehaviour:
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
   casingEjector: {fileID: 1528398869191078598}
+  gunSlide: {fileID: 0}
   muzzleFlash: {fileID: 4871006045433569501}
 --- !u!114 &1528398869191078598
 MonoBehaviour:
@@ -39477,7 +39478,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   casingPrefab: {fileID: 8122246384690150535, guid: 0ac39c155019f8e4a8c54642002580e8, type: 3}
   ejectionPoint: {fileID: 6915021934541660955}
-  ejectionForce: 8
+  ejectionForce: 10
   upwardForce: 2.5
   torqueForce: 4
   destroyDelay: 5

@@ -19779,7 +19779,7 @@ MonoBehaviour:
   fpCamera: {fileID: 0}
   bulletPrefab: {fileID: 3032706208577155948, guid: d5aeaa93e76bd3b4397d0f25f9fe53f6, type: 3}
   muzzlePoint: {fileID: 2873470030435797744}
-  fireRate: 0.11
+  fireRate: 0.06
   maxAmmo: 30
   reloadTime: 2
   isAutomatic: 1
@@ -19789,8 +19789,8 @@ MonoBehaviour:
   cameraRecoil: {fileID: 0}
   weaponRecoil: {fileID: 4995090322603144531}
   camRecoilX: 2.5
-  camRecoilY: 0.5
-  camRecoilZ: 0.55
+  camRecoilY: 2.5
+  camRecoilZ: 2.5
   gunshotClip: {fileID: 8300000, guid: ff63e44af37214e44942f3c1f8d806c2, type: 3}
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
@@ -19811,7 +19811,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   casingPrefab: {fileID: 8240945000735242044, guid: 364f36d17359a0142b20413b58de67f7, type: 3}
   ejectionPoint: {fileID: 2591522995309893715}
-  ejectionForce: 5
+  ejectionForce: 10
   upwardForce: 1.5
   torqueForce: 4
   destroyDelay: 5
@@ -39612,9 +39612,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   kickBack: 0.05
-  kickUp: 0.01
-  rotationKick: 20
-  recoverySpeed: 15
+  kickUp: 0.05
+  rotationKick: 1
+  recoverySpeed: 25
   weaponADS: {fileID: 3928102241211913328}
   adsRecoilMultiplier: 0.3
 --- !u!1001 &6194686380692250202
