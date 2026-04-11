@@ -9,6 +9,8 @@ public class WeaponDrop : MonoBehaviour
     public GameObject Mono19WorldPrefab;
     public GameObject BreacherM4WorldPrefab;
     public GameObject HummingbirdWorldPrefab;
+    public GameObject ARWorldPrefab;
+    public GameObject ARScopedWorldPrefab;
 
     private InputAction dropAction;
 
@@ -58,6 +60,8 @@ public class WeaponDrop : MonoBehaviour
         if (weaponName.Contains("Mono19")) return Mono19WorldPrefab;
         if (weaponName.Contains("BreacherM4")) return BreacherM4WorldPrefab;
         if (weaponName.Contains("Hummingbird")) return HummingbirdWorldPrefab;
+        if (weaponName.Contains("AR")) return HummingbirdWorldPrefab;
+        if (weaponName.Contains("ARScoped")) return HummingbirdWorldPrefab;
         return null;
     }
 
