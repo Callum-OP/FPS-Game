@@ -20151,8 +20151,8 @@ MonoBehaviour:
   camRecoilX: 2.5
   camRecoilY: 2.5
   camRecoilZ: 2.5
-  gunshotClip: {fileID: 8300000, guid: ff63e44af37214e44942f3c1f8d806c2, type: 3}
-  reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
+  gunshotClip: {fileID: 8300000, guid: 5cd5dd2bad98cb74ab3d5c392e69864e, type: 3}
+  reloadClip: {fileID: 8300000, guid: f6355ee80b1eb634cb0f15448cda246d, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
   casingEjector: {fileID: 5176811261315588740}
   gunSlide: {fileID: 0}

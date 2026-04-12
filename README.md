@@ -45,3 +45,6 @@ Maybe unlockable skills too?
     Instant takedown? (if they get close)
 
 # Issues
+If you drop gun while canted, you stay canted
+
+Some sounds are louder and quieter than they should be, add a way to change the volume

@@ -39593,7 +39593,7 @@ MonoBehaviour:
   camRecoilX: 4
   camRecoilY: 4
   camRecoilZ: 4
-  gunshotClip: {fileID: 8300000, guid: ff63e44af37214e44942f3c1f8d806c2, type: 3}
+  gunshotClip: {fileID: 8300000, guid: 4aa57be40d36b8648b87182d582a4c67, type: 3}
   reloadClip: {fileID: 8300000, guid: d90e6dd859644b0478b4c2e8494f3c89, type: 3}
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
   casingEjector: {fileID: 171540251199544824}
