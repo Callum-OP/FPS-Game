@@ -48,3 +48,5 @@ Maybe unlockable skills too?
 If you drop gun while canted, you stay canted
 
 Some sounds are louder and quieter than they should be, add a way to change the volume
+
+It would probably make more sense if leaning disabled the fast walk
