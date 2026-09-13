@@ -150,6 +150,7 @@
     <Compile Include="Assets\Scripts\WeaponDrop.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Easy FPS\Scripts\MouseLookScript.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\GlowLight.cs" />
+    <Compile Include="Assets\Scripts\WeaponHandIK.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Synty\PolygonGeneric\Scripts\Generic_SimpleRotate.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\RotatableObject.cs" />
   </ItemGroup>

@@ -148,12 +148,83 @@ public static class AnimationSystemBuilder
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
+        AutoAssignController(controller);
+        AssetDatabase.SaveAssets();
+
         Debug.Log($"[AnimationSystemBuilder] Done. Imported {imported} clips, {missing} missing. " +
                   $"Controller: {ControllerPath}\nStrafe assumptions: {StrafeAssumptions}");
         if (missing > 0)
             Debug.LogWarning("[AnimationSystemBuilder] Some clips were missing - check the console above for exact file names expected under " + MixamoRoot);
 
         Selection.activeObject = controller;
+    }
+
+    // Wipes an existing controller asset back to a blank single-layer, zero-parameter
+    // state so BuildController can repopulate it from scratch without touching its
+    // GUID (see comment above BuildController).
+    static void ClearController(AnimatorController controller)
+    {
+        string path = AssetDatabase.GetAssetPath(controller);
+        foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(path))
+        {
+            if (obj != null && obj != controller)
+                Object.DestroyImmediate(obj, true);
+        }
+
+        controller.parameters = new AnimatorControllerParameter[0];
+
+        var freshSM = new AnimatorStateMachine { name = "Base Layer", hideFlags = HideFlags.HideInHierarchy };
+        AssetDatabase.AddObjectToAsset(freshSM, controller);
+        controller.layers = new[]
+        {
+            new AnimatorControllerLayer { name = "Base Layer", defaultWeight = 1f, stateMachine = freshSM }
+        };
+    }
+
+    // ---- auto-assign to Player/Enemy ------------------------------------
+    // Finds every prefab with a humanoid Animator (Player, Enemy, EnemyMelee, etc.)
+    // and points its Animator at the freshly-built controller, so you never have to
+    // manually re-drag CharacterAnimator.controller onto them after running this tool.
+    static void AutoAssignController(AnimatorController controller)
+    {
+        int assigned = 0;
+
+        foreach (string guid in AssetDatabase.FindAssets("t:Prefab"))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null) continue;
+
+            bool changed = false;
+            foreach (var animator in prefab.GetComponentsInChildren<Animator>(true))
+            {
+                if (animator.avatar == null || !animator.avatar.isHuman) continue;
+                if (animator.runtimeAnimatorController == controller) continue;
+                animator.runtimeAnimatorController = controller;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                EditorUtility.SetDirty(prefab);
+                PrefabUtility.SavePrefabAsset(prefab);
+                assigned++;
+            }
+        }
+
+        // Also cover Player/Enemy instances placed directly in open scenes (not
+        // prefab instances) so a rebuild doesn't leave those stale either.
+        foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsSortMode.None))
+        {
+            if (animator.avatar == null || !animator.avatar.isHuman) continue;
+            if (animator.runtimeAnimatorController == controller) continue;
+            animator.runtimeAnimatorController = controller;
+            EditorUtility.SetDirty(animator);
+            assigned++;
+        }
+
+        if (assigned > 0)
+            Debug.Log($"[AnimationSystemBuilder] Auto-assigned CharacterAnimator.controller to {assigned} humanoid Animator(s)/prefab(s).");
     }
 
     // ---- clip import ------------------------------------------------------
@@ -249,8 +320,17 @@ public static class AnimationSystemBuilder
     // ---- controller -----------------------------------------------------
     static AnimatorController BuildController(AvatarMask upperBodyMask)
     {
-        if (File.Exists(ControllerPath)) AssetDatabase.DeleteAsset(ControllerPath);
-        var controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
+        // Rebuild IN PLACE instead of delete+recreate. Deleting the asset and
+        // recreating it at the same path gives it a brand new GUID, which silently
+        // breaks the Animator.runtimeAnimatorController reference on Player/Enemy
+        // prefabs every single time this tool runs - that's why they kept needing
+        // to be re-dragged in. Reusing the existing asset object keeps its GUID
+        // stable, so prefab references survive a rebuild.
+        var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        if (controller != null)
+            ClearController(controller);
+        else
+            controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
 
         controller.AddParameter("MoveX", AnimatorControllerParameterType.Float);
         controller.AddParameter("MoveY", AnimatorControllerParameterType.Float);
@@ -265,6 +345,16 @@ public static class AnimationSystemBuilder
 
         BuildBaseLayer(controller);
         BuildUpperBodyLayer(controller, upperBodyMask);
+
+        // Turn on the IK pass so OnAnimatorIK() actually gets called - WeaponHandIK
+        // uses it to snap the hand bones onto the weapon's grip points every frame,
+        // after the animator has posed the arms. Without this the hands never move
+        // and the "hand doesn't match the weapon" mismatch stays.
+        var baseLayer = controller.layers[0];
+        baseLayer.iKPass = true;
+        var layers = controller.layers;
+        layers[0] = baseLayer;
+        controller.layers = layers;
 
         return controller;
     }
@@ -372,6 +462,13 @@ public static class AnimationSystemBuilder
             defaultWeight = 1f,
             avatarMask = mask,
             blendingMode = AnimatorLayerBlendingMode.Override,
+            // This layer overrides arm/spine/head bones AFTER the base layer every
+            // frame, which was silently overwriting WeaponHandIK's hand placement the
+            // instant it was applied - that's why hands tracked rotation loosely but
+            // never actually reached the grip and never responded to camera pitch.
+            // Enabling the IK pass here too makes this (the layer that actually owns
+            // the arms) apply the IK snap last, so it sticks.
+            iKPass = true,
             stateMachine = new AnimatorStateMachine { name = "UpperBody", hideFlags = HideFlags.HideInHierarchy }
         };
         AssetDatabase.AddObjectToAsset(layer.stateMachine, controller);

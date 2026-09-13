@@ -225,13 +225,13 @@ GameObject:
   - component: {fileID: 8380861452952741765}
   - component: {fileID: 802424425183540071}
   - component: {fileID: 7209459024370866370}
-  - component: {fileID: 8403096973582887497}
   - component: {fileID: 7013886737931384741}
   - component: {fileID: 2735340585188078159}
   - component: {fileID: 7219984608590271071}
   - component: {fileID: 2714943959344486485}
   - component: {fileID: 8719003296114661464}
   - component: {fileID: 2851115830741363710}
+  - component: {fileID: 8784270823998979221}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -530,6 +530,7 @@ MonoBehaviour:
   animator: {fileID: 2714943959344486485}
   agent: {fileID: 0}
   controller: {fileID: 4978825219315633988}
+  playerMovement: {fileID: 0}
   animationDriver: {fileID: 8719003296114661464}
   walkSpeed: 2.5
   runSpeed: 5.5
@@ -537,6 +538,21 @@ MonoBehaviour:
   groundCheckDistance: 0.3
   idleDeadzone: 0.15
   debugLog: 1
+--- !u!114 &8784270823998979221
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58bf2d312f4f39440ad5f56647ee73b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponHandIK
+  blendSpeed: 8
+  rightElbowHint: {fileID: 3501758186824354529}
+  leftElbowHint: {fileID: 8492838950576652720}
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -607,9 +623,19 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
   m_PrefabInstance: {fileID: 2334260011061684335}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &3501758186824354529 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1223936316459213454, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
 --- !u!95 &4783233763987129048 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 7063193259301972663, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &8492838950576652720 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6176780465991723487, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
   m_PrefabInstance: {fileID: 2334260011061684335}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &7137902250309885460

@@ -41,7 +41,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1974036301361946662}
   - component: {fileID: 4571212422672409181}
-  - component: {fileID: 910542812212260045}
   - component: {fileID: 3714461844059609211}
   - component: {fileID: 6584046625278314045}
   - component: {fileID: 5500162237225312280}
@@ -243,6 +242,7 @@ MonoBehaviour:
   animator: {fileID: 4799998883464736613}
   agent: {fileID: 5500162237225312280}
   controller: {fileID: 0}
+  playerMovement: {fileID: 0}
   animationDriver: {fileID: 7892662152946834436}
   walkSpeed: 2.5
   runSpeed: 5.5

@@ -8,6 +8,12 @@ public class WeaponController : MonoBehaviour
     public GameObject bulletPrefab;
     public Transform muzzlePoint;
 
+    [Header("Hand IK Grips")]
+    [Tooltip("Empty child transform positioned/oriented at this weapon's grip - the right hand IK target.")]
+    public Transform rightHandGrip;
+    [Tooltip("Empty child transform at the foregrip/forward hand spot - leave empty for one-handed weapons.")]
+    public Transform leftHandGrip;
+
     [Header("Ammo")]
     public float fireRate = 0.1f;
     public int maxAmmo = 30;
@@ -56,6 +62,8 @@ public class WeaponController : MonoBehaviour
 
     void Awake()
     {
+        ResolveHandGrips();
+
         // Auto find camera
         if (fpCamera == null) fpCamera = Camera.main;
 
@@ -79,7 +87,29 @@ public class WeaponController : MonoBehaviour
         if (gunSlide == null)
             gunSlide = GetComponentInChildren<GunSlide>();
 
-        characterAnimation = FindFirstObjectByType<CharacterAnimationDriver>();
+        characterAnimation = FindAnyObjectByType<CharacterAnimationDriver>();
+    }
+
+    void ResolveHandGrips()
+    {
+        if (rightHandGrip == null)
+            rightHandGrip = FindChildByName("RightHandGrip");
+        if (leftHandGrip == null)
+            leftHandGrip = FindChildByName("LeftHandGrip");
+
+        if (rightHandGrip == null)
+            Debug.LogWarning($"{name} has no RightHandGrip child. Add a marked child transform or assign WeaponController.rightHandGrip.", this);
+    }
+
+    Transform FindChildByName(string childName)
+    {
+        foreach (var child in GetComponentsInChildren<Transform>(true))
+        {
+            if (child.name == childName)
+                return child;
+        }
+
+        return null;
     }
 
     void Update()

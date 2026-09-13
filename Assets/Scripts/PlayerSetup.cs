@@ -19,6 +19,7 @@ public class PlayerSetup : MonoBehaviour
     [HideInInspector] public PlayerHUD playerHUD;
     [HideInInspector] public AmmoHUD ammoHUD;
     CharacterAnimationDriver characterAnimation;
+    WeaponHandIK weaponHandIK;
 
     void Awake()
     {
@@ -36,6 +37,7 @@ public class PlayerSetup : MonoBehaviour
         playerMovement = GetComponent<PlayerMovement>();
         playerHealth = GetComponent<PlayerHealth>();
         characterAnimation = GetComponentInChildren<CharacterAnimationDriver>();
+        weaponHandIK = GetComponentInChildren<WeaponHandIK>();
 
         // Only the local player's rigged body should ever hide its head - enemies
         // share the same body prefab and must keep theirs.
@@ -139,6 +141,7 @@ public class PlayerSetup : MonoBehaviour
 
         activeWeapon = weapon;
         characterAnimation?.SetWeaponFrom(weapon);
+        weaponHandIK?.SetGripTargets(weapon.rightHandGrip, weapon.leftHandGrip);
 
         // Regather weapon components from NEW weapon
         GatherWeaponComponents(weapon);
