@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>Player melee attack: V key or middle mouse. Swings the body's arm
-/// (Melee trigger on the shared controller), damages and briefly stuns enemies
-/// in front of the camera.</summary>
+/// <summary>Player melee attack: V key or middle mouse. Plays the masked upper-body
+/// swing (Melee trigger on CharacterAnimationDriver), damages and briefly stuns
+/// enemies in front of the camera.</summary>
 public class PlayerMelee : MonoBehaviour
 {
     [Header("Attack")]
@@ -14,7 +14,8 @@ public class PlayerMelee : MonoBehaviour
     public float stunDuration = 1.2f;
 
     [Header("References")]
-    public UpperBodyPose bodyPose; // auto-found in children if empty
+    public CharacterAnimationDriver animationDriver; // auto-found in children if empty
+    public UpperBodyPose legacyBodyPose;              // optional fallback for older rigs
 
     InputAction meleeAction;
     Camera cam;
@@ -34,8 +35,14 @@ public class PlayerMelee : MonoBehaviour
         if (timer > 0f || !meleeAction.WasPressedThisFrame()) return;
         timer = cooldown;
 
-        if (bodyPose == null) bodyPose = GetComponentInChildren<UpperBodyPose>();
-        if (bodyPose != null) bodyPose.TriggerMelee();
+        if (animationDriver == null) animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
+        if (animationDriver != null)
+            animationDriver.PlayMelee();
+        else
+        {
+            if (legacyBodyPose == null) legacyBodyPose = GetComponentInChildren<UpperBodyPose>();
+            legacyBodyPose?.TriggerMelee();
+        }
 
         Vector3 origin = cam != null ? cam.transform.position : transform.position + Vector3.up * 1.5f;
         Vector3 dir = cam != null ? cam.transform.forward : transform.forward;

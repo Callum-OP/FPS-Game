@@ -37,6 +37,10 @@ public class PlayerSetup : MonoBehaviour
         playerHealth = GetComponent<PlayerHealth>();
         characterAnimation = GetComponentInChildren<CharacterAnimationDriver>();
 
+        // Only the local player's rigged body should ever hide its head - enemies
+        // share the same body prefab and must keep theirs.
+        GetComponentInChildren<HeadHider>()?.Activate();
+
         // These are on the camera itself
         cameraRecoil = fpCamera.GetComponent<CameraRecoil>();
         cameraLean = fpCamera.GetComponent<CameraLean>();

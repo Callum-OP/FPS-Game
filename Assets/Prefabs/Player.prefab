@@ -229,6 +229,9 @@ GameObject:
   - component: {fileID: 7013886737931384741}
   - component: {fileID: 2735340585188078159}
   - component: {fileID: 7219984608590271071}
+  - component: {fileID: 2714943959344486485}
+  - component: {fileID: 8719003296114661464}
+  - component: {fileID: 2851115830741363710}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -299,6 +302,8 @@ MonoBehaviour:
   cameraTransform: {fileID: 7430708228133973812}
   weaponCant: {fileID: 0}
   cantSpeedMultiplier: 0.5
+  animationDriver: {fileID: 0}
+  crouchSpeedMultiplier: 0.5
   footstepClips:
   - {fileID: 8300000, guid: 3519e1b49b777a34d8674238d3c71350, type: 3}
   footstepInterval: 0.4
@@ -500,7 +505,65 @@ MonoBehaviour:
   damage: 40
   cooldown: 0.8
   stunDuration: 1.2
-  bodyPose: {fileID: 0}
+  animationDriver: {fileID: 0}
+  legacyBodyPose: {fileID: 0}
+--- !u!95 &2714943959344486485
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 4cf6a219d675f334e81ee17e81df6378, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &8719003296114661464
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 749d3505beb843842ad1e9e031a92c06, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterAnimationDriver
+  defaultWeaponClass: 1
+--- !u!114 &2851115830741363710
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eaa447621804f544c81010d753fa8aa5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterLocomotion
+  animator: {fileID: 2714943959344486485}
+  agent: {fileID: 0}
+  controller: {fileID: 4978825219315633988}
+  animationDriver: {fileID: 8719003296114661464}
+  walkSpeed: 2.5
+  runSpeed: 5.5
+  damping: 0.12
+  groundCheckDistance: 0.3
+  idleDeadzone: 0.15
+  debugLog: 1
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -554,15 +617,12 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7063193259301972663, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: 4cf6a219d675f334e81ee17e81df6378, type: 2}
+    - target: {fileID: 7063193259301972663, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
       propertyPath: m_WarningMessage
-      value: "\nBinding warning: Some generic clip(s) animate transforms that are
-        already bound by a Humanoid avatar. These transforms can only be changed
-        by Humanoid clips.\n\tTransform 'mixamorig:Hips'\n\tTransform 'mixamorig:LeftFoot'\n\tTransform
-        'mixamorig:LeftHandThumb2'\n\tTransform 'mixamorig:LeftHandIndex1'\n\tTransform
-        'mixamorig:LeftHandPinky2'\n\tTransform 'mixamorig:RightHandRing2'\n\tTransform
-        'mixamorig:Spine1'\n\tTransform 'mixamorig:LeftToeBase'\n\tTransform 'mixamorig:LeftHandThumb3'\n\tTransform
-        'mixamorig:RightArm'\n\tand more ...\n\tFrom animation clip 'mixamo.com'\n\tFrom
-        animation clip 'mixamo.com'"
+      value: 
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

@@ -21,6 +21,11 @@ public class PlayerMovement : MonoBehaviour
     public WeaponCant weaponCant;
     public float cantSpeedMultiplier = 0.5f;  // 50% speed when canted
 
+    [Header("Crouch")]
+    public CharacterAnimationDriver animationDriver; // auto-found in children if empty
+    public float crouchSpeedMultiplier = 0.5f;
+    private bool isCrouching = false;
+
     private CharacterController controller;
     private Vector3 velocity;
     private float xRotation = 0f;
@@ -30,6 +35,7 @@ public class PlayerMovement : MonoBehaviour
     private InputAction lookAction;
     private InputAction jumpAction;
     private InputAction sprintAction;
+    private InputAction crouchAction;
 
     [Header("Footsteps")]
     public AudioClip[] footstepClips;
@@ -44,6 +50,7 @@ public class PlayerMovement : MonoBehaviour
         lookAction   = new InputAction("Look",   binding: "<Mouse>/delta");
         jumpAction   = new InputAction("Jump",   binding: "<Keyboard>/space");
         sprintAction = new InputAction("Sprint", binding: "<Keyboard>/f");
+        crouchAction = new InputAction("Crouch", binding: "<Keyboard>/c");
 
         // WASD
         moveAction = new InputAction("Move");
@@ -57,11 +64,13 @@ public class PlayerMovement : MonoBehaviour
         lookAction.Enable();
         jumpAction.Enable();
         sprintAction.Enable();
+        crouchAction.Enable();
     }
 
     void Start()
     {
         controller = GetComponent<CharacterController>();
+        if (animationDriver == null) animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -103,10 +112,18 @@ public class PlayerMovement : MonoBehaviour
         Vector2 moveInput = moveAction.ReadValue<Vector2>();
         bool isSprinting  = sprintAction.ReadValue<float>() > 0.5f;
 
+        if (crouchAction.WasPressedThisFrame())
+        {
+            isCrouching = !isCrouching;
+            if (isCrouching) isSprinting = false;
+            animationDriver?.SetCrouching(isCrouching);
+        }
+
         float speed = isSprinting ? runSpeed : walkSpeed;
 
         // Apply all multipliers
         speed *= speedMultiplier;
+        if (isCrouching) speed *= crouchSpeedMultiplier;
 
         // Slow down when canted
         if (weaponCant != null && weaponCant.IsCanted())
@@ -149,5 +166,6 @@ public class PlayerMovement : MonoBehaviour
         lookAction.Disable();
         jumpAction.Disable();
         sprintAction.Disable();
+        crouchAction.Disable();
     }
 }

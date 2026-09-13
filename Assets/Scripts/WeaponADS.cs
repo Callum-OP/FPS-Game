@@ -3,6 +3,9 @@ using UnityEngine.InputSystem;
 
 public class WeaponADS : MonoBehaviour
 {
+    [Header("Body Animation")]
+    public CharacterAnimationDriver animationDriver; // auto-found on player if empty
+
     [Header("Positions")]
     public Vector3 hipPosition = new Vector3(0f, -0.1f, 0f);
     public Vector3 adsPosition = new Vector3(0f, 0.03f, 0.2f);
@@ -29,6 +32,8 @@ public class WeaponADS : MonoBehaviour
     void Awake()
     {
         if (fpCamera == null) fpCamera = Camera.main;
+        if (animationDriver == null) animationDriver = GetComponentInParent<CharacterAnimationDriver>();
+        if (animationDriver == null) animationDriver = FindFirstObjectByType<CharacterAnimationDriver>();
 
         // Use left shift to aim
         aimAction = new InputAction("Aim", binding: "<Keyboard>/leftShift");
@@ -44,7 +49,9 @@ public class WeaponADS : MonoBehaviour
 
     void Update()
     {
+        bool wasAiming = isAiming;
         isAiming = aimAction.ReadValue<float>() > 0.5f;
+        if (isAiming != wasAiming) animationDriver?.SetAiming(isAiming);
 
         Vector3 targetPos = isAiming ? adsPosition : hipPosition;
         Vector3 targetRot = isAiming ? adsRotation : hipRotation;

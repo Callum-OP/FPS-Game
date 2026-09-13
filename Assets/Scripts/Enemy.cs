@@ -222,6 +222,8 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
+        characterAnimation?.SetAiming(false);
+
         // Lost sight
         if (!playerInSight)
             EnterInvestigate();
@@ -231,6 +233,7 @@ public class EnemyAI : MonoBehaviour
     {
         if (isStunned) return; // Cannot attack when stunned
 
+        characterAnimation?.SetAiming(false);
         FacePlayer();
         agent.isStopped = true;
 
@@ -375,6 +378,7 @@ public class EnemyAI : MonoBehaviour
         if (attackTimer > 0f || bulletPrefab == null || muzzlePoint == null) return;
 
         attackTimer = attackCooldown;
+        characterAnimation?.SetAiming(true);
         characterAnimation?.PlayShoot();
 
         // Build up aim time while stationary and in sight

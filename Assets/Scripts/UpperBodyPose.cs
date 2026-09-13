@@ -44,8 +44,23 @@ public class UpperBodyPose : MonoBehaviour
 
     void Start()
     {
+        // The new Animator-driven system (CharacterAnimationDriver + CharacterAnimator.controller)
+        // poses the arms through real retargeted clips on a masked upper-body layer. This script
+        // predates that and would fight it every frame for the same muscles, so stand down whenever
+        // that component is present anywhere on the character hierarchy.
+        if (GetComponentInParent<CharacterAnimationDriver>() != null ||
+            GetComponentInChildren<CharacterAnimationDriver>() != null)
+        {
+            enabled = false;
+            return;
+        }
+
         anim = GetComponent<Animator>();
-        if (anim == null || !anim.isHuman || anim.avatar == null) { enabled = false; return; }
+        if (anim == null || anim.runtimeAnimatorController == null || !anim.isHuman || anim.avatar == null)
+        {
+            enabled = false;
+            return;
+        }
         handler = new HumanPoseHandler(anim.avatar, transform);
 
         holdIdx = new int[HoldPose.Length];

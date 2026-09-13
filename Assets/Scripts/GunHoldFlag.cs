@@ -8,6 +8,9 @@ public class GunHoldFlag : MonoBehaviour
 
     void Start()
     {
+        // Superseded by CharacterAnimationDriver's WeaponClass parameter - stand down if present.
+        if (GetComponent<CharacterAnimationDriver>() != null) { enabled = false; return; }
+
         var anim = GetComponent<Animator>();
         if (anim != null) anim.SetBool("HasGun", hasGun);
     }

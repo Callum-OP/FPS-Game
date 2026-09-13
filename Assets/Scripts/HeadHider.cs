@@ -1,11 +1,14 @@
 using UnityEngine;
 
 /// <summary>First-person body helper: collapses the head bone so the player's own
-/// head/mask never blocks the camera, while arms and torso stay visible.</summary>
+/// head/mask never blocks the camera, while arms and torso stay visible.
+/// Off by default - call Activate() (PlayerSetup does this automatically) so enemies
+/// sharing the same rigged body prefab don't lose their heads too.</summary>
 public class HeadHider : MonoBehaviour
 {
     Transform head;
     Vector3 origScale = Vector3.one;
+    bool active;
 
     void Start()
     {
@@ -16,9 +19,13 @@ public class HeadHider : MonoBehaviour
         origScale = head.localScale;
     }
 
+    /// <summary>Call once on whichever instance is actually the local player's body.</summary>
+    public void Activate() { active = true; }
+
     // every frame, after animation/pose writes — some of them restore bone scale
     void LateUpdate()
     {
+        if (!active || head == null) return;
         head.localScale = origScale * 0.001f;
     }
 
