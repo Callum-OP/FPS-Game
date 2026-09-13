@@ -17,6 +17,7 @@ public class CharacterLocomotion : MonoBehaviour
     public Animator animator;
     public NavMeshAgent agent;
     public CharacterController controller;
+    public PlayerMovement playerMovement;
     public CharacterAnimationDriver animationDriver;
 
     [Tooltip("Planar speed (m/s) that maps to a full walk (blend value 1).")]
@@ -43,6 +44,7 @@ public class CharacterLocomotion : MonoBehaviour
         if (animator == null) animator = GetComponent<Animator>();
         if (agent == null) agent = GetComponentInParent<NavMeshAgent>();
         if (controller == null) controller = GetComponentInParent<CharacterController>();
+        if (playerMovement == null) playerMovement = GetComponentInParent<PlayerMovement>();
         if (animationDriver == null) animationDriver = GetComponent<CharacterAnimationDriver>();
         lastPos = transform.position;
     }
@@ -52,7 +54,12 @@ public class CharacterLocomotion : MonoBehaviour
         Vector3 worldVelocity;
         bool grounded = true;
 
-        if (agent != null && agent.enabled && !agent.isStopped)
+        if (playerMovement != null && playerMovement.enabled)
+        {
+            worldVelocity = playerMovement.PlanarVelocity;
+            grounded = playerMovement.IsGrounded;
+        }
+        else if (agent != null && agent.enabled && !agent.isStopped)
         {
             worldVelocity = agent.velocity;
         }

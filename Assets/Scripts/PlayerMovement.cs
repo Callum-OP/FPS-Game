@@ -28,6 +28,8 @@ public class PlayerMovement : MonoBehaviour
 
     private CharacterController controller;
     private Vector3 velocity;
+    public Vector3 PlanarVelocity { get; private set; }
+    public bool IsGrounded => controller != null && controller.isGrounded;
     private float xRotation = 0f;
 
     // Input actions
@@ -130,7 +132,9 @@ public class PlayerMovement : MonoBehaviour
             speed *= cantSpeedMultiplier;
 
         Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
-        controller.Move(move * speed * Time.deltaTime);
+        Vector3 movement = move * speed;
+        controller.Move(movement * Time.deltaTime);
+        PlanarVelocity = movement;
 
         if (jumpAction.WasPressedThisFrame() && isGrounded)
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);

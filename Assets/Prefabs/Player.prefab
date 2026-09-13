@@ -225,7 +225,7 @@ GameObject:
   - component: {fileID: 8380861452952741765}
   - component: {fileID: 802424425183540071}
   - component: {fileID: 7209459024370866370}
-  - component: {fileID: 1703958914090550850}
+  - component: {fileID: 8403096973582887497}
   - component: {fileID: 7013886737931384741}
   - component: {fileID: 2735340585188078159}
   - component: {fileID: 7219984608590271071}
@@ -425,33 +425,6 @@ MonoBehaviour:
   throwForce: 15
   throwUpward: 5
   maxGrenades: 3
---- !u!54 &1703958914090550850
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8403096973582887497}
-  serializedVersion: 5
-  m_Mass: 10
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 126
-  m_CollisionDetection: 0
 --- !u!114 &7013886737931384741
 MonoBehaviour:
   m_ObjectHideFlags: 0
