@@ -33,7 +33,5 @@ public class Health : MonoBehaviour
     {
         Debug.Log($"{name} died!");
         onDeath?.Invoke();
-        if (destroyOnDeath)
-            Destroy(gameObject);
     }
 }

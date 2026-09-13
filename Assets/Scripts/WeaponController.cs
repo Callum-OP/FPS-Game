@@ -49,6 +49,7 @@ public class WeaponController : MonoBehaviour
     private InputAction reloadAction;
     private int currentAmmo;
     private bool isReloading;
+    CharacterAnimationDriver characterAnimation;
 
     [Header("Muzzle Flash")]
     public ParticleSystem muzzleFlash;
@@ -77,6 +78,8 @@ public class WeaponController : MonoBehaviour
 
         if (gunSlide == null)
             gunSlide = GetComponentInChildren<GunSlide>();
+
+        characterAnimation = FindFirstObjectByType<CharacterAnimationDriver>();
     }
 
     void Update()
@@ -120,6 +123,7 @@ public class WeaponController : MonoBehaviour
 
         currentAmmo--;
         onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
+        characterAnimation?.PlayShoot();
 
         AudioManager.Instance?.Play(gunshotClip);
 
@@ -244,6 +248,7 @@ public class WeaponController : MonoBehaviour
     {
         isReloading = true;
         onReloadStart?.Invoke();
+        characterAnimation?.PlayReload();
         Debug.Log("Reloading...");
 
         yield return new WaitForSeconds(reloadTime);

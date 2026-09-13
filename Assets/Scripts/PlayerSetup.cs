@@ -18,6 +18,7 @@ public class PlayerSetup : MonoBehaviour
     [HideInInspector] public LowerWeapon lowerWeapon;
     [HideInInspector] public PlayerHUD playerHUD;
     [HideInInspector] public AmmoHUD ammoHUD;
+    CharacterAnimationDriver characterAnimation;
 
     void Awake()
     {
@@ -34,6 +35,7 @@ public class PlayerSetup : MonoBehaviour
 
         playerMovement = GetComponent<PlayerMovement>();
         playerHealth = GetComponent<PlayerHealth>();
+        characterAnimation = GetComponentInChildren<CharacterAnimationDriver>();
 
         // These are on the camera itself
         cameraRecoil = fpCamera.GetComponent<CameraRecoil>();
@@ -132,6 +134,7 @@ public class PlayerSetup : MonoBehaviour
         }
 
         activeWeapon = weapon;
+        characterAnimation?.SetWeaponFrom(weapon);
 
         // Regather weapon components from NEW weapon
         GatherWeaponComponents(weapon);

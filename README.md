@@ -1,5 +1,13 @@
 # Current features
 
+## Local assets
+
+Downloaded, supplied, and other potentially redistributable Unity assets live
+under `Assets/LocalAssets/`, which is ignored by Git. Keep a local backup of
+that folder and do not commit it. A fresh checkout needs the local asset bundle
+restored before opening gameplay scenes.
+# Current features
+
 Player can move using wasd keys and press X to lower weapon and fast walk.
 Can press Left Shift to aim and use Q to lean left or E to lean right (useful for peeking round corners).
 Can press F to sprint and R to reload.

@@ -217,8 +217,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4253706166033543944}
-  - component: {fileID: 1708898540370315702}
-  - component: {fileID: 7899218655484857867}
   - component: {fileID: 4978825219315633988}
   - component: {fileID: 7265401261218519411}
   - component: {fileID: 737586484682861139}
@@ -228,6 +226,9 @@ GameObject:
   - component: {fileID: 802424425183540071}
   - component: {fileID: 7209459024370866370}
   - component: {fileID: 1703958914090550850}
+  - component: {fileID: 7013886737931384741}
+  - component: {fileID: 2735340585188078159}
+  - component: {fileID: 7219984608590271071}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -250,65 +251,9 @@ Transform:
   m_Children:
   - {fileID: 7430708228133973812}
   - {fileID: 6760172537210262285}
+  - {fileID: 747363711740859744}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &1708898540370315702
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8403096973582887497}
-  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &7899218655484857867
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8403096973582887497}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!143 &4978825219315633988
 CharacterController:
   m_ObjectHideFlags: 0
@@ -502,6 +447,138 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 126
   m_CollisionDetection: 0
+--- !u!114 &7013886737931384741
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7cbd4a9968c190440b19641d0e7ef8dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeathCam
+  cam: {fileID: 6377591225008060462}
+  orbitTarget: {fileID: 747363711740859744}
+  disableOnDeath:
+  - {fileID: 7265401261218519411}
+  - {fileID: 3292127557675933084}
+  startRadius: 2.5
+  endRadius: 7
+  startHeight: 1.8
+  endHeight: 4.5
+  orbitSpeed: 25
+  zoomOutTime: 3.5
+  lookHeight: 0.8
+--- !u!114 &2735340585188078159
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8478f5b1f55947941b31a912750c3872, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Ragdoll
+  animator: {fileID: 4783233763987129048}
+--- !u!114 &7219984608590271071
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11fb4f320615b8343bf181e457b3d754, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMelee
+  range: 2.4
+  damage: 40
+  cooldown: 0.8
+  stunDuration: 1.2
+  bodyPose: {fileID: 0}
+--- !u!1001 &2334260011061684335
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 4253706166033543944}
+    m_Modifications:
+    - target: {fileID: 1987674067119739359, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_Name
+      value: YBotBody
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7063193259301972663, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      propertyPath: m_WarningMessage
+      value: "\nBinding warning: Some generic clip(s) animate transforms that are
+        already bound by a Humanoid avatar. These transforms can only be changed
+        by Humanoid clips.\n\tTransform 'mixamorig:Hips'\n\tTransform 'mixamorig:LeftFoot'\n\tTransform
+        'mixamorig:LeftHandThumb2'\n\tTransform 'mixamorig:LeftHandIndex1'\n\tTransform
+        'mixamorig:LeftHandPinky2'\n\tTransform 'mixamorig:RightHandRing2'\n\tTransform
+        'mixamorig:Spine1'\n\tTransform 'mixamorig:LeftToeBase'\n\tTransform 'mixamorig:LeftHandThumb3'\n\tTransform
+        'mixamorig:RightArm'\n\tand more ...\n\tFrom animation clip 'mixamo.com'\n\tFrom
+        animation clip 'mixamo.com'"
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+--- !u!4 &747363711740859744 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &4783233763987129048 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 7063193259301972663, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &7137902250309885460
 PrefabInstance:
   m_ObjectHideFlags: 0

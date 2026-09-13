@@ -1,3 +1,5 @@
+# Locally supplied or downloaded assets are intentionally kept out of Git.
+Assets/LocalAssets/
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -26,3 +28,8 @@ crash.dmp
 [Rr]ecovery/
 *.recovery
 _Recovery
+
+
+Assets\Test
+
+Docs

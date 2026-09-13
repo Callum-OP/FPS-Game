@@ -33,6 +33,7 @@ public class EnemyAI : MonoBehaviour
 
     [Header("Shooting (optional)")]
     public bool canShoot = false;
+    public CharacterWeaponClass weaponClass = CharacterWeaponClass.Rifle;
     public GameObject bulletPrefab;
     public Transform muzzlePoint;
     public float bulletSpeed = 40f;
@@ -56,6 +57,8 @@ public class EnemyAI : MonoBehaviour
     private Transform player;
     private PlayerHealth playerHealth;
 
+    private UpperBodyPose bodyPose; // animated body (drives Melee swing)
+    private CharacterAnimationDriver characterAnimation;
     private Vector3 lastKnownPlayerPos;
     private float investigateTimer;
     private float attackTimer;
@@ -84,6 +87,17 @@ public class EnemyAI : MonoBehaviour
         // Connect to health events
         health.onDeath.AddListener(OnDeath);
         agent.speed = walkSpeed;
+        bodyPose = GetComponentInChildren<UpperBodyPose>();
+        characterAnimation = GetComponentInChildren<CharacterAnimationDriver>();
+        if (!canShoot)
+            characterAnimation?.SetWeaponClass(CharacterWeaponClass.Unarmed);
+        else
+        {
+            CharacterWeaponClass selectedClass = weaponClass;
+            if (name.IndexOf("Club", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                selectedClass = CharacterWeaponClass.Pistol;
+            characterAnimation?.SetWeaponClass(selectedClass);
+        }
 
         // Start patrolling if waypoints are set, otherwise idle
         if (waypoints != null && waypoints.Length > 0)
@@ -228,6 +242,7 @@ public class EnemyAI : MonoBehaviour
         if (attackTimer <= 0f)
         {
             attackTimer = attackCooldown;
+            if (bodyPose != null) bodyPose.TriggerMelee();
             playerHealth.TakeDamage(attackDamage);
             Debug.Log($"{name} attacked player for {attackDamage} damage");
         }
@@ -324,7 +339,8 @@ public class EnemyAI : MonoBehaviour
 
         // Line of sight check
         if (Physics.Raycast(transform.position + Vector3.up * 1.5f,
-            dirToPlayer.normalized, out RaycastHit hit, dist, sightBlockers))
+            dirToPlayer.normalized, out RaycastHit hit, dist, sightBlockers,
+            QueryTriggerInteraction.Ignore)) // don't let own trigger hitboxes block sight
         {
             // Hit something before reaching player
             if (!hit.transform.CompareTag("Player"))
@@ -359,6 +375,7 @@ public class EnemyAI : MonoBehaviour
         if (attackTimer > 0f || bulletPrefab == null || muzzlePoint == null) return;
 
         attackTimer = attackCooldown;
+        characterAnimation?.PlayShoot();
 
         // Build up aim time while stationary and in sight
         if (agent.isStopped)
@@ -400,6 +417,10 @@ public class EnemyAI : MonoBehaviour
 
         bullet.transform.forward = direction;
 
+        // enemy bullets only hurt the player — no friendly fire between enemies
+        Projectile proj = bullet.GetComponent<Projectile>();
+        if (proj != null) proj.firedByEnemy = true;
+
         Rigidbody rb = bullet.GetComponent<Rigidbody>();
         if (rb != null)
         {
@@ -425,12 +446,14 @@ public class EnemyAI : MonoBehaviour
     {
         currentState = State.Dead;
         agent.isStopped = true;
-        
-        // Disable collider
+
+        // Disable colliders so the corpse stops blocking shots/paths — the Ragdoll
+        // component re-enables the bone colliders a frame later and the body
+        // collapses where it died (no despawn).
         foreach (Collider col in GetComponentsInChildren<Collider>())
             col.enabled = false;
 
-        Destroy(gameObject, 2f);
+        enabled = false;
     }
 
     // View sight range in editor
