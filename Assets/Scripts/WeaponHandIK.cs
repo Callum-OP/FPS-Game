@@ -42,6 +42,8 @@ public class WeaponHandIK : MonoBehaviour
     Animator anim;
     Transform rightGrip;
     Transform leftGrip;
+    Transform reloadRightOverride;
+    Transform reloadLeftOverride;
     WeaponHandIKAnimatorBridge animatorBridge;
     float rightWeight;
     float leftWeight;
@@ -74,6 +76,20 @@ public class WeaponHandIK : MonoBehaviour
     {
         rightGrip = right;
         leftGrip = left;
+        // A new weapon means any in-progress reload pose from the old one is meaningless.
+        reloadRightOverride = null;
+        reloadLeftOverride = null;
+    }
+
+    /// <summary>Called by WeaponReloadHandler to temporarily steer a hand away from its
+    /// normal weapon grip (e.g. left hand reaching for a spare mag) without touching the
+    /// underlying grip targets set by SetGripTargets. Pass null for either hand to hand
+    /// control of that hand back to its normal grip - the blend weight (rightWeight/
+    /// leftWeight) fades smoothly either way since ApplyIK never snaps.</summary>
+    public void SetReloadOverride(Transform right, Transform left)
+    {
+        reloadRightOverride = right;
+        reloadLeftOverride = left;
     }
 
     void OnAnimatorIK(int layerIndex)
@@ -87,15 +103,19 @@ public class WeaponHandIK : MonoBehaviour
     {
         if (anim == null) return;
 
+        // Reload overrides win when present; otherwise fall back to the weapon's normal grips.
+        Transform effectiveRight = reloadRightOverride != null ? reloadRightOverride : rightGrip;
+        Transform effectiveLeft = reloadLeftOverride != null ? reloadLeftOverride : leftGrip;
+
         // Don't fight the melee swing / ragdoll / death poses - only apply while a
         // weapon is actually meant to be held.
-        float rightTarget = rightGrip != null ? 1f : 0f;
-        float leftTarget = leftGrip != null ? 1f : 0f;
+        float rightTarget = effectiveRight != null ? 1f : 0f;
+        float leftTarget = effectiveLeft != null ? 1f : 0f;
         rightWeight = Mathf.MoveTowards(rightWeight, rightTarget, blendSpeed * Time.deltaTime);
         leftWeight = Mathf.MoveTowards(leftWeight, leftTarget, blendSpeed * Time.deltaTime);
 
-        ApplyHand(AvatarIKGoal.RightHand, rightGrip, rightWeight, rightElbowHint, AvatarIKHint.RightElbow);
-        ApplyHand(AvatarIKGoal.LeftHand, leftGrip, leftWeight, leftElbowHint, AvatarIKHint.LeftElbow);
+        ApplyHand(AvatarIKGoal.RightHand, effectiveRight, rightWeight, rightElbowHint, AvatarIKHint.RightElbow);
+        ApplyHand(AvatarIKGoal.LeftHand, effectiveLeft, leftWeight, leftElbowHint, AvatarIKHint.LeftElbow);
     }
 
     void ApplyHand(AvatarIKGoal goal, Transform grip, float weight, Transform elbowHint, AvatarIKHint hint)

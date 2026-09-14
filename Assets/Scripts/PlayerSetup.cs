@@ -20,6 +20,7 @@ public class PlayerSetup : MonoBehaviour
     [HideInInspector] public AmmoHUD ammoHUD;
     CharacterAnimationDriver characterAnimation;
     WeaponHandIK weaponHandIK;
+    WeaponReloadHandler weaponReloadHandler;
 
     void Awake()
     {
@@ -63,6 +64,8 @@ public class PlayerSetup : MonoBehaviour
         weaponADS = weapon.GetComponentInChildren<WeaponADS>(true);
         weaponSway = weapon.GetComponentInChildren<WeaponSway>(true);
         lowerWeapon = weapon.GetComponentInChildren<LowerWeapon>(true);
+        weaponReloadHandler = weapon.GetComponentInChildren<WeaponReloadHandler>(true);
+        weaponReloadHandler?.SetHandIK(weaponHandIK);
 
         Debug.Log($"Gathered from weapon {weapon.name} — " +
             $"Cant:{weaponCant != null} " +

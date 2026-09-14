@@ -46,6 +46,10 @@ public class WeaponController : MonoBehaviour
     [Header("Slide")]
     public GunSlide gunSlide;
 
+    [Header("Reload Visuals")]
+    [Tooltip("Optional - drives the procedural mag-out/mag-in hand movement and mag drop/pickup props. Leave unassigned (e.g. on the shotgun) to fall back to a plain reload with no hand repositioning.")]
+    public WeaponReloadHandler reloadHandler;
+
     // HUD
     public System.Action<int, int> onAmmoChanged;
     public System.Action onReloadStart;
@@ -86,6 +90,9 @@ public class WeaponController : MonoBehaviour
 
         if (gunSlide == null)
             gunSlide = GetComponentInChildren<GunSlide>();
+
+        if (reloadHandler == null)
+            reloadHandler = GetComponent<WeaponReloadHandler>();
 
         characterAnimation = FindAnyObjectByType<CharacterAnimationDriver>();
     }
@@ -279,6 +286,7 @@ public class WeaponController : MonoBehaviour
         isReloading = true;
         onReloadStart?.Invoke();
         characterAnimation?.PlayReload();
+        reloadHandler?.PlayReload(reloadTime);
         Debug.Log("Reloading...");
 
         yield return new WaitForSeconds(reloadTime);
