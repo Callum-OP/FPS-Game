@@ -20160,8 +20160,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   animationDriver: {fileID: 0}
-  hipPosition: {x: 0, y: -0.7, z: 0.4}
-  adsPosition: {x: 0, y: -0.49, z: 0.8}
+  hipPosition: {x: 0, y: -0.376923, z: 0.215385}
+  adsPosition: {x: 0, y: -0.30625, z: 0.5}
   hipRotation: {x: -1, y: 1.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10

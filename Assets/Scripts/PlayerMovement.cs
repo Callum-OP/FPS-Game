@@ -24,7 +24,15 @@ public class PlayerMovement : MonoBehaviour
     [Header("Crouch")]
     public CharacterAnimationDriver animationDriver; // auto-found in children if empty
     public float crouchSpeedMultiplier = 0.5f;
+    [Tooltip("How far the camera drops (local Y, relative to its standing position) while crouched.")]
+    public float crouchCameraDrop = 0.5f;
+    [Tooltip("How much of the CharacterController's standing height is kept while crouched (0-1). Keeps the feet planted - the capsule shrinks from the top, not the middle.")]
+    [Range(0.3f, 1f)] public float crouchHeightFraction = 0.6f;
+    public float crouchTransitionSpeed = 8f;
     private bool isCrouching = false;
+    private float standingCameraLocalY;
+    private float standingControllerHeight;
+    private Vector3 standingControllerCenter;
 
     private CharacterController controller;
     private Vector3 velocity;
@@ -75,12 +83,44 @@ public class PlayerMovement : MonoBehaviour
         if (animationDriver == null) animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        // Captured rather than hardcoded, so this works with whatever height/eye
+        // position was actually set up in the scene instead of guessing an absolute value.
+        if (cameraTransform != null) standingCameraLocalY = cameraTransform.localPosition.y;
+        if (controller != null)
+        {
+            standingControllerHeight = controller.height;
+            standingControllerCenter = controller.center;
+        }
     }
 
     void Update()
     {
         HandleMouseLook();
         HandleMovement();
+        HandleCrouchHeight();
+    }
+
+    void HandleCrouchHeight()
+    {
+        if (cameraTransform != null)
+        {
+            float targetY = standingCameraLocalY - (isCrouching ? crouchCameraDrop : 0f);
+            Vector3 pos = cameraTransform.localPosition;
+            pos.y = Mathf.Lerp(pos.y, targetY, crouchTransitionSpeed * Time.deltaTime);
+            cameraTransform.localPosition = pos;
+        }
+
+        if (controller != null)
+        {
+            float targetHeight = isCrouching ? standingControllerHeight * crouchHeightFraction : standingControllerHeight;
+            controller.height = Mathf.Lerp(controller.height, targetHeight, crouchTransitionSpeed * Time.deltaTime);
+
+            // Shrink from the top, not the middle - keeps the feet on the ground
+            // instead of the whole capsule sinking/floating as height changes.
+            float heightLost = standingControllerHeight - controller.height;
+            controller.center = standingControllerCenter - new Vector3(0f, heightLost * 0.5f, 0f);
+        }
     }
 
     public void SetSpeedMultiplier(float multiplier)

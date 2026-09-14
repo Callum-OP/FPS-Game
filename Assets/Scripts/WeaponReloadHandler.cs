@@ -9,9 +9,11 @@ using System.Collections;
 /// have one that lines up with an arbitrary weapon's magwell), this drives the left
 /// hand procedurally through WeaponHandIK's reload-override hook: it reaches for a
 /// magazine point, a mag prop pops out and falls to the floor like the empty casings
-/// do, a fresh mag prop appears "in hand", gets seated back into the weapon, and the
-/// hand returns to its normal grip. The right hand gets a small lift offset for the
-/// same window so it doesn't look frozen mid-reload while the left hand is off the gun.
+/// do, a fresh mag prop appears in the hand, gets seated back into the weapon, and the
+/// hand returns to its normal grip. Instead of also faking a right-hand lift (which
+/// looked disconnected from the gun), the weapon itself lifts and tilts up slightly for
+/// the same window - the right hand just naturally follows since it's IK'd to a grip
+/// point that's a child of the weapon.
 ///
 /// Entirely optional: if this component isn't on a weapon (or magazinePrefab /
 /// handReloadPoint are left empty) WeaponController's reload falls back to exactly
@@ -30,7 +32,13 @@ using System.Collections;
 ///  4. Assign magazinePrefab - a small mag mesh. Give it a Rigidbody + Collider so the
 ///     dropped copy tumbles on the floor; the carried/seated copies strip those off
 ///     automatically since they're purely cosmetic.
-///  5. Tune the timing fields below (fractions of WeaponController.reloadTime) to match
+///  5. Leave weaponLiftPivot empty to auto-use the RightHandGrip's parent (the weapon
+///     mesh's own pivot, above WeaponCant/WeaponRecoil/LowerWeapon in the rig) - only
+///     assign it explicitly if your weapon's hierarchy differs.
+///  6. Tune magHandOffsetPosition/Rotation in Play Mode so the carried mag prop actually
+///     lines up with the hand mesh - it's parented straight to the LeftHand bone now, so
+///     this offset is the only thing positioning it (see note on that field).
+///  7. Tune the timing fields below (fractions of WeaponController.reloadTime) to match
 ///     however long your reload animation actually takes to look right.
 /// </summary>
 [RequireComponent(typeof(WeaponController))]
@@ -43,6 +51,10 @@ public class WeaponReloadHandler : MonoBehaviour
     public Transform magSeatPoint;
     [Tooltip("Where the left hand reaches to while carrying the fresh mag before it's seated. Leave empty to skip the hand-repositioning entirely.")]
     public Transform handReloadPoint;
+    [Tooltip("Local position offset from the LeftHand bone the carried mag prop sits at. The mag is parented directly to the hand bone (not handReloadPoint) so it visibly moves with the hand mesh - tune this in Play Mode until it sits in the palm correctly.")]
+    public Vector3 magHandOffsetPosition = Vector3.zero;
+    [Tooltip("Local rotation offset (Euler) from the LeftHand bone for the carried mag prop.")]
+    public Vector3 magHandOffsetRotation = Vector3.zero;
 
     [Header("Timing (fraction of WeaponController.reloadTime, 0-1)")]
     [Range(0f, 1f)] public float handMoveOutTime = 0.05f;  // left hand starts leaving the foregrip
@@ -50,9 +62,13 @@ public class WeaponReloadHandler : MonoBehaviour
     [Range(0f, 1f)] public float magSeatTime = 0.75f;      // new mag clicks in
     [Range(0f, 1f)] public float handReturnTime = 0.9f;    // left hand returns to the foregrip
 
-    [Header("Right Hand")]
-    [Tooltip("Local offset (weapon space) the right hand lifts by while the left hand is off the gun, so the grip doesn't look frozen mid-reload.")]
-    public Vector3 rightHandLiftOffset = new Vector3(0f, 0.03f, 0f);
+    [Header("Weapon Lift (replaces a faked right-hand lift)")]
+    [Tooltip("Transform to nudge up/rotate during the reload instead of moving the right hand. Leave empty to auto-use RightHandGrip's parent transform.")]
+    public Transform weaponLiftPivot;
+    [Tooltip("Peak local position offset applied to weaponLiftPivot, eased in and back out across the whole reload (smoothly peaks at the midpoint - no separate timing needed).")]
+    public Vector3 weaponLiftPosition = new Vector3(0f, 0.02f, 0f);
+    [Tooltip("Peak local rotation offset (Euler) applied to weaponLiftPivot. Negative X tilts the muzzle up on this rig's convention (matches WeaponRecoil's kick-up direction).")]
+    public Vector3 weaponLiftRotation = new Vector3(-6f, 0f, 0f);
 
     [Header("Dropped Mag Physics")]
     public float dropForce = 1.5f;
@@ -60,17 +76,14 @@ public class WeaponReloadHandler : MonoBehaviour
     public float destroyDelay = 5f;
 
     WeaponHandIK handIK;
-    Transform rightOverrideAnchor;
     GameObject carriedMag;
     Coroutine running;
 
-    void Awake()
-    {
-        // Small hidden marker that tracks the normal right-hand grip plus our lift
-        // offset every frame, so it stays correct through sway/recoil/camera pitch.
-        rightOverrideAnchor = new GameObject("ReloadRightHandAnchor").transform;
-        rightOverrideAnchor.SetParent(transform, false);
-    }
+    // What we last added to weaponLiftPivot, so each frame can cleanly undo it before
+    // adding the new amount - keeps this additive on top of WeaponCant/LowerWeapon/etc
+    // instead of fighting them for the transform.
+    Vector3 appliedLiftPos = Vector3.zero;
+    Quaternion appliedLiftRot = Quaternion.identity;
 
     /// <summary>Wired up by PlayerSetup whenever this weapon becomes active.</summary>
     public void SetHandIK(WeaponHandIK ik) => handIK = ik;
@@ -79,14 +92,28 @@ public class WeaponReloadHandler : MonoBehaviour
     /// is passed in so all the timing fractions above scale with whatever this weapon uses.</summary>
     public void PlayReload(float reloadTime)
     {
-        if (running != null) StopCoroutine(running);
+        if (running != null)
+        {
+            StopCoroutine(running);
+            RemoveAppliedLift();
+        }
         running = StartCoroutine(ReloadSequence(reloadTime));
+    }
+
+    Transform ResolveLiftPivot(WeaponController weapon)
+    {
+        if (weaponLiftPivot != null) return weaponLiftPivot;
+        // RightHandGrip's parent is the weapon mesh's own pivot (sits above
+        // WeaponCant/WeaponRecoil/LowerWeapon in the rig) - a sensible default so this
+        // works without extra Inspector setup on top of the grip transforms you already have.
+        if (weapon != null && weapon.rightHandGrip != null) return weapon.rightHandGrip.parent;
+        return null;
     }
 
     IEnumerator ReloadSequence(float reloadTime)
     {
         WeaponController weapon = GetComponent<WeaponController>();
-        Transform baseRight = weapon != null ? weapon.rightHandGrip : null;
+        Transform liftPivot = ResolveLiftPivot(weapon);
         bool canReposition = handIK != null && handReloadPoint != null;
 
         float t = 0f;
@@ -95,17 +122,17 @@ public class WeaponReloadHandler : MonoBehaviour
         while (t < reloadTime)
         {
             t += Time.deltaTime;
-            float frac = reloadTime > 0f ? t / reloadTime : 1f;
+            float frac = reloadTime > 0f ? Mathf.Clamp01(t / reloadTime) : 1f;
 
             if (canReposition && frac >= handMoveOutTime && !returned)
-            {
-                if (baseRight != null)
-                {
-                    rightOverrideAnchor.rotation = baseRight.rotation;
-                    rightOverrideAnchor.position = baseRight.position + baseRight.TransformDirection(rightHandLiftOffset);
-                }
+                handIK.SetReloadOverride(null, handReloadPoint);
 
-                handIK.SetReloadOverride(rightOverrideAnchor, handReloadPoint);
+            if (liftPivot != null)
+            {
+                // Smooth 0 -> 1 -> 0 hump across the whole reload - peaks at the midpoint,
+                // eases back to nothing by the time it's done. No extra timing fields needed.
+                float liftMul = Mathf.Sin(frac * Mathf.PI);
+                ApplyLift(liftPivot, weaponLiftPosition * liftMul, Quaternion.Euler(weaponLiftRotation * liftMul));
             }
 
             if (frac >= magDropTime && !dropped)
@@ -133,8 +160,37 @@ public class WeaponReloadHandler : MonoBehaviour
         if (canReposition && !returned)
             handIK.SetReloadOverride(null, null);
 
+        if (liftPivot != null)
+            RemoveAppliedLift(liftPivot);
+
         CleanupCarriedMag();
         running = null;
+    }
+
+    // Undoes whatever lift was applied last frame, then applies the new amount - keeps
+    // this purely additive on top of the pivot's normal pose instead of overwriting it.
+    void ApplyLift(Transform pivot, Vector3 newPos, Quaternion newRot)
+    {
+        pivot.localPosition -= appliedLiftPos;
+        pivot.localRotation = Quaternion.Inverse(appliedLiftRot) * pivot.localRotation;
+
+        appliedLiftPos = newPos;
+        appliedLiftRot = newRot;
+
+        pivot.localPosition += appliedLiftPos;
+        pivot.localRotation = appliedLiftRot * pivot.localRotation;
+    }
+
+    void RemoveAppliedLift(Transform pivot = null)
+    {
+        if (pivot == null) pivot = ResolveLiftPivot(GetComponent<WeaponController>());
+        if (pivot != null)
+        {
+            pivot.localPosition -= appliedLiftPos;
+            pivot.localRotation = Quaternion.Inverse(appliedLiftRot) * pivot.localRotation;
+        }
+        appliedLiftPos = Vector3.zero;
+        appliedLiftRot = Quaternion.identity;
     }
 
     void DropOldMag()
@@ -154,9 +210,19 @@ public class WeaponReloadHandler : MonoBehaviour
 
     void SpawnCarriedMag()
     {
-        if (magazinePrefab == null || handReloadPoint == null) return;
+        if (magazinePrefab == null) return;
 
-        carriedMag = Instantiate(magazinePrefab, handReloadPoint.position, handReloadPoint.rotation, handReloadPoint);
+        // Parent straight to the actual LeftHand bone (not handReloadPoint, which is only
+        // an IK aim target in weapon space) so the prop visibly rides along with the hand
+        // mesh even if the IK doesn't land pixel-perfect on handReloadPoint.
+        Transform handBone = handIK != null ? handIK.GetHandBone(isRight: false) : null;
+        Transform parent = handBone != null ? handBone : handReloadPoint;
+        if (parent == null) return;
+
+        carriedMag = Instantiate(magazinePrefab, parent);
+        carriedMag.transform.localPosition = magHandOffsetPosition;
+        carriedMag.transform.localRotation = Quaternion.Euler(magHandOffsetRotation);
+
         // Purely cosmetic while it's "in hand" - strip physics so it doesn't fall or collide.
         Rigidbody rb = carriedMag.GetComponent<Rigidbody>();
         if (rb != null) Destroy(rb);

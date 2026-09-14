@@ -451,6 +451,13 @@ public class EnemyAI : MonoBehaviour
         currentState = State.Dead;
         agent.isStopped = true;
 
+        // CharacterAnimationDriver.SetDead() existed already but nothing was calling it,
+        // so the Death animator state never actually played - Ragdoll.cs's own onDeath
+        // listener disables the animator a frame later regardless, but this at least
+        // gets the Dead bool set (and the state entered) for that frame, and covers any
+        // case where the ragdoll's collapse is delayed.
+        characterAnimation?.SetDead(true);
+
         // Disable colliders so the corpse stops blocking shots/paths — the Ragdoll
         // component re-enables the bone colliders a frame later and the body
         // collapses where it died (no despawn).

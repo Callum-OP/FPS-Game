@@ -1,6 +1,25 @@
 using UnityEngine;
 
 /// <summary>
+/// Per-hand finger curl amounts applied on top of whatever the animation clip is doing
+/// with the fingers, so the hand actually closes around the grip instead of hanging
+/// open/flat against it. Degrees are the curl added at each knuckle; tune by eye in Play
+/// Mode with the game paused on a firing/idle frame - a light grip is usually only
+/// 15-25 degrees at the base knuckle, a tight fist-like grip is 60-80.
+/// </summary>
+[System.Serializable]
+public class FingerGripPose
+{
+    [Tooltip("Local axis each finger joint curls around. Mixamo/standard humanoid rigs curl fingers about local X for the base and middle knuckles - flip the sign or try Y/Z if fingers splay sideways instead of curling.")]
+    public Vector3 curlAxis = new Vector3(1f, 0f, 0f);
+    [Range(0f, 90f)] public float thumbCurl = 25f;
+    [Range(0f, 90f)] public float indexCurl = 45f;
+    [Range(0f, 90f)] public float middleCurl = 50f;
+    [Range(0f, 90f)] public float ringCurl = 50f;
+    [Range(0f, 90f)] public float pinkyCurl = 50f;
+}
+
+/// <summary>
 /// Fixes the "shooting animation doesn't match the weapon" problem WITHOUT rebuilding
 /// the camera/body/weapon hierarchy.
 ///
@@ -39,6 +58,12 @@ public class WeaponHandIK : MonoBehaviour
     public Transform rightElbowHint;
     public Transform leftElbowHint;
 
+    [Header("Finger Grip")]
+    [Tooltip("Curl applied to the right hand's fingers while it's gripping (weight > 0). Fades in/out with the same weight as the hand IK itself, so an empty hand relaxes back to the animated pose.")]
+    public FingerGripPose rightGripPose = new FingerGripPose();
+    [Tooltip("Curl applied to the left hand's fingers while it's gripping (weight > 0).")]
+    public FingerGripPose leftGripPose = new FingerGripPose();
+
     Animator anim;
     Transform rightGrip;
     Transform leftGrip;
@@ -47,6 +72,11 @@ public class WeaponHandIK : MonoBehaviour
     WeaponHandIKAnimatorBridge animatorBridge;
     float rightWeight;
     float leftWeight;
+
+    // [proximal, intermediate, distal] per finger, thumb through pinky.
+    Transform[][] rightFingerBones;
+    Transform[][] leftFingerBones;
+    static readonly float[] jointTaper = { 1f, 1f, 0.7f }; // knuckle curls fully, fingertip curls a bit less
 
     void Awake()
     {
@@ -60,15 +90,59 @@ public class WeaponHandIK : MonoBehaviour
         }
 
         if (anim == null)
+        {
             Debug.LogError($"{name} could not find a humanoid Animator in its hierarchy. Weapon hand IK is disabled.", this);
-        else if (anim.gameObject != gameObject)
+            return;
+        }
+
+        if (anim.gameObject != gameObject)
         {
             animatorBridge = anim.gameObject.GetComponent<WeaponHandIKAnimatorBridge>();
             if (animatorBridge == null)
                 animatorBridge = anim.gameObject.AddComponent<WeaponHandIKAnimatorBridge>();
             animatorBridge.owner = this;
         }
+
+        rightFingerBones = CacheFingerBones(isRight: true);
+        leftFingerBones = CacheFingerBones(isRight: false);
     }
+
+    Transform[][] CacheFingerBones(bool isRight)
+    {
+        // HumanBodyBones calls it "Little", not "Pinky" - same finger.
+        HumanBodyBones[,] bones = isRight
+            ? new HumanBodyBones[,]
+            {
+                { HumanBodyBones.RightThumbProximal, HumanBodyBones.RightThumbIntermediate, HumanBodyBones.RightThumbDistal },
+                { HumanBodyBones.RightIndexProximal, HumanBodyBones.RightIndexIntermediate, HumanBodyBones.RightIndexDistal },
+                { HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleIntermediate, HumanBodyBones.RightMiddleDistal },
+                { HumanBodyBones.RightRingProximal, HumanBodyBones.RightRingIntermediate, HumanBodyBones.RightRingDistal },
+                { HumanBodyBones.RightLittleProximal, HumanBodyBones.RightLittleIntermediate, HumanBodyBones.RightLittleDistal },
+            }
+            : new HumanBodyBones[,]
+            {
+                { HumanBodyBones.LeftThumbProximal, HumanBodyBones.LeftThumbIntermediate, HumanBodyBones.LeftThumbDistal },
+                { HumanBodyBones.LeftIndexProximal, HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.LeftIndexDistal },
+                { HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.LeftMiddleDistal },
+                { HumanBodyBones.LeftRingProximal, HumanBodyBones.LeftRingIntermediate, HumanBodyBones.LeftRingDistal },
+                { HumanBodyBones.LeftLittleProximal, HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.LeftLittleDistal },
+            };
+
+        var result = new Transform[5][];
+        for (int f = 0; f < 5; f++)
+        {
+            result[f] = new Transform[3];
+            for (int j = 0; j < 3; j++)
+                result[f][j] = anim.GetBoneTransform(bones[f, j]); // null if this rig has no finger bones - handled at apply time
+        }
+        return result;
+    }
+
+    /// <summary>The live hand bone (not the weapon grip) - use this to attach props that
+    /// should move rigidly with the hand mesh itself, e.g. a magazine held during reload,
+    /// rather than the WeaponHandIK target which is a point in weapon space.</summary>
+    public Transform GetHandBone(bool isRight) =>
+        anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand) : null;
 
     /// <summary>Called by PlayerSetup whenever the active weapon changes. Pass null for
     /// either hand to release it (weight fades out smoothly, no snapping).</summary>
@@ -116,6 +190,30 @@ public class WeaponHandIK : MonoBehaviour
 
         ApplyHand(AvatarIKGoal.RightHand, effectiveRight, rightWeight, rightElbowHint, AvatarIKHint.RightElbow);
         ApplyHand(AvatarIKGoal.LeftHand, effectiveLeft, leftWeight, leftElbowHint, AvatarIKHint.LeftElbow);
+
+        // Finger curl runs after the arm IK above so it's shaping this frame's already-posed
+        // fingers, not fighting the arm placement.
+        ApplyFingerGrip(rightFingerBones, rightGripPose, rightWeight);
+        ApplyFingerGrip(leftFingerBones, leftGripPose, leftWeight);
+    }
+
+    void ApplyFingerGrip(Transform[][] fingerBones, FingerGripPose pose, float weight)
+    {
+        if (fingerBones == null || weight <= 0f) return;
+
+        float[] curls = { pose.thumbCurl, pose.indexCurl, pose.middleCurl, pose.ringCurl, pose.pinkyCurl };
+        for (int f = 0; f < 5; f++)
+        {
+            float baseCurl = curls[f] * weight;
+            if (baseCurl <= 0f) continue;
+
+            for (int j = 0; j < 3; j++)
+            {
+                Transform bone = fingerBones[f][j];
+                if (bone == null) continue; // rig doesn't have this joint - skip it
+                bone.Rotate(pose.curlAxis, baseCurl * jointTaper[j], Space.Self);
+            }
+        }
     }
 
     void ApplyHand(AvatarIKGoal goal, Transform grip, float weight, Transform elbowHint, AvatarIKHint hint)

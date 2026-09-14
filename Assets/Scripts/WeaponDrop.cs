@@ -52,7 +52,7 @@ public class WeaponDrop : MonoBehaviour
         }
 
         weapon.gameObject.SetActive(false);
-        playerSetup.activeWeapon = null;
+        playerSetup.UnequipWeapon();
     }
 
     GameObject GetWorldPrefab(string weaponName)

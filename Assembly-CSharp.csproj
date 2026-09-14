@@ -58,6 +58,7 @@
     <Compile Include="Assets\Scripts\WeaponCant.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\EnvMapAnimator.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\ShiftableObject.cs" />
+    <Compile Include="Assets\Scripts\RagdollBuilder.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextSelector_A.cs" />
     <Compile Include="Assets\Scripts\LowerWeapon.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\FencePlacement.cs" />

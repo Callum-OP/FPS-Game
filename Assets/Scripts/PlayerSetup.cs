@@ -51,6 +51,12 @@ public class PlayerSetup : MonoBehaviour
         playerHUD = FindFirstObjectByType<PlayerHUD>();
         ammoHUD = FindFirstObjectByType<AmmoHUD>();
 
+        // Play the death animation state when the player dies - CharacterAnimationDriver
+        // already has SetDead(), it just had nothing calling it (Ragdoll.cs listens to
+        // this same event separately to handle the physical collapse).
+        if (playerHealth != null)
+            playerHealth.onDeath += () => characterAnimation?.SetDead(true);
+
         // Weapon specific components gathered from active weapon
         if (activeWeapon != null)
             GatherWeaponComponents(activeWeapon);
@@ -185,5 +191,37 @@ public class PlayerSetup : MonoBehaviour
 
         newWeapon.gameObject.SetActive(true);
         WireWeapon(newWeapon);
+    }
+
+    /// <summary>Called by WeaponDrop after it deactivates the held weapon, so the player
+    /// actually goes back to being unarmed instead of the Animator/hand IK still pointing
+    /// at whatever grip transform the (now-inactive) weapon last had. Previously WeaponDrop
+    /// only cleared PlayerSetup.activeWeapon directly, which skipped all of this.</summary>
+    public void UnequipWeapon()
+    {
+        if (activeWeapon != null && playerHUD != null)
+        {
+            activeWeapon.onAmmoChanged -= playerHUD.UpdateAmmo;
+            activeWeapon.onReloadStart -= playerHUD.ShowReloading;
+            activeWeapon.onReloadEnd -= playerHUD.HideReloading;
+        }
+
+        activeWeapon = null;
+        characterAnimation?.SetWeaponFrom(null); // -> Unarmed
+        weaponHandIK?.SetGripTargets(null, null); // hands stop reaching for a grip that no longer exists
+
+        weaponCant = null;
+        weaponRecoil = null;
+        weaponADS = null;
+        weaponSway = null;
+        lowerWeapon = null;
+        weaponReloadHandler = null;
+
+        if (cameraRecoil != null) cameraRecoil.weaponADS = null;
+        if (cameraLean != null) { cameraLean.weaponCant = null; cameraLean.weaponHolder = null; }
+        if (playerMovement != null) playerMovement.weaponCant = null;
+
+        if (playerHUD != null) playerHUD.UpdateAmmo(0, 0);
+        if (ammoHUD != null) ammoHUD.weapon = null;
     }
 }
