@@ -25,6 +25,7 @@ public class Health : MonoBehaviour
     public void Heal(float amount)
     {
         currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
+        onDamaged?.Invoke(currentHealth / maxHealth);
     }
 
     public float GetHealthPercent() => currentHealth / maxHealth;

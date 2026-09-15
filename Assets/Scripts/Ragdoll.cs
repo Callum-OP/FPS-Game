@@ -65,6 +65,16 @@ public class Ragdoll : MonoBehaviour
                 // an explicit reset PhysX inherits that jump as launch velocity
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
+                // A death pose can leave bones heavily overlapping each other or the
+                // floor. Left uncapped, PhysX's depenetration resolves that overlap
+                // in a single step, which can fling a bone fast enough to tunnel
+                // straight through thin floor geometry even with continuous CD -
+                // this is almost certainly why it's intermittent (some death poses
+                // overlap far worse than others). Capping it forces a gentle
+                // multi-frame push-out instead of one explosive pop.
+                rb.maxDepenetrationVelocity = 2f;
+                rb.solverIterations = 12;
+                rb.solverVelocityIterations = 4;
             }
             var col = rb.GetComponent<Collider>();
             if (col != null && !(col is CharacterController))
@@ -75,6 +85,33 @@ public class Ragdoll : MonoBehaviour
                 // through). dead: solid again so the ragdoll collides with the world.
                 col.isTrigger = !on && liveHitboxes;
             }
+        }
+    }
+
+    // A settling ragdoll never legitimately needs to move faster than this - if a
+    // bone is moving faster, it's almost certainly a depenetration or joint-
+    // projection spike (both addressed elsewhere), not intended motion. This is a
+    // backstop on top of those actual fixes, for whatever still slips past them -
+    // it doesn't depend on collision detection working, unlike a raycast-based
+    // ground correction would (if a ragdoll isn't colliding with anything, there's
+    // no reliable surface to snap it back to either).
+    const float MaxSafeSpeed = 8f;
+
+    IEnumerator GroundSafetyNet()
+    {
+        float elapsed = 0f;
+        while (elapsed < 3f)
+        {
+            elapsed += Time.deltaTime;
+
+            foreach (var rb in bones)
+            {
+                if (rb == null) continue;
+                if (rb.linearVelocity.sqrMagnitude > MaxSafeSpeed * MaxSafeSpeed)
+                    rb.linearVelocity = rb.linearVelocity.normalized * MaxSafeSpeed;
+            }
+
+            yield return null;
         }
     }
 
@@ -127,5 +164,6 @@ public class Ragdoll : MonoBehaviour
             j.highTwistLimit = new SoftJointLimit { limit = 45f };
         }
         SetPhysics(true);
+        StartCoroutine(GroundSafetyNet());
     }
 }

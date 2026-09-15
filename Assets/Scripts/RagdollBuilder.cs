@@ -32,30 +32,38 @@ public static class RagdollBuilder
     {
         public HumanBodyBones bone;
         public HumanBodyBones? parent; // null = ragdoll root (Hips) - no CharacterJoint
-        public float mass;
-        public float radius;
-        public BoneSpec(HumanBodyBones b, HumanBodyBones? p, float m, float r)
-        { bone = b; parent = p; mass = m; radius = r; }
+        public float radiusRatio;      // capsule radius as a fraction of this bone's own measured length
+        public BoneSpec(HumanBodyBones b, HumanBodyBones? p, float radiusRatio)
+        { bone = b; parent = p; this.radiusRatio = radiusRatio; }
     }
 
-    // Core bones only - enough for a believable collapse without needing a joint per finger.
+    // Rough humanoid limb-thickness-to-length ratios. Mass is no longer listed here -
+    // it's now computed from each built capsule's actual volume (see BoneDensity below)
+    // instead of a fixed number, for the same reason radius is now a ratio: a value
+    // tuned for one specific model's scale doesn't generalize to a very differently
+    // scaled/proportioned one (see the comment on BoneDensity for what this fixed).
     static readonly BoneSpec[] Bones =
     {
-        new BoneSpec(HumanBodyBones.Hips,          null,                          8f,   0.16f),
-        new BoneSpec(HumanBodyBones.Spine,         HumanBodyBones.Hips,           6f,   0.15f),
-        new BoneSpec(HumanBodyBones.Chest,         HumanBodyBones.Spine,          6f,   0.16f),
-        new BoneSpec(HumanBodyBones.Head,          HumanBodyBones.Chest,          3f,   0.12f),
+        new BoneSpec(HumanBodyBones.Hips,          null,                          0.30f),
+        new BoneSpec(HumanBodyBones.Spine,         HumanBodyBones.Hips,           0.45f),
+        new BoneSpec(HumanBodyBones.Chest,         HumanBodyBones.Spine,          0.50f),
+        new BoneSpec(HumanBodyBones.Head,          HumanBodyBones.Chest,          0.45f),
 
-        new BoneSpec(HumanBodyBones.LeftUpperArm,  HumanBodyBones.Chest,          2f,   0.06f),
-        new BoneSpec(HumanBodyBones.LeftLowerArm,  HumanBodyBones.LeftUpperArm,   1.5f, 0.05f),
-        new BoneSpec(HumanBodyBones.RightUpperArm, HumanBodyBones.Chest,          2f,   0.06f),
-        new BoneSpec(HumanBodyBones.RightLowerArm, HumanBodyBones.RightUpperArm,  1.5f, 0.05f),
+        new BoneSpec(HumanBodyBones.LeftUpperArm,  HumanBodyBones.Chest,          0.18f),
+        new BoneSpec(HumanBodyBones.LeftLowerArm,  HumanBodyBones.LeftUpperArm,   0.16f),
+        new BoneSpec(HumanBodyBones.RightUpperArm, HumanBodyBones.Chest,          0.18f),
+        new BoneSpec(HumanBodyBones.RightLowerArm, HumanBodyBones.RightUpperArm,  0.16f),
 
-        new BoneSpec(HumanBodyBones.LeftUpperLeg,  HumanBodyBones.Hips,           4f,   0.09f),
-        new BoneSpec(HumanBodyBones.LeftLowerLeg,  HumanBodyBones.LeftUpperLeg,   3f,   0.07f),
-        new BoneSpec(HumanBodyBones.RightUpperLeg, HumanBodyBones.Hips,           4f,   0.09f),
-        new BoneSpec(HumanBodyBones.RightLowerLeg, HumanBodyBones.RightUpperLeg,  3f,   0.07f),
+        new BoneSpec(HumanBodyBones.LeftUpperLeg,  HumanBodyBones.Hips,           0.22f),
+        new BoneSpec(HumanBodyBones.LeftLowerLeg,  HumanBodyBones.LeftUpperLeg,   0.18f),
+        new BoneSpec(HumanBodyBones.RightUpperLeg, HumanBodyBones.Hips,           0.22f),
+        new BoneSpec(HumanBodyBones.RightLowerLeg, HumanBodyBones.RightUpperLeg,  0.18f),
     };
+
+    // kg per cubic metre of capsule volume. Not meant to be biologically accurate -
+    // just a constant that keeps mass proportional to size for WHATEVER model this
+    // runs on, so a bone's mass and its collider size always agree with each other.
+    const float BoneDensity = 300f;
 
     [MenuItem("Tools/FPS Game/Build Ragdoll")]
     static void BuildForSelection()
@@ -66,7 +74,12 @@ public static class RagdollBuilder
             Debug.LogError("Build Ragdoll: select the character's root GameObject (the one with the Humanoid Animator) first.");
             return;
         }
+        Build(go);
+    }
 
+    /// <summary>Builds ragdoll bones/joints on a scene GameObject. Shared with CharacterPrefabBuilder.</summary>
+    public static void Build(GameObject go)
+    {
         // Some rigs (e.g. this project's Enemy prefab) have a non-humanoid Animator
         // sitting on a parent object above the actual body rig's Animator - just taking
         // GetComponent<Animator>() on the selected object can find that one first and
@@ -93,6 +106,11 @@ public static class RagdollBuilder
         var rigidbodies = new Dictionary<HumanBodyBones, Rigidbody>();
         int created = 0, skipped = 0;
 
+        // Hips branches three ways (spine + two legs) so it has no single well-defined
+        // "chain length" the way every other bone here does via its own child - size its
+        // radius off the whole torso+head span instead.
+        float hipsRadiusReference = ReferenceLength(anim);
+
         // Pass 1: Rigidbody + Collider per bone (joints need every Rigidbody to exist first).
         foreach (var spec in Bones)
         {
@@ -112,10 +130,17 @@ public static class RagdollBuilder
             }
 
             rb = Undo.AddComponent<Rigidbody>(t.gameObject);
-            rb.mass = spec.mass;
             rigidbodies[spec.bone] = rb;
 
-            AddCapsule(t, spec.radius);
+            float radiusReference = spec.bone == HumanBodyBones.Hips ? hipsRadiusReference : -1f;
+            CapsuleCollider cap = AddCapsule(t, spec.radiusRatio, radiusReference);
+
+            // Mass from the capsule's actual volume, not a fixed number - see BoneDensity.
+            float cylinderLength = Mathf.Max(0f, cap.height - 2f * cap.radius);
+            float volume = Mathf.PI * cap.radius * cap.radius * cylinderLength
+                         + (4f / 3f) * Mathf.PI * cap.radius * cap.radius * cap.radius;
+            rb.mass = Mathf.Max(0.5f, volume * BoneDensity);
+
             created++;
         }
 
@@ -136,7 +161,17 @@ public static class RagdollBuilder
             joint.highTwistLimit = new SoftJointLimit { limit = 20f };
             joint.swing1Limit = new SoftJointLimit { limit = 40f };
             joint.swing2Limit = new SoftJointLimit { limit = 40f };
-            joint.enableProjection = true;
+            // Projection was previously enabled here to keep joints from stretching
+            // under extreme force, but projection is a direct position SNAP applied
+            // outside the normal physics step - it completely bypasses collision
+            // detection. A ragdoll spawning in an overlapping death pose can easily
+            // exceed the projection distance the instant physics turns on, teleporting
+            // a bone (and everything downstream of it in the joint chain) straight
+            // through floor/wall geometry in one frame - this is almost certainly why
+            // enemies were intermittently falling through several floors at once with
+            // no apparent collision response. A joint stretching slightly for a frame
+            // while the solver catches up is far preferable to a silent teleport.
+            joint.enableProjection = false;
         }
 
         Undo.CollapseUndoOperations(group);
@@ -144,24 +179,45 @@ public static class RagdollBuilder
                   "Ragdoll.cs keeps all of this kinematic/disabled until death, same as before - this just gives it something to switch on.");
     }
 
-    static void AddCapsule(Transform bone, float radius)
+    static float ReferenceLength(Animator anim)
+    {
+        Transform hips = anim.GetBoneTransform(HumanBodyBones.Hips);
+        Transform head = anim.GetBoneTransform(HumanBodyBones.Head);
+        if (hips != null && head != null)
+            return Vector3.Distance(hips.position, head.position);
+        return 1f; // sane fallback for a rig missing Head entirely
+    }
+
+    static CapsuleCollider AddCapsule(Transform bone, float radiusRatio, float radiusReferenceLength = -1f)
     {
         // Aim the capsule at the bone's first child - this holds for the strict chains
         // used here (Hips>Spine>Chest>Head, UpperArm>LowerArm, UpperLeg>LowerLeg). A bone
         // with no usable child just gets a small sphere-like capsule so this never throws
         // on an unusual rig.
         CapsuleCollider cap = Undo.AddComponent<CapsuleCollider>(bone.gameObject);
-        cap.radius = radius;
 
         Transform end = bone.childCount > 0 ? bone.GetChild(0) : null;
         Vector3 localEnd = end != null ? bone.InverseTransformPoint(end.position) : Vector3.zero;
-        float length = localEnd.magnitude;
+        float length = end != null ? localEnd.magnitude : 0f;
+
+        // Radius scales with the bone's own measured length by default, so it adapts
+        // automatically to whatever scale/proportions a given model uses - a fixed
+        // absolute radius (the old approach) only ever looked right on the one rig it
+        // was tuned against. On a very differently-scaled model it could end up wildly
+        // too big or too small for that model's actual bone spacing, and an oversized/
+        // undersized capsule fighting a mass that doesn't match it is exactly what was
+        // flinging custom characters' ragdolls into the air on death. Hips passes in
+        // radiusReferenceLength (see ReferenceLength) instead of using its own length,
+        // since it doesn't have one well-defined chain length to measure.
+        float referenceLength = radiusReferenceLength > 0f ? radiusReferenceLength : length;
+        float radius = Mathf.Max(0.02f, referenceLength * radiusRatio);
+        cap.radius = radius;
 
         if (end == null || length < 0.01f)
         {
             cap.height = radius * 2f;
             cap.direction = 0;
-            return;
+            return cap;
         }
 
         // Capsule "direction" is whichever local axis the bone chain actually runs along -
@@ -175,5 +231,6 @@ public static class RagdollBuilder
         cap.direction = axis;
         cap.height = Mathf.Max(length, radius * 2f);
         cap.center = localEnd * 0.5f;
+        return cap;
     }
 }

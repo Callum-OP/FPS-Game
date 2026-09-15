@@ -60,8 +60,10 @@ public class WeaponDrop : MonoBehaviour
         if (weaponName.Contains("Mono19")) return Mono19WorldPrefab;
         if (weaponName.Contains("BreacherM4")) return BreacherM4WorldPrefab;
         if (weaponName.Contains("Hummingbird")) return HummingbirdWorldPrefab;
-        if (weaponName.Contains("AR")) return HummingbirdWorldPrefab;
-        if (weaponName.Contains("ARScoped")) return HummingbirdWorldPrefab;
+        // Check ARScoped before AR - "ARScoped" also contains "AR", so the more
+        // specific name has to be matched first or it's unreachable.
+        if (weaponName.Contains("ARScoped")) return ARScopedWorldPrefab;
+        if (weaponName.Contains("AR")) return ARWorldPrefab;
         return null;
     }
 

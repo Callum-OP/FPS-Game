@@ -33,6 +33,7 @@ public class CharacterAnimationDriver : MonoBehaviour
     static readonly int ReloadHash = Animator.StringToHash("Reload");
     static readonly int MeleeHash = Animator.StringToHash("Melee");
     static readonly int DeadHash = Animator.StringToHash("Dead");
+    static readonly int InjuredHash = Animator.StringToHash("Injured");
     static readonly int MoveXHash = Animator.StringToHash("MoveX");
     static readonly int MoveYHash = Animator.StringToHash("MoveY");
 
@@ -92,6 +93,7 @@ public class CharacterAnimationDriver : MonoBehaviour
     public void PlayMelee() { if (CanAnimate()) animator.SetTrigger(MeleeHash); }
 
     public void SetDead(bool dead) { if (CanAnimate()) animator.SetBool(DeadHash, dead); }
+    public void SetInjured(bool injured) { if (CanAnimate()) animator.SetBool(InjuredHash, injured); }
 
     bool CanAnimate() => animator != null && animator.runtimeAnimatorController != null;
 

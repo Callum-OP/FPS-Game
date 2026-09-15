@@ -5,6 +5,8 @@ public class PlayerSetup : MonoBehaviour
     [Header("Assign These Only")]
     public Camera fpCamera;
     public WeaponController activeWeapon;
+    [Tooltip("Health fraction (0-1) at or below which the Injured locomotion overlay plays.")]
+    public float InjuredHealthFraction = 0.3f;
 
     // Auto found
     [HideInInspector] public PlayerMovement playerMovement;
@@ -56,6 +58,23 @@ public class PlayerSetup : MonoBehaviour
         // this same event separately to handle the physical collapse).
         if (playerHealth != null)
             playerHealth.onDeath += () => characterAnimation?.SetDead(true);
+
+        // Low-health "injured" locomotion overlay - clears itself automatically
+        // if health regens back above the threshold.
+        if (playerHealth != null)
+            playerHealth.onHealthChanged += (frac) => characterAnimation?.SetInjured(frac <= InjuredHealthFraction);
+
+        // Drop the held weapon on death so it isn't left floating attached to the
+        // camera once DeathCam detaches it - reuses the same WeaponDrop.Drop() the
+        // manual drop key calls, which deactivates the weapon and unequips it.
+        // Subscribed here in Awake so it fires before DeathCam's own OnEnable
+        // subscription detaches the camera.
+        if (playerHealth != null)
+        {
+            WeaponDrop weaponDrop = GetComponent<WeaponDrop>();
+            if (weaponDrop != null)
+                playerHealth.onDeath += () => weaponDrop.Drop();
+        }
 
         // Weapon specific components gathered from active weapon
         if (activeWeapon != null)

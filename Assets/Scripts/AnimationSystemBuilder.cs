@@ -116,6 +116,17 @@ public static class AnimationSystemBuilder
 
         // Airborne fallback (any weapon) - Action Adventure Pack
         new ClipDef("airborne_idle",  "Action Adventure Pack", "falling idle", true),
+
+        // Injured (low health) - Male Injured Pack. This pack only has forward/
+        // backward locomotion (no left/right strafe clips like the other packs),
+        // so the left/right blend points below reuse the forward clip - a
+        // reasonable approximation for a temporary "hurt" overlay, but flag it
+        // if a true strafing injured pose ever matters more than it does now.
+        new ClipDef("inj_idle",      "Male Injured Pack", "injured idle", true),
+        new ClipDef("inj_walk_fwd",  "Male Injured Pack", "injured walk", true),
+        new ClipDef("inj_run_fwd",   "Male Injured Pack", "injured run", true),
+        new ClipDef("inj_walk_back", "Male Injured Pack", "injured walk backwards", true),
+        new ClipDef("inj_run_back",  "Male Injured Pack", "injured run backwards", true),
     };
 
     // NOTE: Mixamo gives no left/right label on ambiguous pairs. This script assumes
@@ -342,6 +353,7 @@ public static class AnimationSystemBuilder
         controller.AddParameter("Reload", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Melee", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Dead", AnimatorControllerParameterType.Bool);
+        controller.AddParameter("Injured", AnimatorControllerParameterType.Bool);
 
         BuildBaseLayer(controller);
         BuildUpperBodyLayer(controller, upperBodyMask);
@@ -398,16 +410,28 @@ public static class AnimationSystemBuilder
             (0,-1,"rc_walk_back"),
         });
 
+        // Male Injured Pack has no strafe clips, so left/right just reuse forward -
+        // a fine approximation for a temporary low-health overlay.
+        BlendTree injured = Directional2D("Injured", new (float x, float y, string key)[]
+        {
+            (0,0,"inj_idle"),
+            (0,1,"inj_walk_fwd"), (-1,1,"inj_walk_fwd"), (1,1,"inj_walk_fwd"),
+            (0,2,"inj_run_fwd"), (-1,2,"inj_run_fwd"), (1,2,"inj_run_fwd"),
+            (0,-1,"inj_walk_back"), (0,-2,"inj_run_back"),
+        });
+
         AssetDatabase.AddObjectToAsset(unarmed, controller);
         AssetDatabase.AddObjectToAsset(pistol, controller);
         AssetDatabase.AddObjectToAsset(rifle, controller);
         AssetDatabase.AddObjectToAsset(rifleCrouch, controller);
+        AssetDatabase.AddObjectToAsset(injured, controller);
 
         AnimatorState sUnarmed = AddMotionState(sm, "Unarmed", unarmed, new Vector3(0, 300, 0));
         AnimatorState sPistol  = AddMotionState(sm, "Pistol", pistol, new Vector3(220, 300, 0));
         AnimatorState sRifle   = AddMotionState(sm, "Rifle", rifle, new Vector3(440, 300, 0));
         AnimatorState sCrouch  = AddMotionState(sm, "RifleCrouch", rifleCrouch, new Vector3(440, 460, 0));
         AnimatorState sAir     = AddMotionState(sm, "Airborne", C("airborne_idle"), new Vector3(220, 460, 0));
+        AnimatorState sInjured = AddMotionState(sm, "Injured", injured, new Vector3(660, 300, 0));
         AnimatorState sDead    = AddMotionState(sm, "Death", C("ri_death_front"), new Vector3(220, 620, 0));
         sm.defaultState = sUnarmed;
 
@@ -421,12 +445,16 @@ public static class AnimationSystemBuilder
             t.AddCondition(AnimatorConditionMode.Equals, j, "WeaponClass");
         }
 
-        // Rifle <-> crouch
+        // Rifle & Pistol <-> crouch. Both reuse the same crouch pose - hands are
+        // already IK-attached to whichever weapon's own grip transform, so the
+        // rifle pack's crouch clip reads fine held as a pistol too, no separate
+        // pistol crouch animation needed.
         AddInstantTransition(sRifle, sCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
-        AddInstantTransition(sCrouch, sRifle, AnimatorConditionMode.IfNot, 0, "IsCrouching");
-        // Leaving/entering crouch also needs to react to weapon swap away from rifle
+        AddInstantTransition(sPistol, sCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
+        AddInstantTransition(sCrouch, sRifle, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
+        AddInstantTransition(sCrouch, sPistol, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
+        // Unarmed has no crouch pose - stand up immediately if the weapon swaps away entirely
         AddInstantTransition(sCrouch, sUnarmed, AnimatorConditionMode.Equals, 0, "WeaponClass");
-        AddInstantTransition(sCrouch, sPistol, AnimatorConditionMode.Equals, 1, "WeaponClass");
 
         // Airborne in/out
         foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch })
@@ -435,13 +463,24 @@ public static class AnimationSystemBuilder
         AddInstantTransition(sAir, sPistol, AnimatorConditionMode.If, 0, "IsGrounded", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
         AddInstantTransition(sAir, sRifle, AnimatorConditionMode.If, 0, "IsGrounded", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
 
-        // Death from anywhere
-        foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir })
+        // Death from anywhere - added before the Injured wiring below so it's
+        // evaluated first: Unity checks a state's transitions in the order
+        // they were added, and Dead must win if both are true simultaneously.
+        foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sInjured })
         {
             var t = s.AddTransition(sDead);
             t.hasExitTime = false; t.duration = 0.1f;
             t.AddCondition(AnimatorConditionMode.If, 0, "Dead");
         }
+
+        // Injured (low health) overrides normal ground movement, and returns to
+        // whichever weapon pose is currently active once health recovers.
+        var groundStates = new[] { sUnarmed, sPistol, sRifle, sCrouch };
+        foreach (var s in groundStates)
+            AddInstantTransition(s, sInjured, AnimatorConditionMode.If, 0, "Injured");
+        AddInstantTransition(sInjured, sUnarmed, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
+        AddInstantTransition(sInjured, sPistol, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
+        AddInstantTransition(sInjured, sRifle, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
     }
 
     static void AddInstantTransition(AnimatorState from, AnimatorState to, AnimatorConditionMode mode, float threshold, string param, System.Action<AnimatorStateTransition> extra = null)
@@ -482,7 +521,14 @@ public static class AnimationSystemBuilder
         AnimatorState melee  = AddMotionState(sm, "UB_Melee", C("act_melee"), new Vector3(0, 140, 0));
         sm.defaultState = idle;
 
-        AddInstantTransition(idle, aim, AnimatorConditionMode.If, 0, "Aiming");
+        // Only Rifle raises into the masked Aim pose. The Pistol_Handgun pack has no
+        // separate "resting" pose - pi_idle is already a raised, ready-to-fire stance -
+        // so forcing the Rifle pack's two-handed "ri_idle_aim" clip on a pistol-holder
+        // here was overwriting a perfectly good pose with a mismatched one (no rifle in
+        // hand to justify the two-handed grip, hence the arms looking like they're
+        // bracing/resting an invisible weapon off to the side instead of firing).
+        AddInstantTransition(idle, aim, AnimatorConditionMode.If, 0, "Aiming",
+            extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
         AddInstantTransition(aim, idle, AnimatorConditionMode.IfNot, 0, "Aiming");
 
         foreach (var s in new[] { idle, aim })

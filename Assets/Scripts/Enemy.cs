@@ -20,6 +20,8 @@ public class EnemyAI : MonoBehaviour
     public float attackDamage = 10f;
     public float attackCooldown = 1.2f;
     public float shootRange = 15f;
+    [Tooltip("Health fraction (0-1) at or below which the Injured locomotion overlay plays.")]
+    public float InjuredHealthFraction = 0.3f;
 
     [Header("Movement")]
     public float walkSpeed = 2.5f;
@@ -59,6 +61,7 @@ public class EnemyAI : MonoBehaviour
 
     private UpperBodyPose bodyPose; // animated body (drives Melee swing)
     private CharacterAnimationDriver characterAnimation;
+    private EnemyWeapon enemyWeapon;
     private Vector3 lastKnownPlayerPos;
     private float investigateTimer;
     private float attackTimer;
@@ -86,9 +89,11 @@ public class EnemyAI : MonoBehaviour
 
         // Connect to health events
         health.onDeath.AddListener(OnDeath);
+        health.onDamaged.AddListener((healthFraction) => characterAnimation?.SetInjured(healthFraction <= InjuredHealthFraction));
         agent.speed = walkSpeed;
         bodyPose = GetComponentInChildren<UpperBodyPose>();
         characterAnimation = GetComponentInChildren<CharacterAnimationDriver>();
+        enemyWeapon = GetComponent<EnemyWeapon>();
         if (!canShoot)
             characterAnimation?.SetWeaponClass(CharacterWeaponClass.Unarmed);
         else
@@ -457,6 +462,9 @@ public class EnemyAI : MonoBehaviour
         // gets the Dead bool set (and the state entered) for that frame, and covers any
         // case where the ragdoll's collapse is delayed.
         characterAnimation?.SetDead(true);
+
+        // Drop the held weapon as a world pickup, same as the player does.
+        enemyWeapon?.Drop();
 
         // Disable colliders so the corpse stops blocking shots/paths — the Ragdoll
         // component re-enables the bone colliders a frame later and the body

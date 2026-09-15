@@ -40,6 +40,24 @@ public class DeathCam : MonoBehaviour
     {
         health = GetComponent<PlayerHealth>();
         if (cam == null) cam = Camera.main;
+
+        // Resolve the ragdoll's Hips bone to orbit. Done unconditionally (not just when
+        // orbitTarget is unset) because a stale/incorrect Inspector assignment - e.g.
+        // pointing at the character model's static root transform instead of the Hips
+        // bone that ragdoll physics actually moves - would otherwise leave the camera
+        // orbiting a point that never moves once the body ragdolls.
+        foreach (var anim in GetComponentsInChildren<Animator>(true))
+        {
+            if (anim.avatar != null && anim.avatar.isHuman)
+            {
+                Transform hips = anim.GetBoneTransform(HumanBodyBones.Hips);
+                if (hips != null)
+                {
+                    orbitTarget = hips;
+                    break;
+                }
+            }
+        }
     }
 
     void OnEnable()  { if (health != null) health.onDeath += OnDeath; }
