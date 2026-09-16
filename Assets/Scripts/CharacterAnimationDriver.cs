@@ -34,6 +34,7 @@ public class CharacterAnimationDriver : MonoBehaviour
     static readonly int MeleeHash = Animator.StringToHash("Melee");
     static readonly int DeadHash = Animator.StringToHash("Dead");
     static readonly int InjuredHash = Animator.StringToHash("Injured");
+    static readonly int DeathFromBackHash = Animator.StringToHash("DeathFromBack");
     static readonly int MoveXHash = Animator.StringToHash("MoveX");
     static readonly int MoveYHash = Animator.StringToHash("MoveY");
 
@@ -93,6 +94,33 @@ public class CharacterAnimationDriver : MonoBehaviour
     public void PlayMelee() { if (CanAnimate()) animator.SetTrigger(MeleeHash); }
 
     public void SetDead(bool dead) { if (CanAnimate()) animator.SetBool(DeadHash, dead); }
+
+    /// <summary>Death with a direction - picks the shot-from-behind clip when fromBack is
+    /// true. Set the direction BEFORE the Dead bool so the transition sees it in the same
+    /// frame it's evaluated.</summary>
+    public void SetDead(bool dead, bool fromBack)
+    {
+        if (!CanAnimate()) return;
+        animator.SetBool(DeathFromBackHash, fromBack);
+        animator.SetBool(DeadHash, dead);
+    }
+
+    /// <summary>Length of the death clip currently playing on the base layer, so a
+    /// ragdoll can be timed to take over partway through it. Returns 0 if nothing
+    /// useful is playing.</summary>
+    public float GetCurrentBaseStateLength()
+    {
+        if (!CanAnimate()) return 0f;
+        var info = animator.GetCurrentAnimatorStateInfo(0);
+        return info.length;
+    }
+
+    /// <summary>Normalised progress through the current base-layer state (0-1+).</summary>
+    public float GetCurrentBaseStateProgress()
+    {
+        if (!CanAnimate()) return 0f;
+        return animator.GetCurrentAnimatorStateInfo(0).normalizedTime;
+    }
     public void SetInjured(bool injured) { if (CanAnimate()) animator.SetBool(InjuredHash, injured); }
 
     bool CanAnimate() => animator != null && animator.runtimeAnimatorController != null;

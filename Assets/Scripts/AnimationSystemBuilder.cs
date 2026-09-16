@@ -94,6 +94,10 @@ public static class AnimationSystemBuilder
         new ClipDef("ri_jump_loop",      "Pro Rifle Pack", "jump loop", true),
         new ClipDef("ri_jump_down",      "Pro Rifle Pack", "jump down", false),
         new ClipDef("ri_death_front",    "Pro Rifle Pack", "death from the front", false),
+        // Shot-from-behind death. If your Pro Rifle Pack doesn't ship this file the
+        // import just logs it as missing and the back-death state falls back to the
+        // front clip - nothing else breaks.
+        new ClipDef("ri_death_back",     "Pro Rifle Pack", "death from the back", false),
 
         // Rifle crouch - Pro Rifle Pack
         new ClipDef("rc_idle",       "Pro Rifle Pack", "idle crouching aiming", true),
@@ -354,6 +358,8 @@ public static class AnimationSystemBuilder
         controller.AddParameter("Melee", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Dead", AnimatorControllerParameterType.Bool);
         controller.AddParameter("Injured", AnimatorControllerParameterType.Bool);
+        // Which death clip to play - set by CharacterAnimationDriver.SetDead(dead, fromBack).
+        controller.AddParameter("DeathFromBack", AnimatorControllerParameterType.Bool);
 
         BuildBaseLayer(controller);
         BuildUpperBodyLayer(controller, upperBodyMask);
@@ -402,6 +408,12 @@ public static class AnimationSystemBuilder
             (0,-2,"ri_run_back"), (-0.5f,-2,"ri_run_back_l"), (0.5f,-2,"ri_run_back_r"),
         });
 
+        // Used by EVERY weapon class now, not just the rifle. Only the arms differ
+        // between a rifle and a pistol pose, and the arms are IK'd onto whichever gun is
+        // actually held (plus, for the pistol, overridden by the masked UpperBody pose
+        // added in BuildUpperBodyLayer) - so the legs from the rifle crouch clip read
+        // fine underneath a pistol or empty hands. That's the "lower half of one pose,
+        // upper half of another" combination.
         BlendTree rifleCrouch = Directional2D("RifleCrouch", new (float x, float y, string key)[]
         {
             (0,0,"rc_idle"),
@@ -432,7 +444,8 @@ public static class AnimationSystemBuilder
         AnimatorState sCrouch  = AddMotionState(sm, "RifleCrouch", rifleCrouch, new Vector3(440, 460, 0));
         AnimatorState sAir     = AddMotionState(sm, "Airborne", C("airborne_idle"), new Vector3(220, 460, 0));
         AnimatorState sInjured = AddMotionState(sm, "Injured", injured, new Vector3(660, 300, 0));
-        AnimatorState sDead    = AddMotionState(sm, "Death", C("ri_death_front"), new Vector3(220, 620, 0));
+        AnimatorState sDead     = AddMotionState(sm, "Death", C("ri_death_front"), new Vector3(220, 620, 0));
+        AnimatorState sDeadBack = AddMotionState(sm, "DeathBack", C("ri_death_back") != null ? C("ri_death_back") : C("ri_death_front"), new Vector3(440, 620, 0));
         sm.defaultState = sUnarmed;
 
         var weaponStates = new[] { sUnarmed, sPistol, sRifle };
@@ -453,8 +466,10 @@ public static class AnimationSystemBuilder
         AddInstantTransition(sPistol, sCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
         AddInstantTransition(sCrouch, sRifle, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
         AddInstantTransition(sCrouch, sPistol, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
-        // Unarmed has no crouch pose - stand up immediately if the weapon swaps away entirely
-        AddInstantTransition(sCrouch, sUnarmed, AnimatorConditionMode.Equals, 0, "WeaponClass");
+        // Unarmed crouches too now - same legs, empty hands. Worth seeing how it reads
+        // before deciding whether an unarmed-specific crouch pack is worth sourcing.
+        AddInstantTransition(sUnarmed, sCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
+        AddInstantTransition(sCrouch, sUnarmed, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
 
         // Airborne in/out
         foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch })
@@ -468,6 +483,14 @@ public static class AnimationSystemBuilder
         // they were added, and Dead must win if both are true simultaneously.
         foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sInjured })
         {
+            // Front death first, then back - Unity evaluates a state's transitions in
+            // the order they were added, and both carry the same "Dead" condition, so
+            // the back one is distinguished by DeathFromBack being true.
+            var tb = s.AddTransition(sDeadBack);
+            tb.hasExitTime = false; tb.duration = 0.1f;
+            tb.AddCondition(AnimatorConditionMode.If, 0, "Dead");
+            tb.AddCondition(AnimatorConditionMode.If, 0, "DeathFromBack");
+
             var t = s.AddTransition(sDead);
             t.hasExitTime = false; t.duration = 0.1f;
             t.AddCondition(AnimatorConditionMode.If, 0, "Dead");
@@ -519,7 +542,16 @@ public static class AnimationSystemBuilder
         AnimatorState fire   = AddMotionState(sm, "UB_Fire", C("act_fire_rifle"), new Vector3(220, 140, 0));
         AnimatorState reload = AddMotionState(sm, "UB_Reload", C("act_reload"), new Vector3(0, 280, 0));
         AnimatorState melee  = AddMotionState(sm, "UB_Melee", C("act_melee"), new Vector3(0, 140, 0));
+        // Pistol upper body, masked over whatever the legs are doing. This is what makes
+        // the shared (rifle-authored) crouch tree usable for a handgun: the legs crouch,
+        // this replaces the arms/spine with the pistol pack's own ready stance.
+        AnimatorState pistolPose = AddMotionState(sm, "UB_PistolPose", C("pi_idle"), new Vector3(440, 0, 0));
         sm.defaultState = idle;
+
+        AddInstantTransition(idle, pistolPose, AnimatorConditionMode.If, 0, "IsCrouching",
+            extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
+        AddInstantTransition(pistolPose, idle, AnimatorConditionMode.IfNot, 0, "IsCrouching");
+        AddInstantTransition(pistolPose, idle, AnimatorConditionMode.NotEqual, 1, "WeaponClass");
 
         // Only Rifle raises into the masked Aim pose. The Pistol_Handgun pack has no
         // separate "resting" pose - pi_idle is already a raised, ready-to-fire stance -
@@ -531,7 +563,7 @@ public static class AnimationSystemBuilder
             extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
         AddInstantTransition(aim, idle, AnimatorConditionMode.IfNot, 0, "Aiming");
 
-        foreach (var s in new[] { idle, aim })
+        foreach (var s in new[] { idle, aim, pistolPose })
         {
             var tf = s.AddTransition(fire);
             tf.hasExitTime = false; tf.duration = 0.05f;

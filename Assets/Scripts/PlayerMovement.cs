@@ -1,6 +1,25 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Also the SINGLE OWNER of the camera's local position/rotation.
+///
+/// This is the fix for the jitter when looking up while walking. Previously
+/// PlayerMovement (pitch + crouch drop), CameraLean (tilt/yaw/side shift) and
+/// CameraRecoil (recoil kick) all wrote cameraTransform.localRotation/localPosition
+/// outright in their own Update(), in whatever order Unity happened to run them, and
+/// each one read the transform back as its own smoothing input - so every frame they
+/// partially erased and re-derived each other's contribution. That feedback shows up as
+/// the camera (and therefore the camera-parented weapon and the IK'd hands chasing it)
+/// shaking and jumping, worst exactly when several of them are active at once: looking
+/// up + walking + leaning.
+///
+/// Now the other two only push their contribution in (SetCameraLean / SetCameraRotationOffset)
+/// and this script composes all of them once, from its own internal state, so nothing
+/// ever reads back a transform another script wrote. Execution order is pinned so the
+/// providers run first each frame.
+/// </summary>
+[DefaultExecutionOrder(-150)]
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMovement : MonoBehaviour
 {
@@ -18,7 +37,7 @@ public class PlayerMovement : MonoBehaviour
     public Transform cameraTransform;
     [Tooltip("How far up the camera can pitch, in degrees.")]
     public float lookUpLimit = 80f;
-    [Tooltip("How far down the camera can pitch, in degrees. Kept tighter than lookUpLimit by default - looking too far down otherwise points the camera at an angle that's technically behind/below the character, which is also what was pushing the arm reach/bend issues to their worst.")]
+    [Tooltip("How far down the camera can pitch, in degrees.")]
     public float lookDownLimit = 65f;
 
     [Header("Cant")]
@@ -34,14 +53,22 @@ public class PlayerMovement : MonoBehaviour
     [Range(0.3f, 1f)] public float crouchHeightFraction = 0.6f;
     public float crouchTransitionSpeed = 8f;
     private bool isCrouching = false;
-    private float standingCameraLocalY;
+    private float currentCrouchDrop = 0f;
+    private Vector3 standingCameraLocalPos;
     private float standingControllerHeight;
     private Vector3 standingControllerCenter;
+
+    // --- camera contribution channels (pushed in by other scripts, applied here) ---
+    private Quaternion cameraRotationOffset = Quaternion.identity; // CameraRecoil
+    private float leanTiltZ, leanYawY, leanShiftX;                 // CameraLean
+    private Vector3 cameraPositionOffset;                          // CameraBodyFollow
 
     private CharacterController controller;
     private Vector3 velocity;
     public Vector3 PlanarVelocity { get; private set; }
     public bool IsGrounded => controller != null && controller.isGrounded;
+    public bool IsCrouching => isCrouching;
+    public float CameraPitch => xRotation;
     private float xRotation = 0f;
 
     // Input actions
@@ -90,7 +117,7 @@ public class PlayerMovement : MonoBehaviour
 
         // Captured rather than hardcoded, so this works with whatever height/eye
         // position was actually set up in the scene instead of guessing an absolute value.
-        if (cameraTransform != null) standingCameraLocalY = cameraTransform.localPosition.y;
+        if (cameraTransform != null) standingCameraLocalPos = cameraTransform.localPosition;
         if (controller != null)
         {
             standingControllerHeight = controller.height;
@@ -103,17 +130,45 @@ public class PlayerMovement : MonoBehaviour
         HandleMouseLook();
         HandleMovement();
         HandleCrouchHeight();
+        ApplyCameraTransform();
+    }
+
+    // ------------------------------------------------------------------
+    // Camera contribution API - other scripts push, they never write the transform.
+    // ------------------------------------------------------------------
+
+    /// <summary>Extra local-space rotation composed on top of pitch/lean (CameraRecoil).</summary>
+    public void SetCameraRotationOffset(Quaternion offset) => cameraRotationOffset = offset;
+
+    /// <summary>Lean contribution (CameraLean): roll, yaw and sideways shift.</summary>
+    public void SetCameraLean(float tiltZ, float yawY, float shiftX)
+    {
+        leanTiltZ = tiltZ;
+        leanYawY = yawY;
+        leanShiftX = shiftX;
+    }
+
+    /// <summary>Extra local-space camera position offset (CameraBodyFollow).</summary>
+    public void SetCameraPositionOffset(Vector3 offset) => cameraPositionOffset = offset;
+
+    void ApplyCameraTransform()
+    {
+        if (cameraTransform == null) return;
+
+        // Composed from state every frame - never read back off the transform, so no
+        // script can feed its own (or anyone else's) previous output back into itself.
+        cameraTransform.localRotation =
+            Quaternion.Euler(xRotation, leanYawY, leanTiltZ) * cameraRotationOffset;
+
+        cameraTransform.localPosition = standingCameraLocalPos
+            + new Vector3(leanShiftX, -currentCrouchDrop, 0f)
+            + cameraPositionOffset;
     }
 
     void HandleCrouchHeight()
     {
-        if (cameraTransform != null)
-        {
-            float targetY = standingCameraLocalY - (isCrouching ? crouchCameraDrop : 0f);
-            Vector3 pos = cameraTransform.localPosition;
-            pos.y = Mathf.Lerp(pos.y, targetY, crouchTransitionSpeed * Time.deltaTime);
-            cameraTransform.localPosition = pos;
-        }
+        float targetDrop = isCrouching ? crouchCameraDrop : 0f;
+        currentCrouchDrop = Mathf.Lerp(currentCrouchDrop, targetDrop, crouchTransitionSpeed * Time.deltaTime);
 
         if (controller != null)
         {
@@ -139,15 +194,8 @@ public class PlayerMovement : MonoBehaviour
         xRotation -= lookInput.y * mouseSensitivity;
         xRotation = Mathf.Clamp(xRotation, -lookUpLimit, lookDownLimit);
 
-        // Preserve camera lean angle
-        float currentZ = cameraTransform.localEulerAngles.z;
-        float currentY = cameraTransform.localEulerAngles.y;
-
-        if (currentZ > 180f) currentZ -= 360f;
-        if (currentY > 180f) currentY -= 360f;
-
-        cameraTransform.localRotation = Quaternion.Euler(xRotation, currentY, currentZ);
         transform.Rotate(Vector3.up * lookInput.x * mouseSensitivity);
+        // The camera transform itself is written once, in ApplyCameraTransform().
     }
 
     void HandleMovement()

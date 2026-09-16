@@ -95,6 +95,7 @@ public class WeaponReloadHandler : MonoBehaviour
     public float destroyDelay = 5f;
 
     WeaponHandIK handIK;
+    LowerWeapon holderOwner; // owns movedWeaponPart's transform, if present
     Transform playerReloadGrabPoint; // pushed in by PlayerSetup.SetAttachPoints()
     Transform playerMagHandPoint;    // pushed in by PlayerSetup.SetAttachPoints()
     GameObject carriedMag;
@@ -148,7 +149,10 @@ public class WeaponReloadHandler : MonoBehaviour
         WeaponController weapon = GetComponent<WeaponController>();
 
         if (movedWeaponPart == null)
+        {
             movedWeaponPart = weapon != null && weapon.rightHandGrip != null ? weapon.rightHandGrip.parent : null;
+            holderOwner = movedWeaponPart != null ? movedWeaponPart.GetComponent<LowerWeapon>() : null;
+        }
 
         Transform grabPoint = EffectiveGrabPoint;
         bool canReposition = handIK != null && (grabPoint != null || handReloadPoint != null);
@@ -169,12 +173,16 @@ public class WeaponReloadHandler : MonoBehaviour
 
         if (movedWeaponPart != null && weaponReloadPivot != null)
         {
-            // Deltas computed once from the snapshot rather than absolute targets, and
-            // applied additively in LateUpdate (undo-old/add-new) - this is what lets it
-            // safely compose with WeaponHandIK's own additive pull-back on this same
-            // pivot regardless of which component's LateUpdate happens to run first.
-            reloadMoveDeltaPos = weaponReloadPivot.localPosition - movedWeaponPart.localPosition;
-            reloadMoveDeltaRot = weaponReloadPivot.localRotation * Quaternion.Inverse(movedWeaponPart.localRotation);
+            // Measured against the holder's OWN base pose (the lowered/raised lerp's
+            // internal state) rather than the live transform, which already contains
+            // this offset - reading the live value back was a feedback loop that made
+            // the gun drift and jitter.
+            Vector3 basePos = holderOwner != null ? holderOwner.BaseLocalPosition : movedWeaponPart.localPosition;
+            Quaternion baseRot = holderOwner != null ? holderOwner.BaseLocalRotation : movedWeaponPart.localRotation;
+            reloadMoveDeltaPos = weaponReloadPivot.localPosition - basePos;
+            reloadMoveDeltaRot = weaponReloadPivot.localRotation * Quaternion.Inverse(baseRot);
+            lastFallbackBasePos = basePos;
+            lastFallbackBaseRot = baseRot;
             moveActive = true;
         }
         else
@@ -226,20 +234,32 @@ public class WeaponReloadHandler : MonoBehaviour
     void LateUpdate()
     {
         if (movedWeaponPart == null) return;
-
-        // Purely additive: undo whatever this component added last frame, then add this
-        // frame's amount. This composes safely with WeaponHandIK's own additive
-        // pull-back on the same pivot, regardless of execution order between the two.
-        movedWeaponPart.localPosition -= appliedMoveDeltaPos;
-        movedWeaponPart.localRotation = Quaternion.Inverse(appliedMoveDeltaRot) * movedWeaponPart.localRotation;
+        // Nothing applied and nothing to apply - don't touch the transform at all
+        // (important for the fallback path below, which would otherwise write a pose
+        // it never captured).
+        if (!moveActive && appliedMoveDeltaPos == Vector3.zero && appliedMoveDeltaRot == Quaternion.identity) return;
 
         float mul = moveActive ? Mathf.Sin(moveFrac * Mathf.PI) : 0f;
         appliedMoveDeltaPos = reloadMoveDeltaPos * mul;
         appliedMoveDeltaRot = Quaternion.Slerp(Quaternion.identity, reloadMoveDeltaRot, mul);
 
-        movedWeaponPart.localPosition += appliedMoveDeltaPos;
-        movedWeaponPart.localRotation = appliedMoveDeltaRot * movedWeaponPart.localRotation;
+        if (holderOwner != null)
+        {
+            // Pushed into the transform's owner, which composes every contribution in
+            // one place - no undo-then-re-add against a transform someone else has
+            // also been smoothing.
+            holderOwner.SetReloadOffset(appliedMoveDeltaPos, appliedMoveDeltaRot);
+        }
+        else
+        {
+            // No LowerWeapon on this pivot - fall back to owning it directly here.
+            movedWeaponPart.localPosition = lastFallbackBasePos + appliedMoveDeltaPos;
+            movedWeaponPart.localRotation = appliedMoveDeltaRot * lastFallbackBaseRot;
+        }
     }
+
+    Vector3 lastFallbackBasePos;
+    Quaternion lastFallbackBaseRot = Quaternion.identity;
 
     // Eases handAnchor through grip -> grabPoint -> handReloadPoint -> grip, skipping
     // any waypoint left unassigned. Interpolated every frame (not snapped between
@@ -289,6 +309,11 @@ public class WeaponReloadHandler : MonoBehaviour
         Rigidbody rb = dropped.GetComponent<Rigidbody>();
         if (rb != null)
         {
+            // Same tunnelling fix as the bullet casings - small props spawned moving
+            // fall straight through thin floor colliders with discrete detection.
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+
             Vector3 dir = -magSeatPoint.up + new Vector3(Random.Range(-0.2f, 0.2f), 0f, Random.Range(-0.2f, 0.2f));
             rb.AddForce(dir.normalized * dropForce, ForceMode.Impulse);
             rb.AddTorque(Random.insideUnitSphere * dropTorque, ForceMode.Impulse);

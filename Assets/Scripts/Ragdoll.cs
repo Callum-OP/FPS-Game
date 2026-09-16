@@ -11,11 +11,31 @@ using UnityEngine.AI;
 public class Ragdoll : MonoBehaviour
 {
     public Animator animator;
+
+    [Header("Death Animation Before Ragdoll")]
+    [Tooltip("Chance (0-1) that a death animation plays before the ragdoll takes over. The rest of the time the body goes straight to physics, so deaths don't all look identical.")]
+    [Range(0f, 1f)] public float deathAnimationChance = 0.5f;
+    [Tooltip("How far through the death clip the ragdoll takes over (0.5 = halfway). Earlier hands more of the fall to physics; later keeps more of the authored motion.")]
+    [Range(0.1f, 1f)] public float ragdollTakeoverPoint = 0.45f;
+    [Tooltip("Safety cap in seconds - the ragdoll always takes over by now even if the clip is long or the animator never reaches the takeover point.")]
+    public float maxDeathAnimationTime = 1.2f;
+    [Tooltip("How much of the death animation's own bone velocity is handed to the ragdoll when it takes over. 1 = the corpse keeps falling exactly the way the clip was moving it, which is what makes the handover invisible; 0 = it drops from rest.")]
+    [Range(0f, 1.5f)] public float velocityInheritance = 1f;
+
+    [Header("Ground Safety")]
+    [Tooltip("Backstop for bodies that get through the floor anyway: for a few seconds after death the hips are raycast against the ground and the whole corpse is lifted back up if it ends up below it. Collision fixes come first, but the level's floor colliders are thin enough that this is worth keeping on.")]
+    public bool groundClamp = true;
+    [Tooltip("Layers treated as ground by the clamp above.")]
+    public LayerMask groundLayers = ~0;
+    [Tooltip("How long the clamp stays active after death.")]
+    public float groundClampDuration = 4f;
     Rigidbody[] bones;
     Transform[] allBones;      // every skeleton transform, for pose repair on death
     Vector3[] restLocalPos;    // their sane local positions captured before any pose writer runs
     bool dead;
-    bool liveHitboxes; // enemies keep bone colliders on while alive so bullets can hit limbs
+    bool liveHitboxes;
+    Transform hipsBone;
+    Vector3[] lastBonePositions; // for handing the death clip's motion to the ragdoll // enemies keep bone colliders on while alive so bullets can hit limbs
 
     void Awake()
     {
@@ -33,6 +53,7 @@ public class Ragdoll : MonoBehaviour
         restLocalPos = new Vector3[allBones.Length];
         for (int i = 0; i < allBones.Length; i++)
             restLocalPos[i] = allBones[i].localPosition;
+        if (animator != null && animator.isHuman) hipsBone = animator.GetBoneTransform(HumanBodyBones.Hips);
         // the player must NOT have live bone colliders (own bullets would hit their arms)
         liveHitboxes = GetComponentInParent<PlayerHealth>() == null;
         SetPhysics(false);
@@ -60,7 +81,16 @@ public class Ragdoll : MonoBehaviour
                 // stays at the PhysX default so a bone that dies overlapping a
                 // wall pops free in a few frames instead of slow-crawling
                 // through geometry (a low cap never finishes the job).
-                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                // ContinuousSpeculative rather than ContinuousDynamic: speculative
+                // contacts are generated from the body's swept bounds every step, so
+                // they still catch a bone that was TELEPORTED into place (which is
+                // exactly what the pose-heal below does) and they work for rotation as
+                // well as translation. ContinuousDynamic's sweep starts from PhysX's
+                // last known pose, which after a teleport is the wrong place - that's
+                // the remaining intermittent fall-through case, and matches "it looks
+                // like collision is skipped entirely".
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
                 // the pose-heal teleports bones just before this switch — without
                 // an explicit reset PhysX inherits that jump as launch velocity
                 rb.linearVelocity = Vector3.zero;
@@ -115,14 +145,127 @@ public class Ragdoll : MonoBehaviour
         }
     }
 
+    // Last line of defence for the bodies that still get through - and the shape of the
+    // failure (sinking straight down, feet first, still upright) is the giveaway that
+    // they're not being caught by collision at all rather than being flung: a body that
+    // never registers a floor contact just accelerates downward keeping its pose. Rather
+    // than trying to make PhysX catch it, this watches the hips against a downward
+    // raycast and lifts the whole corpse back to the surface if it ends up below it.
+    IEnumerator GroundClamp()
+    {
+        if (hipsBone == null) yield break;
+
+        float elapsed = 0f;
+        while (elapsed < groundClampDuration)
+        {
+            elapsed += Time.deltaTime;
+
+            // Cast from well above the hips so the ray starts outside any floor the body
+            // may already be inside.
+            Vector3 origin = hipsBone.position + Vector3.up * 3f;
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 12f, groundLayers, QueryTriggerInteraction.Ignore))
+            {
+                float sunk = hit.point.y - hipsBone.position.y;
+                if (sunk > 0.25f) // hips are a quarter of a metre below the floor surface
+                {
+                    // Move every bone up together, so the pose is preserved and nothing
+                    // gets torn apart by its joints, then kill the downward velocity that
+                    // put it there. Only the rigidbodies are moved - everything else in
+                    // the skeleton is parented under one of them and comes along.
+                    Vector3 lift = Vector3.up * (sunk + 0.1f);
+                    foreach (var rb in bones)
+                    {
+                        if (rb == null) continue;
+                        rb.position += lift;
+                        Vector3 v = rb.linearVelocity;
+                        if (v.y < 0f) v.y = 0f;
+                        rb.linearVelocity = v;
+                    }
+                    Physics.SyncTransforms();
+                }
+            }
+
+            yield return new WaitForFixedUpdate();
+        }
+    }
+
     public void Die()
     {
         if (dead) return;
         dead = true;
-        StartCoroutine(Collapse());
+        StartCoroutine(DeathSequence());
     }
 
-    IEnumerator Collapse()
+    /// <summary>Optional: tell the ragdoll which way the killing shot came from before it
+    /// dies, so the right death clip plays. If nothing calls this, the direction is worked
+    /// out from the player's position instead.</summary>
+    public void NotifyHitDirection(Vector3 worldDirectionOfShot)
+    {
+        Vector3 flat = Vector3.ProjectOnPlane(worldDirectionOfShot, Vector3.up);
+        if (flat.sqrMagnitude < 0.0001f) return;
+        hitFromBack = Vector3.Dot(transform.forward, flat.normalized) > 0f; // travelling the same way we face = hit in the back
+        hasHitDirection = true;
+    }
+
+    bool hitFromBack;
+    bool hasHitDirection;
+
+    // Plays a death animation part-way through (some of the time) and then hands the
+    // fall over to physics mid-motion, seeding the bones with the velocity the clip was
+    // already moving them at, so the swap reads as one continuous fall instead of the
+    // body freezing and then dropping.
+    IEnumerator DeathSequence()
+    {
+        bool playAnimation = animator != null && animator.enabled
+            && Random.value < deathAnimationChance;
+
+        if (playAnimation)
+        {
+            if (!hasHitDirection) hitFromBack = WorkOutHitFromBack();
+
+            var driver = GetComponentInChildren<CharacterAnimationDriver>();
+            if (driver != null) driver.SetDead(true, hitFromBack);
+            else { animator.SetBool("DeathFromBack", hitFromBack); animator.SetBool("Dead", true); }
+
+            // Let the transition actually start before measuring progress.
+            yield return null;
+            yield return null;
+
+            float elapsed = 0f;
+            while (elapsed < maxDeathAnimationTime)
+            {
+                elapsed += Time.deltaTime;
+                var info = animator.GetCurrentAnimatorStateInfo(0);
+                if (info.normalizedTime >= ragdollTakeoverPoint) break;
+                CacheBonePositions();
+                yield return null;
+            }
+            CacheBonePositions();
+        }
+
+        yield return Collapse(seedVelocities: playAnimation);
+    }
+
+    // No hit direction was supplied, so infer it: the player is what killed this thing
+    // in practice, and standing behind the enemy means it was shot in the back.
+    bool WorkOutHitFromBack()
+    {
+        var playerObj = GameObject.FindGameObjectWithTag("Player");
+        if (playerObj == null) return false;
+        Vector3 toPlayer = Vector3.ProjectOnPlane(playerObj.transform.position - transform.position, Vector3.up);
+        return Vector3.Dot(transform.forward, toPlayer) < 0f;
+    }
+
+    void CacheBonePositions()
+    {
+        if (bones == null) return;
+        if (lastBonePositions == null || lastBonePositions.Length != bones.Length)
+            lastBonePositions = new Vector3[bones.Length];
+        for (int i = 0; i < bones.Length; i++)
+            if (bones[i] != null) lastBonePositions[i] = bones[i].position;
+    }
+
+    IEnumerator Collapse(bool seedVelocities = false)
     {
         // Wait a frame so other onDeath listeners (e.g. EnemyAI disabling colliders) run first.
         yield return null;
@@ -163,7 +306,39 @@ public class Ragdoll : MonoBehaviour
             j.lowTwistLimit = new SoftJointLimit { limit = -45f };
             j.highTwistLimit = new SoftJointLimit { limit = 45f };
         }
+        // Push every transform write above (the pose heal, and the collider enable/
+        // trigger flips) into PhysX before anything goes dynamic. Without this the
+        // bodies wake up at their PRE-heal poses for one step and then get corrected,
+        // and that correction is a teleport with no collision detection behind it -
+        // a bone sitting under the floor for one step comes out the other side.
+        Physics.SyncTransforms();
+        // Measure the clip's last frame of motion right before physics takes over.
+        Vector3[] preSwitch = null;
+        if (seedVelocities && lastBonePositions != null)
+        {
+            preSwitch = new Vector3[bones.Length];
+            for (int i = 0; i < bones.Length; i++)
+                if (bones[i] != null) preSwitch[i] = bones[i].position;
+        }
+
         SetPhysics(true);
+        Physics.SyncTransforms();
+
+        if (preSwitch != null && Time.deltaTime > 0f)
+        {
+            // Hand the animation's own motion to the bodies so the corpse carries on
+            // falling the way the clip was throwing it, rather than stopping dead and
+            // then dropping - that pause is what makes an animation-to-ragdoll swap
+            // look like two separate events.
+            for (int i = 0; i < bones.Length; i++)
+            {
+                if (bones[i] == null || i >= lastBonePositions.Length) continue;
+                Vector3 v = (preSwitch[i] - lastBonePositions[i]) / Time.deltaTime;
+                bones[i].linearVelocity = Vector3.ClampMagnitude(v * velocityInheritance, MaxSafeSpeed);
+            }
+        }
+
         StartCoroutine(GroundSafetyNet());
+        if (groundClamp) StartCoroutine(GroundClamp());
     }
 }

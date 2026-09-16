@@ -1,5 +1,13 @@
 using UnityEngine;
 
+/// <summary>
+/// Computes the lean and pushes it into PlayerMovement, which is now the single owner
+/// of the camera transform. It no longer writes transform.localRotation/localPosition
+/// itself - that's what used to fight PlayerMovement's pitch and CameraRecoil's kick
+/// every frame (and it read localEulerAngles.x back in, which wraps to ~300 degrees
+/// when looking up, so the fight got worse exactly when looking up).
+/// </summary>
+[DefaultExecutionOrder(-160)]
 public class CameraLean : MonoBehaviour
 {
     [Header("Lean Settings")]
@@ -10,17 +18,18 @@ public class CameraLean : MonoBehaviour
 
     [Header("References")]
     public WeaponCant weaponCant;
-    public Transform weaponHolder;
+    public Transform weaponHolder; // kept for Inspector compatibility, no longer written to
+    [Tooltip("Auto-found on the player root if left empty.")]
+    public PlayerMovement playerMovement;
 
-    private Vector3 originalCameraPos;
-    private Vector3 originalWeaponPos;
     private float currentLean = 0f;
+    private float currentShift = 0f;
 
     void Start()
     {
-        originalCameraPos = transform.localPosition;
-        if (weaponHolder != null)
-            originalWeaponPos = weaponHolder.localPosition;
+        if (playerMovement == null) playerMovement = GetComponentInParent<PlayerMovement>();
+        if (playerMovement == null)
+            Debug.LogWarning($"{name}: no PlayerMovement found in parents - camera lean will not be applied.", this);
     }
 
     void Update()
@@ -32,17 +41,9 @@ public class CameraLean : MonoBehaviour
 
         float leanFraction = leanAngle != 0 ? currentLean / leanAngle : 0f;
 
-        // Diagonal rotation
-        float currentX = transform.localEulerAngles.x;
-        transform.localRotation = Quaternion.Euler(
-            currentX,
-            -leanYAngle  *  leanFraction, // Rotate
-            currentLean); // Tilt
-
-        // Shift camera sideways
-        transform.localPosition = Vector3.Lerp(
-            transform.localPosition,
-            originalCameraPos + new Vector3(-leanShift * leanFraction, 0f, 0f),
+        currentShift = Mathf.Lerp(currentShift, -leanShift * leanFraction,
             leanSpeed * Time.deltaTime);
+
+        playerMovement?.SetCameraLean(currentLean, -leanYAngle * leanFraction, currentShift);
     }
 }

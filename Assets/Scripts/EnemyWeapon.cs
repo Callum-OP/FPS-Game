@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -34,6 +35,26 @@ public class EnemyWeapon : MonoBehaviour
     [Tooltip("How fast the anchor blends between resting and aiming.")]
     public float aimBlendSpeed = 8f;
 
+    [Header("Lowered (out of combat)")]
+    [Tooltip("Local position of the weapon anchor while the enemy isn't in combat - gun down at the waist, the same idea as the player's X key. Patrolling with a rifle levelled at nothing looks wrong.")]
+    public Vector3 loweredPositionOffset = new Vector3(0.12f, 0.85f, 0.18f);
+    [Tooltip("Local rotation of the weapon anchor while out of combat - tilt the muzzle down.")]
+    public Vector3 loweredRotationOffset = new Vector3(35f, 0f, 0f);
+    [Tooltip("How fast the gun raises/lowers when combat starts or ends.")]
+    public float lowerBlendSpeed = 4f;
+
+    [Header("Ammo / Reload")]
+    [Tooltip("Rounds before this enemy has to reload. Set per weapon type on the prefab.")]
+    public int magazineSize = 30;
+    [Tooltip("How long a reload takes. Match it roughly to the reload animation.")]
+    public float reloadTime = 2.2f;
+    [Tooltip("Local offset from the hips where the off hand reaches for a fresh magazine - same body-relative grab point the player's reload uses.")]
+    public Vector3 reloadGrabOffset = new Vector3(-0.15f, 0f, 0.12f);
+    public Vector3 reloadGrabRotation = new Vector3(0f, 0f, 0f);
+    [Tooltip("Fraction of the reload spent travelling to the mag pouch, and then to the magwell. The rest is the trip back to the grip.")]
+    [Range(0f, 1f)] public float handGrabTime = 0.25f;
+    [Range(0f, 1f)] public float handSeatTime = 0.6f;
+
     [Header("Drop on death")]
     [Tooltip("The matching *Pickup prefab, e.g. ARPickup.prefab - what actually spawns in the world.")]
     public GameObject worldPickupPrefab;
@@ -44,13 +65,22 @@ public class EnemyWeapon : MonoBehaviour
     Transform anchor;
     bool aiming;
     float aimBlend;
+    bool combatReady;
+    float combatBlend;
     bool dropped;
+    int ammo;
+    bool reloading;
+    Transform reloadHandAnchor;
+    CharacterAnimationDriver animationDriver;
+    Transform weaponReloadPoint; // the gun's own magwell point, if the prefab has one
 
     void Start()
     {
         if (weaponPrefab == null) return;
 
         enemyAI = GetComponent<EnemyAI>();
+        ammo = Mathf.Max(1, magazineSize);
+        animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
 
         Animator anim = GetComponentInChildren<Animator>();
         if (anim == null)
@@ -83,6 +113,9 @@ public class EnemyWeapon : MonoBehaviour
         // before stripping every script it brought with it (WeaponController,
         // WeaponADS, WeaponCant... all read player input/camera state, which
         // an enemy doesn't have and shouldn't react to).
+        var reloadHandler = weaponInstance.GetComponent<WeaponReloadHandler>();
+        if (reloadHandler != null) weaponReloadPoint = reloadHandler.handReloadPoint;
+
         WeaponController wc = weaponInstance.GetComponent<WeaponController>();
         if (wc != null)
         {
@@ -103,12 +136,119 @@ public class EnemyWeapon : MonoBehaviour
     {
         if (anchor == null) return;
 
-        float target = aiming ? 1f : 0f;
+        // Aiming only counts while the gun is actually up.
+        float target = (aiming && !reloading) ? 1f : 0f;
         aimBlend = Mathf.MoveTowards(aimBlend, target, aimBlendSpeed * Time.deltaTime);
+        combatBlend = Mathf.MoveTowards(combatBlend, combatReady ? 1f : 0f, lowerBlendSpeed * Time.deltaTime);
 
-        anchor.localPosition = Vector3.Lerp(restPositionOffset, aimPositionOffset, aimBlend);
-        anchor.localRotation = Quaternion.Slerp(
+        // Two blends, composed: lowered -> ready -> aiming. Nothing else writes this
+        // transform, same single-owner rule the player's weapon follows.
+        Vector3 readyPos = Vector3.Lerp(restPositionOffset, aimPositionOffset, aimBlend);
+        Quaternion readyRot = Quaternion.Slerp(
             Quaternion.Euler(restRotationOffset), Quaternion.Euler(aimRotationOffset), aimBlend);
+
+        anchor.localPosition = Vector3.Lerp(loweredPositionOffset, readyPos, combatBlend);
+        anchor.localRotation = Quaternion.Slerp(Quaternion.Euler(loweredRotationOffset), readyRot, combatBlend);
+    }
+
+    /// <summary>Gun up (in combat) or down at the waist (patrolling/idle). Called by EnemyAI
+    /// as it changes state.</summary>
+    public void SetCombatReady(bool value) => combatReady = value;
+
+    public bool IsReloading => reloading;
+    public bool HasAmmo => ammo > 0;
+    public int Ammo => ammo;
+
+    /// <summary>Spends a round. Returns false if the magazine is empty - EnemyAI uses that
+    /// as its cue to go and reload (ideally behind something).</summary>
+    public bool TryConsumeAmmo()
+    {
+        if (reloading || ammo <= 0) return false;
+        ammo--;
+        return true;
+    }
+
+    /// <summary>Starts a reload, if one isn't already running.</summary>
+    public void Reload()
+    {
+        if (reloading || weaponInstance == null) return;
+        StartCoroutine(ReloadRoutine());
+    }
+
+    // Mirrors the player's WeaponReloadHandler at a smaller scale: the off hand leaves
+    // the foregrip, dips to a mag pouch on the hip, comes up to the magwell, and returns.
+    // The same WeaponHandIK reload-override hook the player uses drives it, so it works
+    // with whatever gun the enemy is holding without per-weapon setup.
+    IEnumerator ReloadRoutine()
+    {
+        reloading = true;
+        aiming = false;
+        animationDriver?.PlayReload();
+
+        Transform grabPoint = handIK != null
+            ? handIK.GetOrCreateReloadGrabPoint(reloadGrabOffset, reloadGrabRotation)
+            : null;
+
+        if (handIK != null && grabPoint != null)
+        {
+            if (reloadHandAnchor == null)
+                reloadHandAnchor = new GameObject("EnemyReloadHandAnchor").transform;
+
+            WeaponController wc = weaponInstance != null ? weaponInstance.GetComponent<WeaponController>() : null;
+            Transform gripPoint = wc != null ? wc.leftHandGrip : null;
+            Vector3 gripStart = gripPoint != null ? gripPoint.position : transform.position;
+            Quaternion gripStartRot = gripPoint != null ? gripPoint.rotation : transform.rotation;
+
+            reloadHandAnchor.SetPositionAndRotation(gripStart, gripStartRot);
+            handIK.SetReloadOverride(null, reloadHandAnchor);
+
+            float t = 0f;
+            while (t < reloadTime)
+            {
+                t += Time.deltaTime;
+                float frac = reloadTime > 0f ? Mathf.Clamp01(t / reloadTime) : 1f;
+
+                Vector3 seatPos = weaponReloadPoint != null ? weaponReloadPoint.position : gripStart;
+                Quaternion seatRot = weaponReloadPoint != null ? weaponReloadPoint.rotation : gripStartRot;
+
+                Vector3 fromPos, toPos; Quaternion fromRot, toRot; float segStart, segEnd;
+                if (frac <= handGrabTime)
+                {
+                    fromPos = gripStart; fromRot = gripStartRot;
+                    toPos = grabPoint.position; toRot = grabPoint.rotation;
+                    segStart = 0f; segEnd = handGrabTime;
+                }
+                else if (frac <= handSeatTime)
+                {
+                    fromPos = grabPoint.position; fromRot = grabPoint.rotation;
+                    toPos = seatPos; toRot = seatRot;
+                    segStart = handGrabTime; segEnd = handSeatTime;
+                }
+                else
+                {
+                    fromPos = seatPos; fromRot = seatRot;
+                    toPos = gripPoint != null ? gripPoint.position : gripStart;
+                    toRot = gripPoint != null ? gripPoint.rotation : gripStartRot;
+                    segStart = handSeatTime; segEnd = 1f;
+                }
+
+                float segT = Mathf.Clamp01((frac - segStart) / Mathf.Max(0.0001f, segEnd - segStart));
+                segT = segT * segT * (3f - 2f * segT); // smoothstep, so each leg eases rather than snapping
+                reloadHandAnchor.SetPositionAndRotation(
+                    Vector3.Lerp(fromPos, toPos, segT), Quaternion.Slerp(fromRot, toRot, segT));
+
+                yield return null;
+            }
+
+            handIK.SetReloadOverride(null, null);
+        }
+        else
+        {
+            yield return new WaitForSeconds(reloadTime);
+        }
+
+        ammo = Mathf.Max(1, magazineSize);
+        reloading = false;
     }
 
     /// <summary>Called from EnemyAI alongside CharacterAnimationDriver.SetAiming(), same
@@ -136,5 +276,10 @@ public class EnemyWeapon : MonoBehaviour
 
         if (weaponInstance != null)
             weaponInstance.SetActive(false);
+    }
+
+    void OnDestroy()
+    {
+        if (reloadHandAnchor != null) Destroy(reloadHandAnchor.gameObject);
     }
 }

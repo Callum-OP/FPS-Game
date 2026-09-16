@@ -1,5 +1,13 @@
 using UnityEngine;
 
+/// <summary>
+/// Computes the recoil kick and pushes it into PlayerMovement (now the single owner of
+/// the camera transform) instead of multiplying it onto transform.localRotation itself.
+/// The old version compounded its own output back into the transform every frame and
+/// was then partially erased by PlayerMovement/CameraLean, which is a large part of the
+/// camera (and therefore gun/hand) jitter.
+/// </summary>
+[DefaultExecutionOrder(-160)]
 public class CameraRecoil : MonoBehaviour
 {
     [Header("Recoil")]
@@ -15,8 +23,17 @@ public class CameraRecoil : MonoBehaviour
     public WeaponADS weaponADS;
     public float adsRecoilMultiplier = 0.4f;
 
+    [Header("References")]
+    [Tooltip("Auto-found on the player root if left empty.")]
+    public PlayerMovement playerMovement;
+
     private Vector3 currentRotation;
     private Vector3 targetRotation;
+
+    void Start()
+    {
+        if (playerMovement == null) playerMovement = GetComponentInParent<PlayerMovement>();
+    }
 
     void Update()
     {
@@ -24,13 +41,11 @@ public class CameraRecoil : MonoBehaviour
         targetRotation = Vector3.Lerp(targetRotation, Vector3.zero,
             recoverySpeed * Time.deltaTime);
 
-        // Smoothly apply to current rotation
+        // Smoothly approach it
         currentRotation = Vector3.Slerp(currentRotation, targetRotation,
             recoilSpeed * Time.deltaTime);
 
-        // Apply on top of whatever the camera is already doing
-        transform.localRotation = Quaternion.Euler(currentRotation)
-            * transform.localRotation;
+        playerMovement?.SetCameraRotationOffset(Quaternion.Euler(currentRotation));
     }
 
     public void Configure(float x, float y, float z)

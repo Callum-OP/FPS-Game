@@ -75,6 +75,14 @@ public class WeaponHandIK : MonoBehaviour
     public float maxPullBack = 0.25f;
     [Tooltip("How fast the pull-back eases in/out as the required amount/direction changes.")]
     public float pullBackSpeed = 10f;
+    [Tooltip("Shortfall (metres) ignored before any pull-back happens at all. Without a deadzone the weapon reacts to the last millimetre of every walk-cycle wobble, which is what makes it twitch side to side while moving.")]
+    public float pullBackDeadzone = 0.04f;
+    [Tooltip("Seconds of smoothing on the pull-back. Higher = the weapon drifts to its new spot instead of snapping there each step.")]
+    public float pullBackSmoothTime = 0.25f;
+    [Tooltip("How much of the pull-back is allowed SIDEWAYS (in the weapon holder's local X). 0 means the weapon is only ever pulled back/up/down, never left or right - this is the fix for the gun and arm flicking to the right and back while walking, which is the animated shoulder swinging in and out of reach once per step and dragging the weapon with it.")]
+    [Range(0f, 1f)] public float lateralPullBackFraction = 0f;
+    [Tooltip("Measure reach from the shoulder's RESTING position (its bind spot on the body) rather than its live animated position. The live shoulder swings several centimetres every step, so the 'how far short is the hand' measurement - and therefore the pull-back - oscillates with the walk cycle even when nothing about the aim has changed. Leave this on unless you specifically want the weapon to breathe with the animation.")]
+    public bool measureReachFromRestingShoulder = true;
 
     [Header("Torso Lean (helps the off-hand reach on two-handed weapons)")]
     [Tooltip("Degrees the chest twists to bring the off-hand's shoulder closer to its grip on two-handed weapons (e.g. a rifle's foregrip), rather than relying on arm stretch and pull-back alone. Set to 0 to disable. Flip the sign if it twists the wrong way for your rig.")]
@@ -94,23 +102,29 @@ public class WeaponHandIK : MonoBehaviour
     // Cached once in Awake for the reach clamp and fallback elbow hint below.
     Transform rightShoulder, rightHandBone;
     Transform leftShoulder, leftHandBone;
+    Vector3 rightShoulderRestLocal, leftShoulderRestLocal; // in animator-root space, captured once
+    Vector3 pullBackVelocity; // SmoothDamp state
     float rightArmReach = Mathf.Infinity;
     float leftArmReach = Mathf.Infinity;
     Transform chestBone;
     float currentTorsoLean;
 
-    // Weapon pull-back state. movedWeaponPart is the same "weapon's own top-level pivot"
-    // concept WeaponReloadHandler uses (rightGrip's parent) - resolved fresh whenever the
-    // grips change so it always points at whichever weapon is actually equipped. The
-    // applied offset is tracked in WORLD space so this can be purely additive (undo last
-    // frame's, apply this frame's) in LateUpdate, which lets it safely compose with
-    // WeaponReloadHandler's own additive (local-space) move on the same pivot regardless
-    // of which component's LateUpdate happens to run first - the two only ever touch the
-    // transform through their own tracked delta, never by reading and overwriting the
-    // other's contribution.
-    Transform movedWeaponPart;
-    Vector3 pullBackOffset;      // current world-space pull-back vector, eased towards its target each frame
-    Vector3 appliedPullBackOffset;
+    // Weapon pull-back state. The pull-back is no longer written onto the weapon
+    // transform here - it's handed to WeaponADS (the single owner of the weapon root),
+    // which composes it in Update BEFORE the Animator's IK pass runs. Two reasons:
+    //  - This script used to move the weapon in LateUpdate, i.e. after it had already
+    //    solved the hands against the weapon's earlier position. That one-frame
+    //    mismatch is the hand/gun jitter when looking up while walking.
+    //  - Measuring "how far short is the hand" against a weapon this script had itself
+    //    already pulled back is a feedback loop: pull back -> gap closes -> pull-back
+    //    eases off -> gap opens -> pull back again, which oscillates. appliedPullBack
+    //    below is subtracted back out before measuring, so the required pull-back is a
+    //    stable function of the camera/body pose alone.
+    WeaponADS offsetOwner;
+    Vector3 pullBackOffset;       // world-space pull-back being requested, eased each frame
+    Vector3 appliedPullBack;      // what the owner is currently applying, for the measurement above
+    int lastIKFrame = -1;         // the IK pass runs once per IK-enabled layer (base + UpperBody);
+                                  // per-frame state must only advance on the first of them
 
     // [proximal, intermediate, distal] per finger, thumb through pinky.
     Transform[][] rightFingerBones;
@@ -150,6 +164,9 @@ public class WeaponHandIK : MonoBehaviour
         leftShoulder = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
         leftHandBone = anim.GetBoneTransform(HumanBodyBones.LeftHand);
 
+        if (rightShoulder != null) rightShoulderRestLocal = anim.transform.InverseTransformPoint(rightShoulder.position);
+        if (leftShoulder != null) leftShoulderRestLocal = anim.transform.InverseTransformPoint(leftShoulder.position);
+
         rightArmReach = MeasureArmReach(rightShoulder, anim.GetBoneTransform(HumanBodyBones.RightLowerArm), rightHandBone);
         leftArmReach = MeasureArmReach(leftShoulder, anim.GetBoneTransform(HumanBodyBones.LeftLowerArm), leftHandBone);
 
@@ -168,6 +185,17 @@ public class WeaponHandIK : MonoBehaviour
         float upperArmLen = Vector3.Distance(shoulder.position, elbow.position);
         float forearmLen = Vector3.Distance(elbow.position, hand.position);
         return (upperArmLen + forearmLen) * armReachSafety;
+    }
+
+    // The live shoulder bone travels several centimetres per step; its resting spot on
+    // the body doesn't. Using the resting spot for the reach measurement keeps the
+    // pull-back a function of where the weapon is relative to the BODY, not of where
+    // the walk animation happens to be in its cycle.
+    Vector3 StableShoulderPosition(bool isRight, Transform live)
+    {
+        if (!measureReachFromRestingShoulder || anim == null) return live.position;
+        Vector3 rest = isRight ? rightShoulderRestLocal : leftShoulderRestLocal;
+        return rest == Vector3.zero ? live.position : anim.transform.TransformPoint(rest);
     }
 
     Transform[][] CacheFingerBones(bool isRight)
@@ -244,13 +272,14 @@ public class WeaponHandIK : MonoBehaviour
         reloadRightOverride = null;
         reloadLeftOverride = null;
 
-        // Same "weapon's own top-level pivot" WeaponReloadHandler resolves - re-resolved
-        // per weapon so pull-back always acts on whatever's actually equipped now, and
-        // reset so a leftover pull-back amount from the previous weapon doesn't carry
-        // over onto the new one.
-        movedWeaponPart = right != null ? right.parent : null;
+        // Re-resolved per weapon so the pull-back always acts on whatever's actually
+        // equipped now, and reset so a leftover amount from the previous weapon doesn't
+        // carry over onto the new one.
+        if (offsetOwner != null) offsetOwner.SetPullBackWorldOffset(Vector3.zero);
+        offsetOwner = right != null ? right.GetComponentInParent<WeaponADS>() : null;
         pullBackOffset = Vector3.zero;
-        appliedPullBackOffset = Vector3.zero;
+        appliedPullBack = Vector3.zero;
+        offsetOwner?.SetPullBackWorldOffset(Vector3.zero);
     }
 
     /// <summary>Called by WeaponReloadHandler to temporarily steer a hand away from its
@@ -275,19 +304,33 @@ public class WeaponHandIK : MonoBehaviour
     {
         if (anim == null) return;
 
+        // OnAnimatorIK fires once per layer with an IK pass enabled - both the base and
+        // the UpperBody layer have one - so this runs TWICE per frame. The IK goals have
+        // to be set on every pass, but anything that advances state or rotates bones
+        // directly must only happen once, or weights blend at double speed and the
+        // finger curl is applied twice (on top of the double-rate pull-back easing, a
+        // further source of the shaking).
+        bool firstPassThisFrame = lastIKFrame != Time.frameCount;
+        lastIKFrame = Time.frameCount;
+
         // Reload overrides win when present; otherwise fall back to the weapon's normal grips.
         Transform effectiveRight = reloadRightOverride != null ? reloadRightOverride : rightGrip;
         Transform effectiveLeft = reloadLeftOverride != null ? reloadLeftOverride : leftGrip;
 
         // Don't fight the melee swing / ragdoll / death poses - only apply while a
         // weapon is actually meant to be held.
-        float rightTarget = effectiveRight != null ? 1f : 0f;
-        float leftTarget = effectiveLeft != null ? 1f : 0f;
-        rightWeight = Mathf.MoveTowards(rightWeight, rightTarget, blendSpeed * Time.deltaTime);
-        leftWeight = Mathf.MoveTowards(leftWeight, leftTarget, blendSpeed * Time.deltaTime);
+        if (firstPassThisFrame)
+        {
+            float rightTarget = effectiveRight != null ? 1f : 0f;
+            float leftTarget = effectiveLeft != null ? 1f : 0f;
+            rightWeight = Mathf.MoveTowards(rightWeight, rightTarget, blendSpeed * Time.deltaTime);
+            leftWeight = Mathf.MoveTowards(leftWeight, leftTarget, blendSpeed * Time.deltaTime);
+        }
 
         Vector3 rightExcessVec = ApplyHand(AvatarIKGoal.RightHand, effectiveRight, rightWeight, rightElbowHint, AvatarIKHint.RightElbow, rightShoulder, rightArmReach);
         Vector3 leftExcessVec = ApplyHand(AvatarIKGoal.LeftHand, effectiveLeft, leftWeight, leftElbowHint, AvatarIKHint.LeftElbow, leftShoulder, leftArmReach);
+
+        if (!firstPassThisFrame) return;
 
         // Whichever hand is short of its grip by more drives the pull-back - the left
         // hand on a two-handed weapon usually needs more, since it travels further from
@@ -296,9 +339,30 @@ public class WeaponHandIK : MonoBehaviour
         // down, or is just turned to an awkward angle.
         Vector3 dominantExcess = leftExcessVec.sqrMagnitude >= rightExcessVec.sqrMagnitude ? leftExcessVec : rightExcessVec;
         Vector3 targetPullBack = -dominantExcess;
+
+        // Strip out most (by default all) of the sideways component. A pull-back that's
+        // free to point anywhere follows the shoulder's own left/right swing, which is
+        // exactly the "gun and arm jumps right then returns left while walking" - and it
+        // never helps reach anyway, since the problem it exists to solve is the weapon
+        // being too far FORWARD/UP, not too far to one side.
+        Transform lateralRef = offsetOwner != null ? offsetOwner.transform : anim.transform;
+        Vector3 side = lateralRef.right;
+        float lateral = Vector3.Dot(targetPullBack, side);
+        targetPullBack -= side * lateral * (1f - lateralPullBackFraction);
+
         if (targetPullBack.magnitude > maxPullBack)
             targetPullBack = targetPullBack.normalized * maxPullBack;
-        pullBackOffset = Vector3.MoveTowards(pullBackOffset, targetPullBack, pullBackSpeed * Time.deltaTime);
+
+        // SmoothDamp rather than MoveTowards: a constant-rate move reaches its target
+        // within a frame or two at typical speeds, so per-step changes in the target
+        // pass straight through as visible steps. This spreads them over ~pullBackSmoothTime.
+        pullBackOffset = Vector3.SmoothDamp(pullBackOffset, targetPullBack, ref pullBackVelocity,
+            Mathf.Max(0.01f, pullBackSmoothTime), Mathf.Infinity, Time.deltaTime);
+
+        // Handed to the weapon root's owner rather than written here - see the field
+        // comments above for why that removes both the one-frame lag and the feedback.
+        appliedPullBack = pullBackOffset;
+        offsetOwner?.SetPullBackWorldOffset(pullBackOffset);
 
         // Twist the torso towards the off-hand's grip so it doesn't have to rely on arm
         // stretch and pull-back alone to reach a two-handed weapon's foregrip - a real
@@ -312,22 +376,6 @@ public class WeaponHandIK : MonoBehaviour
         // fingers, not fighting the arm placement.
         ApplyFingerGrip(rightFingerBones, rightGripPose, rightWeight);
         ApplyFingerGrip(leftFingerBones, leftGripPose, leftWeight);
-    }
-
-    void LateUpdate()
-    {
-        if (movedWeaponPart == null) return;
-
-        // Purely additive in WORLD space: undo whatever was added last frame, then add
-        // this frame's amount. World space means no local/parent conversion needed for
-        // a pure directional pull, and undo-then-redo of the same world vector is safe
-        // regardless of what else touched the transform in between (its parent doesn't
-        // move again until next frame) - this is what lets it compose safely with
-        // WeaponReloadHandler's own additive (local-space) move on the same pivot,
-        // regardless of which component's LateUpdate happens to run first.
-        movedWeaponPart.position -= appliedPullBackOffset;
-        appliedPullBackOffset = pullBackOffset;
-        movedWeaponPart.position += appliedPullBackOffset;
     }
 
     void ApplyFingerGrip(Transform[][] fingerBones, FingerGripPose pose, float weight)
@@ -375,14 +423,21 @@ public class WeaponHandIK : MonoBehaviour
             // backward-looking bend to reach the impossible target anyway.
             if (shoulder != null && maxReach < Mathf.Infinity)
             {
+                // Measured against where the grip would be WITHOUT the pull-back this
+                // script is already causing, so the requested amount doesn't chase its
+                // own effect (see appliedPullBack above), and from a shoulder position
+                // that doesn't swing with the walk cycle (see the field tooltip).
+                Vector3 measureShoulder = StableShoulderPosition(goal == AvatarIKGoal.RightHand, shoulder);
+                Vector3 rawFromShoulder = (targetPos - appliedPullBack) - measureShoulder;
+                float rawDist = rawFromShoulder.magnitude;
+                if (rawDist > maxReach + pullBackDeadzone)
+                    excessVector = (rawFromShoulder / rawDist) * (rawDist - maxReach - pullBackDeadzone);
+
+                // The hand itself still clamps against the grip's real current position.
                 Vector3 fromShoulder = targetPos - shoulder.position;
                 float dist = fromShoulder.magnitude;
                 if (dist > maxReach)
-                {
-                    Vector3 dir = fromShoulder / dist;
-                    excessVector = dir * (dist - maxReach);
-                    targetPos = shoulder.position + dir * maxReach;
-                }
+                    targetPos = shoulder.position + (fromShoulder / dist) * maxReach;
             }
 
             anim.SetIKPosition(goal, targetPos);

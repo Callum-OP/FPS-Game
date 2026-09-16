@@ -656,6 +656,7 @@ GameObject:
   - component: {fileID: 5665828315263583112}
   - component: {fileID: 3420109757068916442}
   - component: {fileID: 6579001472306139828}
+  - component: {fileID: 1535710873978564576}
   m_Layer: 0
   m_Name: Mono19
   m_TagString: Untagged
@@ -746,7 +747,7 @@ MonoBehaviour:
   pelletCount: 8
   spreadAngle: 10
   cameraRecoil: {fileID: 0}
-  weaponRecoil: {fileID: 0}
+  weaponRecoil: {fileID: 4396114731410950155}
   camRecoilX: 2
   camRecoilY: 2
   camRecoilZ: 2
@@ -803,6 +804,28 @@ MonoBehaviour:
   dropForce: 1.5
   dropTorque: 3
   destroyDelay: 5
+--- !u!114 &1535710873978564576
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7210103834045770318}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fbd2b97eff3c3b41b712724d661d879, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponMovementBob
+  positionAmount: 0.25
+  rotationAmount: 90
+  aimMultiplier: 0.25
+  fullEffectSpeed: 4
+  idleAmount: 0.2
+  maxOffset: 0.1
+  smooth: 14
+  restingDrift: 0.2
+  weaponADS: {fileID: 2559716683699181159}
+  playerMovement: {fileID: 0}
 --- !u!1 &7296943828069985562
 GameObject:
   m_ObjectHideFlags: 0
@@ -40213,6 +40236,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba323454735e4d548a90aa12eec2d51c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  loweredHeight: -0.4
   loweredPosition: {x: -0.2, y: -0.4, z: 0.3}
   loweredRotation: {x: 30, y: -20, z: 0}
   lowerSpeed: 8

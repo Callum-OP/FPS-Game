@@ -6,7 +6,7 @@ using UnityEngine.AI;
 [RequireComponent(typeof(Health))]
 public class EnemyAI : MonoBehaviour
 {
-    public enum State { Patrol, Idle, Investigate, Chase, Attack, Dead }
+    public enum State { Patrol, Idle, Investigate, Chase, Attack, Dead, TakeCover, InCover }
 
     [Header("Detection")]
     public float sightRange = 20f;
@@ -22,6 +22,18 @@ public class EnemyAI : MonoBehaviour
     public float shootRange = 15f;
     [Tooltip("Health fraction (0-1) at or below which the Injured locomotion overlay plays.")]
     public float InjuredHealthFraction = 0.3f;
+
+    [Header("Cover")]
+    [Tooltip("Use cover at all. Needs an EnemyCover component on the same object (auto-added if missing).")]
+    public bool useCover = true;
+    [Tooltip("Seconds of shooting before looking for somewhere better to shoot from. Keeps them from standing in the open trading shots forever.")]
+    public float timeInOpenBeforeCover = 3.5f;
+    [Tooltip("How long to stay hidden between peeks.")]
+    public float coverHideTime = 1.6f;
+    [Tooltip("How long to stay leaned out shooting before dropping back down.")]
+    public float peekDuration = 1.8f;
+    [Tooltip("Crouch (the shared crouch locomotion pose) while hidden behind cover.")]
+    public bool crouchInCover = true;
 
     [Header("Movement")]
     public float walkSpeed = 2.5f;
@@ -70,6 +82,14 @@ public class EnemyAI : MonoBehaviour
 
     private bool isStunned = false;
 
+    // Cover
+    private EnemyCover cover;
+    private Vector3 coverPosition;
+    private Vector3 peekPosition;
+    private float coverTimer;
+    private bool peeking;
+    private float timeInOpen;
+
     // Patrol
     private int currentWaypointIndex = 0;
     private bool patrolForward = true;
@@ -94,6 +114,12 @@ public class EnemyAI : MonoBehaviour
         bodyPose = GetComponentInChildren<UpperBodyPose>();
         characterAnimation = GetComponentInChildren<CharacterAnimationDriver>();
         enemyWeapon = GetComponent<EnemyWeapon>();
+        if (useCover)
+        {
+            cover = GetComponent<EnemyCover>();
+            if (cover == null) cover = gameObject.AddComponent<EnemyCover>();
+            if (cover.sightBlockers == 0) cover.sightBlockers = sightBlockers;
+        }
         if (!canShoot)
             characterAnimation?.SetWeaponClass(CharacterWeaponClass.Unarmed);
         else
@@ -128,7 +154,16 @@ public class EnemyAI : MonoBehaviour
             case State.Investigate: HandleInvestigate(); break;
             case State.Chase:       HandleChase();       break;
             case State.Attack:      HandleAttack();      break;
+            case State.TakeCover:   HandleTakeCover();   break;
+            case State.InCover:     HandleInCover();     break;
         }
+
+        // Gun down while there's nothing to shoot at, up the moment there is. Same idea
+        // as the player's lower-weapon key, just driven by the state machine.
+        bool inCombat = currentState == State.Chase || currentState == State.Attack
+            || currentState == State.TakeCover || currentState == State.InCover
+            || (currentState == State.Investigate && playerInSight);
+        enemyWeapon?.SetCombatReady(inCombat);
     }
 
     // State handlers
@@ -221,11 +256,25 @@ public class EnemyAI : MonoBehaviour
         // Shoot if in range and has sight
         if (canShoot && dist <= shootRange && playerInSight)
         {
+            // Out of ammo, or been standing in the open too long - go find something to
+            // stand behind rather than reloading in the middle of a firefight.
+            if (useCover && cover != null && (NeedsReload() || timeInOpen >= timeInOpenBeforeCover)
+                && cover.FindCover(player.position, out coverPosition, out peekPosition))
+            {
+                EnterTakeCover();
+                return;
+            }
+
+            if (NeedsReload()) { enemyWeapon?.Reload(); return; }
+
             agent.isStopped = true;
+            timeInOpen += Time.deltaTime;
             FacePlayer();
             TryShoot();
             return;
         }
+
+        timeInOpen = 0f;
 
         characterAnimation?.SetAiming(false);
         enemyWeapon?.SetAiming(false);
@@ -234,6 +283,107 @@ public class EnemyAI : MonoBehaviour
         if (!playerInSight)
             EnterInvestigate();
     }
+
+    void HandleTakeCover()
+    {
+        agent.isStopped = false;
+        agent.speed = chaseSpeed;
+        agent.SetDestination(coverPosition);
+        characterAnimation?.SetAiming(false);
+        enemyWeapon?.SetAiming(false);
+
+        // Reload on the way - the whole point of breaking off was to get the magazine
+        // changed somewhere the player isn't shooting at.
+        if (NeedsReload()) enemyWeapon?.Reload();
+
+        if (ReachedDestination() || Vector3.Distance(transform.position, coverPosition) < 0.6f)
+            EnterInCover();
+    }
+
+    void HandleInCover()
+    {
+        coverTimer -= Time.deltaTime;
+
+        if (peeking)
+        {
+            // Leaned out: stand, face the player, shoot until the timer runs out or the
+            // magazine does.
+            agent.isStopped = false;
+            agent.SetDestination(peekPosition);
+            characterAnimation?.SetCrouching(false);
+            FacePlayer();
+
+            if (playerInSight && canShoot && !NeedsReload())
+                TryShoot();
+
+            if (coverTimer <= 0f || NeedsReload())
+            {
+                peeking = false;
+                coverTimer = coverHideTime;
+            }
+            return;
+        }
+
+        // Hidden: drop down, stop shooting, reload if needed.
+        agent.SetDestination(coverPosition);
+        bool atCover = Vector3.Distance(transform.position, coverPosition) < 0.6f;
+        agent.isStopped = atCover;
+        if (crouchInCover) characterAnimation?.SetCrouching(atCover);
+        characterAnimation?.SetAiming(false);
+        enemyWeapon?.SetAiming(false);
+
+        if (NeedsReload()) { enemyWeapon?.Reload(); return; }
+
+        // Player got close, or wandered off - cover isn't the answer any more.
+        float dist = Vector3.Distance(transform.position, player.position);
+        if (dist <= attackRange) { LeaveCover(); EnterAttack(); return; }
+
+        if (coverTimer <= 0f)
+        {
+            // Cover that can no longer see the player is useless - find new cover or
+            // just push forward.
+            if (cover != null && !cover.HasLineOfSight(peekPosition + Vector3.up * 1.5f, player.position))
+            {
+                if (cover.FindCover(player.position, out coverPosition, out peekPosition))
+                {
+                    EnterTakeCover();
+                    return;
+                }
+                LeaveCover();
+                EnterChase();
+                return;
+            }
+
+            peeking = true;
+            coverTimer = peekDuration;
+        }
+    }
+
+    void EnterTakeCover()
+    {
+        currentState = State.TakeCover;
+        peeking = false;
+        timeInOpen = 0f;
+        agent.isStopped = false;
+        Debug.Log($"{name} → Taking cover");
+    }
+
+    void EnterInCover()
+    {
+        currentState = State.InCover;
+        peeking = false;
+        coverTimer = coverHideTime;
+        Debug.Log($"{name} → In cover");
+    }
+
+    void LeaveCover()
+    {
+        peeking = false;
+        characterAnimation?.SetCrouching(false);
+    }
+
+    // Empty magazine, or mid-reload - either way there's nothing to fire right now.
+    bool NeedsReload() => enemyWeapon != null && (!enemyWeapon.HasAmmo || enemyWeapon.IsReloading);
 
     void HandleAttack()
     {
@@ -384,6 +534,14 @@ public class EnemyAI : MonoBehaviour
         attackTimer -= Time.deltaTime;
         if (attackTimer > 0f || bulletPrefab == null || muzzlePoint == null) return;
 
+        // One round per shot. An enemy with an EnemyWeapon that's empty or reloading
+        // can't fire at all - EnemyAI's cover logic is what gets it reloaded.
+        if (enemyWeapon != null && !enemyWeapon.TryConsumeAmmo())
+        {
+            enemyWeapon.Reload();
+            return;
+        }
+
         attackTimer = attackCooldown;
         characterAnimation?.SetAiming(true);
         enemyWeapon?.SetAiming(true);
@@ -459,12 +617,12 @@ public class EnemyAI : MonoBehaviour
         currentState = State.Dead;
         agent.isStopped = true;
 
-        // CharacterAnimationDriver.SetDead() existed already but nothing was calling it,
-        // so the Death animator state never actually played - Ragdoll.cs's own onDeath
-        // listener disables the animator a frame later regardless, but this at least
-        // gets the Dead bool set (and the state entered) for that frame, and covers any
-        // case where the ragdoll's collapse is delayed.
-        characterAnimation?.SetDead(true);
+        characterAnimation?.SetCrouching(false);
+
+        // The Dead bool is NOT set here any more. Ragdoll.cs now decides whether this
+        // death plays an animation first (and which direction it was shot from) before
+        // handing over to physics - setting the bool here would force the front-death
+        // clip regardless and start it a frame early.
 
         // Drop the held weapon as a world pickup, same as the player does.
         enemyWeapon?.Drop();

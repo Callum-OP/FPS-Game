@@ -1,16 +1,15 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// NOTE: This lives on the same GameObject/transform as WeaponADS (both are on the
-// weapon root). WeaponADS's Update() sets transform.localPosition/localRotation
-// outright each frame to move between hip and ADS poses. If this script also wrote
-// transform.localPosition outright in its own Update(), the two would stomp each other
-// every frame in whatever order Unity happens to run them - which is exactly what made
-// aiming look "bouncy"/less attached: sway would periodically overwrite the zoomed-in
-// ADS position outright instead of nudging it. Fixed by making sway purely additive
-// (undo-last-then-add-new, like WeaponReloadHandler's lift) and applying it in
-// LateUpdate, which Unity always runs after every script's Update() - so it always
-// composes on top of whatever ADS just set, rather than racing it.
+/// <summary>
+/// Computes mouse sway and hands it to WeaponADS, which owns the weapon root transform
+/// and composes every offset in one place. The old undo-last-then-add-new trick in
+/// LateUpdate worked around the fight with ADS, but it still moved the weapon AFTER the
+/// Animator's IK pass had already solved the hands against the earlier position - a
+/// one-frame mismatch that reads as the hands jittering/sliding off the gun while
+/// looking around and walking. Pushing the offset instead removes both problems.
+/// </summary>
+[DefaultExecutionOrder(-90)]
 public class WeaponSway : MonoBehaviour
 {
     [Header("Sway Settings")]
@@ -23,8 +22,7 @@ public class WeaponSway : MonoBehaviour
     public float adsSwayMultiplier = 0.2f;
 
     private InputAction lookAction;
-    private Vector3 currentSwayOffset; // smoothed offset, recovers toward zero
-    private Vector3 appliedSwayOffset; // what's currently added onto transform.localPosition
+    private Vector3 currentSwayOffset;
 
     void Awake()
     {
@@ -32,7 +30,13 @@ public class WeaponSway : MonoBehaviour
         lookAction.Enable();
     }
 
-    void LateUpdate()
+    void Start()
+    {
+        if (weaponADS == null) weaponADS = GetComponent<WeaponADS>();
+        if (weaponADS == null) weaponADS = GetComponentInParent<WeaponADS>();
+    }
+
+    void Update()
     {
         Vector2 lookInput = lookAction.ReadValue<Vector2>();
 
@@ -47,10 +51,7 @@ public class WeaponSway : MonoBehaviour
         Vector3 targetSwayOffset = new Vector3(swayX, swayY, 0f);
         currentSwayOffset = Vector3.Lerp(currentSwayOffset, targetSwayOffset, swaySmooth * Time.deltaTime);
 
-        // Undo last frame's sway, then add this frame's - stays additive on top of
-        // whatever WeaponADS's Update() already set this frame instead of overwriting it.
-        transform.localPosition += currentSwayOffset - appliedSwayOffset;
-        appliedSwayOffset = currentSwayOffset;
+        weaponADS?.SetSwayOffset(currentSwayOffset);
     }
 
     void OnDestroy() => lookAction.Disable();

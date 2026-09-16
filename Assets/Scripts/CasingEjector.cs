@@ -20,6 +20,14 @@ public class CasingEjector : MonoBehaviour
         Rigidbody rb = casing.GetComponent<Rigidbody>();
         if (rb != null)
         {
+            // A casing collider is ~7mm across and it's spawned already moving, so with
+            // the default discrete detection it can easily travel further than its own
+            // thickness in one physics step and miss the floor entirely. Speculative
+            // continuous detection fixes that for cheap and, unlike ContinuousDynamic,
+            // also handles the spin these get.
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+
                         // Randomise ejection force and upward force slightly
             float randomEjection = ejectionForce + Random.Range(-0.5f, 0.5f);
             float randomUpward   = upwardForce   + Random.Range(-0.3f, 0.3f);
