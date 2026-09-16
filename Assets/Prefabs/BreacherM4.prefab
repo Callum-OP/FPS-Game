@@ -39436,6 +39436,68 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!1 &4084485098646924861
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 867525230156697492}
+  m_Layer: 0
+  m_Name: ReloadRaise
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &867525230156697492
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4084485098646924861}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: 0.10401512, w: 0.99457574}
+  m_LocalPosition: {x: 0, y: 0.07099998, z: 0.509}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3829338631960679855}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 11.941}
+--- !u!1 &5187670953487107366
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2260027330663070636}
+  m_Layer: 0
+  m_Name: ReloadPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2260027330663070636
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5187670953487107366}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: 0.06800393, w: 0.9976851}
+  m_LocalPosition: {x: 0.046001434, y: 0.049999975, z: 0.26600003}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7530102725102030228}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 7.799}
 --- !u!1 &6594838560962264837
 GameObject:
   m_ObjectHideFlags: 0
@@ -39471,6 +39533,7 @@ Transform:
   - {fileID: 5311319321076708714}
   - {fileID: 4986012479232864893}
   - {fileID: 4264181926291644394}
+  - {fileID: 2260027330663070636}
   m_Father: {fileID: 5861847685194333666}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3751242380239690370
@@ -39506,6 +39569,7 @@ GameObject:
   - component: {fileID: 1212110107197663008}
   - component: {fileID: 8128780049312384733}
   - component: {fileID: 171540251199544824}
+  - component: {fileID: 4159098038463464570}
   m_Layer: 0
   m_Name: BreacherM4
   m_TagString: Untagged
@@ -39527,6 +39591,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8772617044774800299}
+  - {fileID: 867525230156697492}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7542695909553746342
@@ -39603,6 +39668,7 @@ MonoBehaviour:
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
   casingEjector: {fileID: 171540251199544824}
   gunSlide: {fileID: 0}
+  reloadHandler: {fileID: 0}
   muzzleFlash: {fileID: 3602602296311612006}
 --- !u!114 &171540251199544824
 MonoBehaviour:
@@ -39621,6 +39687,33 @@ MonoBehaviour:
   ejectionForce: 8
   upwardForce: 1.5
   torqueForce: 4
+  destroyDelay: 5
+--- !u!114 &4159098038463464570
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7421825919243163531}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1c919d80a8ec704db0554b1cba6a1dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponReloadHandler
+  magazinePrefab: {fileID: 4598212022487192858, guid: 60ad67d5e4dd3f34cbdc756f4555976a, type: 3}
+  magSeatPoint: {fileID: 2260027330663070636}
+  handReloadPoint: {fileID: 2260027330663070636}
+  magHandOffsetPosition: {x: 0, y: 0, z: 0}
+  magHandOffsetRotation: {x: 0, y: 0, z: 0}
+  handMoveOutTime: 0.05
+  magDropTime: 0.15
+  magSeatTime: 0.75
+  handReturnTime: 0.9
+  weaponLiftPivot: {fileID: 867525230156697492}
+  weaponLiftPosition: {x: 0, y: 0.02, z: 0}
+  weaponLiftRotation: {x: -6, y: 0, z: 0}
+  dropForce: 1.5
+  dropTorque: 3
   destroyDelay: 5
 --- !u!1 &7943068405551898249
 GameObject:

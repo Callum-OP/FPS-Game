@@ -16,6 +16,10 @@ public class PlayerMovement : MonoBehaviour
     [Header("Mouse Look")]
     public float mouseSensitivity = 0.2f;
     public Transform cameraTransform;
+    [Tooltip("How far up the camera can pitch, in degrees.")]
+    public float lookUpLimit = 80f;
+    [Tooltip("How far down the camera can pitch, in degrees. Kept tighter than lookUpLimit by default - looking too far down otherwise points the camera at an angle that's technically behind/below the character, which is also what was pushing the arm reach/bend issues to their worst.")]
+    public float lookDownLimit = 65f;
 
     [Header("Cant")]
     public WeaponCant weaponCant;
@@ -133,7 +137,7 @@ public class PlayerMovement : MonoBehaviour
         Vector2 lookInput = lookAction.ReadValue<Vector2>();
 
         xRotation -= lookInput.y * mouseSensitivity;
-        xRotation = Mathf.Clamp(xRotation, -85f, 85f);
+        xRotation = Mathf.Clamp(xRotation, -lookUpLimit, lookDownLimit);
 
         // Preserve camera lean angle
         float currentZ = cameraTransform.localEulerAngles.z;

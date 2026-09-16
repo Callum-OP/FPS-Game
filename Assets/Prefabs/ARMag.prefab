@@ -9,11 +9,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4965524155228999438}
-  - component: {fileID: 7435223750889335570}
+  - component: {fileID: 888726404624664302}
   - component: {fileID: 4294199543037564574}
-  - component: {fileID: 797998368836543426}
   m_Layer: 0
-  m_Name: 9mmBullet
+  m_Name: ARMag
   m_TagString: Bullet
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -27,16 +26,16 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4598212022487192858}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.99871176, y: -0, z: -0, w: -0.0507427}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 172.9557, y: -0.00000999991, z: 67.17154}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3943896391168532345}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 185.817, y: 0, z: 0}
---- !u!136 &7435223750889335570
-CapsuleCollider:
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
+--- !u!65 &888726404624664302
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -53,11 +52,9 @@ CapsuleCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.04
-  m_Height: 0.11
-  m_Direction: 1
-  m_Center: {x: 0, y: 0.02, z: 0}
+  serializedVersion: 3
+  m_Size: {x: 0.09628296, y: 0.20942675, z: 0.307554}
+  m_Center: {x: 0.20195007, y: -0.3432884, z: -0.34622326}
 --- !u!54 &4294199543037564574
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -66,7 +63,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4598212022487192858}
   serializedVersion: 5
-  m_Mass: 0.001
+  m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
@@ -80,28 +77,11 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 0
+  m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 1
---- !u!114 &797998368836543426
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4598212022487192858}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 48bea8f7c8adceb438322f0a4c4618cd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Projectile
-  speed: 80
-  damage: 40
-  lifetime: 5
-  minDamagePercent: 0.1
-  firedByEnemy: 0
 --- !u!1 &9134108469934014614
 GameObject:
   m_ObjectHideFlags: 0
@@ -114,7 +94,7 @@ GameObject:
   - component: {fileID: 8938129821350366863}
   - component: {fileID: 3229503321769289669}
   m_Layer: 0
-  m_Name: Bullet_Pistol_A_Part
+  m_Name: AR_A_Mag
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -129,8 +109,8 @@ Transform:
   m_GameObject: {fileID: 9134108469934014614}
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 4, y: 4, z: 4}
+  m_LocalPosition: {x: 0.2049255, y: -0.37, z: -0.204}
+  m_LocalScale: {x: 2.08, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4965524155228999438}
@@ -142,7 +122,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9134108469934014614}
-  m_Mesh: {fileID: -8672069320169216909, guid: df0af03ca4de49d48912d857104cdfab, type: 3}
+  m_Mesh: {fileID: 6969945789079547009, guid: 34d0ea6d21524404888661aace656ebf, type: 3}
 --- !u!23 &3229503321769289669
 MeshRenderer:
   m_ObjectHideFlags: 0

@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 589157765034301573}
   serializedVersion: 2
   m_LocalRotation: {x: 0.028248053, y: 0.0062913112, z: -0.78869575, w: 0.6141022}
-  m_LocalPosition: {x: 0.055, y: -0.036, z: -0.18}
+  m_LocalPosition: {x: 0.10600081, y: -0.050999906, z: -0.14800027}
   m_LocalScale: {x: 2.08, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -693,8 +693,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   animationDriver: {fileID: 0}
-  hipPosition: {x: 0, y: -0.215385, z: 0.215385}
-  adsPosition: {x: 0, y: -0.11875, z: 1}
+  hipPosition: {x: 0.01, y: -0.2, z: 0.16}
+  adsPosition: {x: 0, y: -0.11, z: 0.2}
   hipRotation: {x: -1.2, y: 2.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
@@ -740,6 +740,7 @@ MonoBehaviour:
   fireRate: 0.1
   maxAmmo: 15
   reloadTime: 1
+  reloadCycles: 1
   isAutomatic: 0
   isShotgun: 0
   pelletCount: 8
@@ -786,18 +787,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1c919d80a8ec704db0554b1cba6a1dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponReloadHandler
+  usesMagazine: 1
   magazinePrefab: {fileID: 4598212022487192858, guid: a6f7c7a42b894964ab1e10a9fa5ee5af, type: 3}
   magSeatPoint: {fileID: 4823212047154599419}
+  weaponMagVisual: {fileID: 1600903123651568755}
   handReloadPoint: {fileID: 4823212047154599419}
-  magHandOffsetPosition: {x: 0, y: 0, z: 0}
-  magHandOffsetRotation: {x: 0, y: 0, z: 0}
-  handMoveOutTime: 0.1
-  magDropTime: 0.15
-  magSeatTime: 0.75
+  reloadGrabPointOverride: {fileID: 0}
+  magHandAttachPointOverride: {fileID: 0}
+  handGrabTime: 0.2
+  handReloadTime: 0.55
   handReturnTime: 0.9
-  weaponLiftPivot: {fileID: 913211804769230092}
-  weaponLiftPosition: {x: 0, y: 0.8, z: 0}
-  weaponLiftRotation: {x: -6, y: 0, z: 0}
+  weaponReloadPivot: {fileID: 913211804769230092}
+  carriedMagOffsetPosition: {x: 0, y: 0.096, z: 0}
+  carriedMagOffsetRotationEuler: {x: -90, y: 0, z: -98.034}
   dropForce: 1.5
   dropTorque: 3
   destroyDelay: 5
@@ -40244,7 +40246,7 @@ Transform:
   m_GameObject: {fileID: 8838756649430544355}
   serializedVersion: 2
   m_LocalRotation: {x: 0.010512468, y: 0.10660577, z: -0.6858354, w: 0.7198295}
-  m_LocalPosition: {x: -0.044, y: -0.035, z: -0.11}
+  m_LocalPosition: {x: -0.084, y: -0.095, z: -0.123}
   m_LocalScale: {x: 2.08, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -40275,7 +40277,7 @@ Transform:
   m_GameObject: {fileID: 8842356923433211448}
   serializedVersion: 2
   m_LocalRotation: {x: -0.21475007, y: -0, z: -0, w: 0.9766691}
-  m_LocalPosition: {x: 0, y: 0.20799994, z: 0.52999973}
+  m_LocalPosition: {x: 0, y: 0.0871, z: 0.2224}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

@@ -7,6 +7,8 @@ public class PlayerSetup : MonoBehaviour
     public WeaponController activeWeapon;
     [Tooltip("Health fraction (0-1) at or below which the Injured locomotion overlay plays.")]
     public float InjuredHealthFraction = 0.3f;
+    [Tooltip("Applied to fpCamera.nearClipPlane at Awake. The arms/hands sit very close to a first-person camera, and at smaller character scales (e.g. 1 instead of 1.6) that distance can end up closer than Unity's default near clip plane (0.3), so the near plane silently culls chunks of the upper arm/hand each frame - looking like they clip through or vanish. A small constant like this keeps everything in front of the lens regardless of character scale.")]
+    public float armSafeNearClipPlane = 0.01f;
 
     // Auto found
     [HideInInspector] public PlayerMovement playerMovement;
@@ -23,6 +25,7 @@ public class PlayerSetup : MonoBehaviour
     CharacterAnimationDriver characterAnimation;
     WeaponHandIK weaponHandIK;
     WeaponReloadHandler weaponReloadHandler;
+    CharacterAttachPoints attachPoints;
 
     void Awake()
     {
@@ -41,6 +44,10 @@ public class PlayerSetup : MonoBehaviour
         playerHealth = GetComponent<PlayerHealth>();
         characterAnimation = GetComponentInChildren<CharacterAnimationDriver>();
         weaponHandIK = GetComponentInChildren<WeaponHandIK>();
+        // Manually-placed reload/carry points ("ReloadGrab", "MagHand", etc) live here.
+        // Optional - fine if this component or its entries don't exist yet, the reload
+        // just skips whichever part it can't find a point for.
+        attachPoints = GetComponentInChildren<CharacterAttachPoints>();
 
         // Only the local player's rigged body should ever hide its head - enemies
         // share the same body prefab and must keep theirs.
@@ -91,6 +98,9 @@ public class PlayerSetup : MonoBehaviour
         lowerWeapon = weapon.GetComponentInChildren<LowerWeapon>(true);
         weaponReloadHandler = weapon.GetComponentInChildren<WeaponReloadHandler>(true);
         weaponReloadHandler?.SetHandIK(weaponHandIK);
+        weaponReloadHandler?.SetAttachPoints(
+            attachPoints?.Get("ReloadGrab"),
+            attachPoints?.Get("MagHand"));
 
         Debug.Log($"Gathered from weapon {weapon.name} — " +
             $"Cant:{weaponCant != null} " +
@@ -101,6 +111,11 @@ public class PlayerSetup : MonoBehaviour
     // Things that never change regardless of weapon
     void WireStatic()
     {
+        // Fixes arms/hands clipping through the camera at smaller character scales -
+        // see the tooltip on armSafeNearClipPlane above for why.
+        if (fpCamera != null)
+            fpCamera.nearClipPlane = armSafeNearClipPlane;
+
         if (playerMovement != null)
             playerMovement.cameraTransform = fpCamera.transform;
 

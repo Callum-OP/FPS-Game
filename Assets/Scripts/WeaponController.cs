@@ -18,6 +18,8 @@ public class WeaponController : MonoBehaviour
     public float fireRate = 0.1f;
     public int maxAmmo = 30;
     public float reloadTime = 1.5f;
+    [Tooltip("How many times to repeat the reload sequence, e.g. a shotgun loading one shell at a time instead of a single mag swap. Each cycle refills an equal share of the missing ammo and plays the full reload visuals/animation again - set to 1 for a normal single-mag reload.")]
+    public int reloadCycles = 1;
     public bool isAutomatic = false;
 
     [Header("Shotgun")]
@@ -285,17 +287,25 @@ public class WeaponController : MonoBehaviour
     {
         isReloading = true;
         onReloadStart?.Invoke();
-        characterAnimation?.PlayReload();
-        reloadHandler?.PlayReload(reloadTime);
-        Debug.Log("Reloading...");
 
-        yield return new WaitForSeconds(reloadTime);
+        int cycles = Mathf.Max(1, reloadCycles);
+        int ammoNeeded = maxAmmo - currentAmmo;
+        int ammoPerCycle = Mathf.Max(1, Mathf.CeilToInt((float)ammoNeeded / cycles));
 
-        currentAmmo = maxAmmo;
+        for (int i = 0; i < cycles && currentAmmo < maxAmmo; i++)
+        {
+            characterAnimation?.PlayReload();
+            reloadHandler?.PlayReload(reloadTime);
+
+            yield return new WaitForSeconds(reloadTime);
+
+            currentAmmo = Mathf.Min(maxAmmo, currentAmmo + ammoPerCycle);
+            onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
+            AudioManager.Instance?.Play(reloadClip);
+        }
+
         isReloading = false;
         onReloadEnd?.Invoke();
-        onAmmoChanged?.Invoke(currentAmmo, maxAmmo);
-        AudioManager.Instance?.Play(reloadClip);
     }
 
     public int   GetCurrentAmmo()  => currentAmmo;

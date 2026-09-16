@@ -23,10 +23,16 @@ public class EnemyWeapon : MonoBehaviour
     [Header("Held weapon (visual only)")]
     [Tooltip("One of the player's held-weapon prefabs, e.g. AR.prefab or Mono19.prefab.")]
     public GameObject weaponPrefab;
-    [Tooltip("Local position of the weapon anchor relative to the enemy's root - roughly chest height, slightly forward. Tune by eye in Play Mode.")]
-    public Vector3 holdPositionOffset = new Vector3(0.15f, 1.1f, 0.3f);
-    [Tooltip("Local rotation of the weapon anchor relative to the enemy's root.")]
-    public Vector3 holdRotationOffset;
+    [Tooltip("Local position of the weapon anchor relative to the enemy's root while resting/running - roughly chest height, slightly forward. Tune by eye in Play Mode.")]
+    public Vector3 restPositionOffset = new Vector3(0.15f, 1.1f, 0.3f);
+    [Tooltip("Local rotation of the weapon anchor relative to the enemy's root while resting/running.")]
+    public Vector3 restRotationOffset;
+    [Tooltip("Local position of the weapon anchor while aiming - same idea as the player's WeaponADS.adsPosition. Usually just restPositionOffset raised/pushed forward slightly.")]
+    public Vector3 aimPositionOffset = new Vector3(0.1f, 1.18f, 0.4f);
+    [Tooltip("Local rotation of the weapon anchor while aiming.")]
+    public Vector3 aimRotationOffset;
+    [Tooltip("How fast the anchor blends between resting and aiming.")]
+    public float aimBlendSpeed = 8f;
 
     [Header("Drop on death")]
     [Tooltip("The matching *Pickup prefab, e.g. ARPickup.prefab - what actually spawns in the world.")]
@@ -35,6 +41,9 @@ public class EnemyWeapon : MonoBehaviour
     EnemyAI enemyAI;
     WeaponHandIK handIK;
     GameObject weaponInstance;
+    Transform anchor;
+    bool aiming;
+    float aimBlend;
     bool dropped;
 
     void Start()
@@ -60,12 +69,13 @@ public class EnemyWeapon : MonoBehaviour
         // dragged around by whatever the current animation pose is doing to the
         // hands. The root's own facing is already what EnemyAI turns to aim
         // horizontally, so the anchor turns with it for free.
-        GameObject anchor = new GameObject("WeaponHoldAnchor");
-        anchor.transform.SetParent(transform, false);
-        anchor.transform.localPosition = holdPositionOffset;
-        anchor.transform.localEulerAngles = holdRotationOffset;
+        GameObject anchorGo = new GameObject("WeaponHoldAnchor");
+        anchorGo.transform.SetParent(transform, false);
+        anchorGo.transform.localPosition = restPositionOffset;
+        anchorGo.transform.localEulerAngles = restRotationOffset;
+        anchor = anchorGo.transform;
 
-        weaponInstance = Instantiate(weaponPrefab, anchor.transform);
+        weaponInstance = Instantiate(weaponPrefab, anchor);
         weaponInstance.transform.localPosition = Vector3.zero;
         weaponInstance.transform.localRotation = Quaternion.identity;
 
@@ -88,6 +98,22 @@ public class EnemyWeapon : MonoBehaviour
         foreach (var mb in weaponInstance.GetComponentsInChildren<MonoBehaviour>(true))
             mb.enabled = false;
     }
+
+    void Update()
+    {
+        if (anchor == null) return;
+
+        float target = aiming ? 1f : 0f;
+        aimBlend = Mathf.MoveTowards(aimBlend, target, aimBlendSpeed * Time.deltaTime);
+
+        anchor.localPosition = Vector3.Lerp(restPositionOffset, aimPositionOffset, aimBlend);
+        anchor.localRotation = Quaternion.Slerp(
+            Quaternion.Euler(restRotationOffset), Quaternion.Euler(aimRotationOffset), aimBlend);
+    }
+
+    /// <summary>Called from EnemyAI alongside CharacterAnimationDriver.SetAiming(), same
+    /// event, so the held weapon raises/settles in step with the aim animation.</summary>
+    public void SetAiming(bool value) => aiming = value;
 
     /// <summary>Called from EnemyAI.OnDeath - drops the world pickup and hides the held mesh.</summary>
     public void Drop()
