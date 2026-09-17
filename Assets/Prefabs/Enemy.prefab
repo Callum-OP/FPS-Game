@@ -212,6 +212,8 @@ MonoBehaviour:
   groundClampDuration: 4
   groundClampTolerance: 0.35
   explosionRagdollForce: 9
+  knockbackSkipAnimationThreshold: 16
+  knockbackImpulseScale: 5
 --- !u!95 &4799998883464736613
 Animator:
   serializedVersion: 7
@@ -283,7 +285,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyWeapon
   weaponPrefab: {fileID: 7210103834045770318, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
-  restPositionOffset: {x: 0.15, y: 1.1, z: 0.3}
+  restPositionOffset: {x: 0.15, y: 1.1, z: 0.1}
   restRotationOffset: {x: 0, y: 0, z: 0}
   aimPositionOffset: {x: 0.1, y: 1.18, z: 0.4}
   aimRotationOffset: {x: 0, y: 0, z: 0}

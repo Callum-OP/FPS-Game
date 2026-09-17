@@ -25,14 +25,24 @@ public class EnemyWeapon : MonoBehaviour
     [Header("Held weapon (visual only)")]
     [Tooltip("One of the player's held-weapon prefabs, e.g. AR.prefab or Mono19.prefab.")]
     public GameObject weaponPrefab;
-    [Tooltip("Local position of the weapon anchor relative to the enemy's root while resting/running - roughly chest height, slightly forward. Tune by eye in Play Mode.")]
-    public Vector3 restPositionOffset = new Vector3(0.15f, 1.1f, 0.3f);
-    [Tooltip("Local rotation of the weapon anchor relative to the enemy's root while resting/running.")]
-    public Vector3 restRotationOffset;
-    [Tooltip("Local position of the weapon anchor while aiming - same idea as the player's WeaponADS.adsPosition. Usually just restPositionOffset raised/pushed forward slightly.")]
-    public Vector3 aimPositionOffset = new Vector3(0.1f, 1.18f, 0.4f);
-    [Tooltip("Local rotation of the weapon anchor while aiming.")]
-    public Vector3 aimRotationOffset;
+
+    // Field order/grouping matches WeaponADS on the player (Positions, then Rotations)
+    // so the two inspectors read the same way - hip/rest and ads/aim are the same idea
+    // in both, just relative to a different parent (the enemy's anchor here, the camera
+    // there).
+    [Header("Positions")]
+    [Tooltip("Local position of the weapon anchor while resting/running - the enemy equivalent of WeaponADS.hipPosition. Defaults match the player's tuned pistol values as a sensible starting point; tune by eye in Play Mode since this is relative to the anchor (see restPositionOffset's own placement below), not the camera, so the same numbers won't necessarily look identical.")]
+    public Vector3 restPositionOffset = new Vector3(0.01f, -0.2f, 0.16f);
+    [Tooltip("Local position of the weapon anchor while aiming - the enemy equivalent of WeaponADS.adsPosition.")]
+    public Vector3 aimPositionOffset = new Vector3(0f, -0.11f, 0.2f);
+
+    [Header("Rotations")]
+    [Tooltip("Local rotation of the weapon anchor while resting/running - the enemy equivalent of WeaponADS.hipRotation.")]
+    public Vector3 restRotationOffset = new Vector3(-1.2f, 2.2f, 35f);
+    [Tooltip("Local rotation of the weapon anchor while aiming - the enemy equivalent of WeaponADS.adsRotation.")]
+    public Vector3 aimRotationOffset = Vector3.zero;
+
+    [Header("Settings")]
     [Tooltip("How fast the anchor blends between resting and aiming.")]
     public float aimBlendSpeed = 8f;
 
@@ -78,13 +88,20 @@ public class EnemyWeapon : MonoBehaviour
 
     void Start()
     {
-        if (weaponPrefab == null) return;
-
         enemyAI = GetComponent<EnemyAI>();     // may be null on an ally
         friendlyAI = GetComponent<FriendlyAI>(); // may be null on an enemy
         ammo = Mathf.Max(1, magazineSize);
         animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
 
+        if (weaponPrefab != null) SpawnWeapon(weaponPrefab);
+    }
+
+    /// <summary>Builds the anchor (once) and instantiates the held weapon. Split out of
+    /// Start() so EquipWeapon can call it again for a different prefab - the anchor,
+    /// WeaponHandIK and everything else about how the gun is held stays the same, only
+    /// the weapon model and its grip/muzzle points change.</summary>
+    void SpawnWeapon(GameObject prefab)
+    {
         Animator anim = GetComponentInChildren<Animator>();
         if (anim == null)
         {
@@ -97,18 +114,21 @@ public class EnemyWeapon : MonoBehaviour
         handIK = anim.GetComponent<WeaponHandIK>();
         if (handIK == null) handIK = anim.gameObject.AddComponent<WeaponHandIK>();
 
-        // A fixed anchor on the enemy's own root plays the same role the camera
-        // plays for the player: something stable to hang the gun off that isn't
-        // dragged around by whatever the current animation pose is doing to the
-        // hands. The root's own facing is already what EnemyAI turns to aim
-        // horizontally, so the anchor turns with it for free.
-        GameObject anchorGo = new GameObject("WeaponHoldAnchor");
-        anchorGo.transform.SetParent(transform, false);
-        anchorGo.transform.localPosition = restPositionOffset;
-        anchorGo.transform.localEulerAngles = restRotationOffset;
-        anchor = anchorGo.transform;
+        if (anchor == null)
+        {
+            // A fixed anchor on the enemy's own root plays the same role the camera
+            // plays for the player: something stable to hang the gun off that isn't
+            // dragged around by whatever the current animation pose is doing to the
+            // hands. The root's own facing is already what EnemyAI turns to aim
+            // horizontally, so the anchor turns with it for free.
+            GameObject anchorGo = new GameObject("WeaponHoldAnchor");
+            anchorGo.transform.SetParent(transform, false);
+            anchorGo.transform.localPosition = restPositionOffset;
+            anchorGo.transform.localEulerAngles = restRotationOffset;
+            anchor = anchorGo.transform;
+        }
 
-        weaponInstance = Instantiate(weaponPrefab, anchor);
+        weaponInstance = Instantiate(prefab, anchor);
         weaponInstance.transform.localPosition = Vector3.zero;
         weaponInstance.transform.localRotation = Quaternion.identity;
 
@@ -117,7 +137,7 @@ public class EnemyWeapon : MonoBehaviour
         // WeaponADS, WeaponCant... all read player input/camera state, which
         // an enemy doesn't have and shouldn't react to).
         var reloadHandler = weaponInstance.GetComponent<WeaponReloadHandler>();
-        if (reloadHandler != null) weaponReloadPoint = reloadHandler.handReloadPoint;
+        weaponReloadPoint = reloadHandler != null ? reloadHandler.handReloadPoint : null;
 
         WeaponController wc = weaponInstance.GetComponent<WeaponController>();
         if (wc != null)
@@ -135,11 +155,46 @@ public class EnemyWeapon : MonoBehaviour
                 // nothing was ever setting it.
                 if (friendlyAI != null) friendlyAI.muzzlePoint = wc.muzzlePoint;
             }
+
+            // Ammo/reload timing follows whatever gun is actually equipped, rather than
+            // staying fixed at whatever magazineSize/reloadTime happened to be set on
+            // this component originally - matters once EquipWeapon can swap the gun
+            // out at runtime (see FriendlyAI's auto-pickup).
+            if (wc.maxAmmo > 0) magazineSize = wc.maxAmmo;
+            if (wc.reloadTime > 0f) reloadTime = wc.reloadTime;
         }
+
+        ammo = Mathf.Max(1, magazineSize);
 
         foreach (var mb in weaponInstance.GetComponentsInChildren<MonoBehaviour>(true))
             mb.enabled = false;
     }
+
+    /// <summary>Swaps the held weapon for a different held-weapon prefab (one of the
+    /// player's own, e.g. what a WeaponPickup would hand the player) - used by
+    /// FriendlyAI to upgrade an ally's weapon on the fly. The old weapon is simply
+    /// discarded rather than dropped as a world pickup - there's no per-prefab mapping
+    /// to the matching world-drop prefab available here the way WeaponDrop has for the
+    /// player, so extending this to actually drop the old gun means wiring that mapping
+    /// in too (see WeaponDrop.GetWorldPrefab for the pattern).</summary>
+    public void EquipWeapon(GameObject newHeldWeaponPrefab)
+    {
+        if (newHeldWeaponPrefab == null) return;
+
+        reloading = false;
+        aiming = false;
+        weaponPrefab = newHeldWeaponPrefab;
+
+        if (weaponInstance != null) Destroy(weaponInstance);
+        weaponInstance = null;
+
+        SpawnWeapon(newHeldWeaponPrefab);
+    }
+
+    /// <summary>The currently held weapon's WeaponController, for comparing this
+    /// weapon against a candidate pickup (see FriendlyAI's auto-upgrade logic).</summary>
+    public WeaponController GetWeaponController() =>
+        weaponInstance != null ? weaponInstance.GetComponent<WeaponController>() : null;
 
     void Update()
     {

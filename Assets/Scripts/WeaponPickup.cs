@@ -6,6 +6,11 @@ public class WeaponPickup : MonoBehaviour
     [Header("Which held weapon this pickup gives the player")]
     public GameObject heldWeaponPrefab;
 
+    /// <summary>True on any frame the player is standing inside ANY WeaponPickup's
+    /// trigger. PlayerAllySwap checks this so a dropped weapon under your feet always
+    /// takes priority over swapping guns with a nearby teammate on the same key.</summary>
+    public static bool AnyPlayerInRangeThisFrame;
+
     private bool playerInRange = false;
     private PlayerSetup playerSetup;
     private InputAction pickupAction;
@@ -18,6 +23,8 @@ public class WeaponPickup : MonoBehaviour
 
     void Update()
     {
+        if (playerInRange) AnyPlayerInRangeThisFrame = true;
+
         // Pickup has its own key (1) now, separate from reload (R), so no sharing/
         // suppression logic is needed any more.
         if (playerInRange && pickupAction.WasPressedThisFrame())
@@ -41,7 +48,7 @@ public class WeaponPickup : MonoBehaviour
             // Only whatever was already in THIS weapon's slot gets dropped - the rifle
             // stays on your back when you pick up a pistol. That's the whole point of
             // carrying two.
-            GameObject displaced = inventory.Store(held, equipImmediately: true);
+            GameObject displaced = inventory.Store(held, equipImmediately: true, sourcePrefab: heldWeaponPrefab);
             if (displaced != null)
             {
                 playerSetup.GetComponent<WeaponDrop>()?.DropSpecific(displaced);

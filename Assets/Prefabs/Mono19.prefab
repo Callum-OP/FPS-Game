@@ -674,7 +674,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -7.5209494, y: -1.5799999, z: 3.51972}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.08, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2986232519921770293}
@@ -817,12 +817,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponMovementBob
   positionAmount: 0.25
+  lateralScale: 0.25
   rotationAmount: 90
   aimMultiplier: 0.25
   fullEffectSpeed: 4
   idleAmount: 0.2
   maxOffset: 0.1
-  smooth: 14
+  maxLateralOffset: 0.012
+  smoothTime: 0.08
   restingDrift: 0.2
   weaponADS: {fileID: 2559716683699181159}
   playerMovement: {fileID: 0}

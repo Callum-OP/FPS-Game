@@ -26,9 +26,16 @@ public class FriendlyAI : MonoBehaviour
     public enum State { Follow, Engage, Cover, Dead }
 
     [Header("Following")]
-    [Tooltip("How close to the player the ally tries to stay.")]
+    [Tooltip("Stand-off distance used only while actively catching up to the player (see activeFollowRange) - not used while patrolling nearby.")]
     public float followDistance = 4f;
-    [Tooltip("Distance at which it gives up on whatever it's doing and catches up.")]
+    [Tooltip("While within this range of the player, the ally patrols/wanders nearby instead of tailing them directly. Beyond it, they drop whatever they're doing and beeline back.")]
+    public float activeFollowRange = 10f;
+    [Tooltip("How far from the player's current position the ally wanders while patrolling.")]
+    public float patrolRadius = 6f;
+    [Tooltip("How long the ally pauses at each patrol point before picking a new one.")]
+    public float patrolMinPause = 1.5f;
+    public float patrolMaxPause = 4f;
+    [Tooltip("Distance at which it gives up on combat/cover and catches up to the player instead.")]
     public float leashDistance = 18f;
     public float walkSpeed = 3.5f;
     public float chaseSpeed = 5.5f;
@@ -54,6 +61,20 @@ public class FriendlyAI : MonoBehaviour
     public float coverHideTime = 1.4f;
     public float peekDuration = 2f;
 
+    [Header("Testing")]
+    [Tooltip("Let the player's own bullets damage this ally. Off by default so you can't accidentally gun down your own squad - flip per-ally to experiment with friendly fire.")]
+    public bool allowFriendlyFireFromPlayer = false;
+
+    [Header("Auto Weapon Upgrade")]
+    [Tooltip("Automatically switch to a strictly better dropped weapon lying nearby.")]
+    public bool autoUpgradeWeapon = true;
+    [Tooltip("How close a dropped weapon has to be to be considered.")]
+    public float weaponDetectRadius = 3f;
+    [Tooltip("How long a better weapon has to sit in range, uninterrupted, before the ally takes it - gives the player time to grab it first.")]
+    public float autoPickupDelay = 4f;
+    [Tooltip("Only look for an upgrade while just following/patrolling, never mid-fight.")]
+    public bool onlyUpgradeOutOfCombat = true;
+
     State currentState = State.Follow;
     NavMeshAgent agent;
     Health health;
@@ -68,6 +89,16 @@ public class FriendlyAI : MonoBehaviour
     float coverTimer;
     bool peeking;
     Vector3 coverPosition, peekPosition;
+
+    // Patrol
+    Vector3 patrolTarget;
+    bool hasPatrolTarget;
+    bool patrolWaiting;
+    float patrolPauseTimer;
+
+    // Weapon upgrade
+    WeaponPickup pendingPickup;
+    float pendingPickupTimer;
 
     void Start()
     {
@@ -108,26 +139,131 @@ public class FriendlyAI : MonoBehaviour
 
         // Gun down when there's nothing to shoot at, same as the enemies.
         allyWeapon?.SetCombatReady(currentState != State.Follow || target != null);
+
+        HandleWeaponUpgrade();
     }
 
     void HandleFollow()
     {
-        agent.isStopped = false;
-        agent.speed = Vector3.Distance(transform.position, player.position) > followDistance * 2f
-            ? chaseSpeed : walkSpeed;
+        float distToPlayer = Vector3.Distance(transform.position, player.position);
 
-        // Stand off rather than treading on the player's heels.
-        Vector3 spot = player.position - (player.forward * followDistance);
-        if (NavMesh.SamplePosition(spot, out NavMeshHit hit, 3f, NavMesh.AllAreas))
-            agent.SetDestination(hit.position);
+        if (distToPlayer > activeFollowRange)
+        {
+            // Too far to bother patrolling - drop it and head straight back.
+            hasPatrolTarget = false;
+            patrolWaiting = false;
+            agent.isStopped = false;
+            agent.speed = chaseSpeed;
 
-        if (Vector3.Distance(transform.position, agent.destination) <= agent.stoppingDistance + 0.3f)
-            agent.isStopped = true;
+            Vector3 spot = player.position - (player.forward * followDistance);
+            if (NavMesh.SamplePosition(spot, out NavMeshHit hit, 3f, NavMesh.AllAreas))
+                agent.SetDestination(hit.position);
+
+            if (Vector3.Distance(transform.position, agent.destination) <= agent.stoppingDistance + 0.3f)
+                agent.isStopped = true;
+        }
+        else
+        {
+            // Close enough - wander near the player instead of hovering right behind
+            // them like a shadow.
+            agent.speed = walkSpeed;
+
+            if (patrolWaiting)
+            {
+                agent.isStopped = true;
+                patrolPauseTimer -= Time.deltaTime;
+                if (patrolPauseTimer <= 0f) { patrolWaiting = false; hasPatrolTarget = false; }
+            }
+            else if (!hasPatrolTarget
+                || Vector3.Distance(transform.position, patrolTarget) <= agent.stoppingDistance + 0.3f)
+            {
+                if (hasPatrolTarget)
+                {
+                    // Arrived - pause before wandering off to somewhere new.
+                    patrolWaiting = true;
+                    patrolPauseTimer = Random.Range(patrolMinPause, patrolMaxPause);
+                }
+                else
+                {
+                    // Re-centred on the player's CURRENT position each time, so the
+                    // patrol area drifts along with them rather than anchoring to
+                    // wherever they happened to be when this ally last picked a spot.
+                    Vector2 circle = Random.insideUnitCircle * patrolRadius;
+                    Vector3 probe = player.position + new Vector3(circle.x, 0f, circle.y);
+                    if (NavMesh.SamplePosition(probe, out NavMeshHit hit, 3f, NavMesh.AllAreas))
+                    {
+                        patrolTarget = hit.position;
+                        hasPatrolTarget = true;
+                        agent.isStopped = false;
+                        agent.SetDestination(patrolTarget);
+                    }
+                }
+            }
+        }
 
         characterAnimation?.SetAiming(false);
         allyWeapon?.SetAiming(false);
 
         if (target != null && canShoot) { currentState = State.Engage; timeInOpen = 0f; }
+    }
+
+    // Looks for a strictly better dropped weapon nearby and, after it's sat in range
+    // uninterrupted for autoPickupDelay seconds, takes it. Runs every Update but bails
+    // out immediately unless actually idle/patrolling, so it never interrupts a fight.
+    void HandleWeaponUpgrade()
+    {
+        if (!autoUpgradeWeapon || allyWeapon == null) return;
+        if (onlyUpgradeOutOfCombat && currentState != State.Follow)
+        {
+            pendingPickup = null;
+            return;
+        }
+
+        float currentScore = ScoreOf(allyWeapon.GetWeaponController());
+
+        WeaponPickup best = null;
+        float bestScore = currentScore;
+        foreach (var pickup in FindObjectsByType<WeaponPickup>(FindObjectsSortMode.None))
+        {
+            if (pickup == null || pickup.heldWeaponPrefab == null) continue;
+            if (Vector3.Distance(transform.position, pickup.transform.position) > weaponDetectRadius) continue;
+
+            float score = ScoreOf(pickup.heldWeaponPrefab.GetComponent<WeaponController>());
+            if (score > bestScore) { best = pickup; bestScore = score; }
+        }
+
+        if (best == null)
+        {
+            pendingPickup = null;
+            pendingPickupTimer = 0f;
+            return;
+        }
+
+        if (best != pendingPickup)
+        {
+            pendingPickup = best;
+            pendingPickupTimer = autoPickupDelay;
+        }
+
+        pendingPickupTimer -= Time.deltaTime;
+        if (pendingPickupTimer <= 0f)
+        {
+            allyWeapon.EquipWeapon(pendingPickup.heldWeaponPrefab);
+            Destroy(pendingPickup.gameObject);
+            pendingPickup = null;
+        }
+    }
+
+    // Rough DPS estimate - damage per pellet times pellets, over the time between shots.
+    // Good enough to rank "this gun is clearly better", which is all this needs to do.
+    static float ScoreOf(WeaponController wc)
+    {
+        if (wc == null || wc.bulletPrefab == null) return 0f;
+        var proj = wc.bulletPrefab.GetComponent<Projectile>();
+        float dmg = proj != null ? proj.damage : 0f;
+        int pellets = Mathf.Max(1, wc.pelletCount);
+        float rate = Mathf.Max(0.01f, wc.fireRate);
+        return dmg * pellets / rate;
     }
 
     void HandleEngage()

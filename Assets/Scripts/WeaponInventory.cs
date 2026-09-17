@@ -30,7 +30,12 @@ public class WeaponInventory : MonoBehaviour
     [Tooltip("The rigged body with the Animator - holster points are found or created on its bones.")]
     public Animator bodyAnimator;
 
-    [Header("Holster placement (used only if the body has no named attach point)")]
+    [Header("Holster Points")]
+    [Tooltip("Assign existing transforms here to use them directly (e.g. points already set up on the body). Leave empty to fall back to a named CharacterAttachPoints entry, or fail that, an auto-created point on the spine/hip bone below.")]
+    public Transform primaryHolsterPoint;
+    public Transform secondaryHolsterPoint;
+
+    [Header("Holster placement (used only if the above aren't assigned and the body has no named attach point)")]
     public string primaryHolsterPointName = "BackHolster";
     public string secondaryHolsterPointName = "HipHolster";
     public Vector3 backHolsterOffset = new Vector3(-0.12f, 0.05f, -0.18f);
@@ -39,6 +44,7 @@ public class WeaponInventory : MonoBehaviour
     public Vector3 hipHolsterRotation = new Vector3(0f, 90f, 0f);
 
     GameObject primary, secondary;
+    GameObject primaryPrefab, secondaryPrefab; // source prefabs, for handing a weapon to something else (see PlayerAllySwap)
     Slot activeSlot = Slot.Primary;
     Transform primaryHolster, secondaryHolster;
     InputAction toggleWeapon;
@@ -56,16 +62,20 @@ public class WeaponInventory : MonoBehaviour
             foreach (var a in GetComponentsInChildren<Animator>(true))
                 if (a.avatar != null && a.avatar.isHuman) { bodyAnimator = a; break; }
 
-        primaryHolster = ResolveHolster(primaryHolsterPointName, HumanBodyBones.Spine, backHolsterOffset, backHolsterRotation);
-        secondaryHolster = ResolveHolster(secondaryHolsterPointName, HumanBodyBones.Hips, hipHolsterOffset, hipHolsterRotation);
+        primaryHolster = ResolveHolster(primaryHolsterPoint, primaryHolsterPointName, HumanBodyBones.Spine, backHolsterOffset, backHolsterRotation);
+        secondaryHolster = ResolveHolster(secondaryHolsterPoint, secondaryHolsterPointName, HumanBodyBones.Hips, hipHolsterOffset, hipHolsterRotation);
 
         // Adopt whatever the player already has equipped.
         if (playerSetup != null && playerSetup.activeWeapon != null)
             Store(playerSetup.activeWeapon.gameObject, true);
     }
 
-    Transform ResolveHolster(string pointName, HumanBodyBones fallbackBone, Vector3 offset, Vector3 rotation)
+    Transform ResolveHolster(Transform assigned, string pointName, HumanBodyBones fallbackBone, Vector3 offset, Vector3 rotation)
     {
+        // An explicitly assigned transform always wins - it's exactly what the person
+        // set up by hand, so there's nothing to look up or create.
+        if (assigned != null) return assigned;
+
         var points = GetComponentInChildren<CharacterAttachPoints>();
         var named = points != null ? points.Get(pointName) : null;
         if (named != null) return named;
@@ -93,20 +103,26 @@ public class WeaponInventory : MonoBehaviour
     {
         // Matched on the prefab name - there's no per-weapon class field to read yet.
         // If one gets added to WeaponController later, check it here first.
+        // Hummingbird is an SMG (two-handed, shoulder weapon) despite the small-sounding
+        // name - it belongs on the back with the rifle, not the hip with the pistol.
         string n = weapon.name.ToLowerInvariant();
-        if (n.Contains("mono19") || n.Contains("pistol") || n.Contains("hummingbird")) return Slot.Secondary;
+        if (n.Contains("mono19") || n.Contains("pistol")) return Slot.Secondary;
         return Slot.Primary;
     }
 
     /// <summary>Puts a newly picked-up weapon into its slot and equips it. Whatever was
-    /// already in that slot is returned so the caller can drop it as a world pickup.</summary>
-    public GameObject Store(GameObject weapon, bool equipImmediately)
+    /// already in that slot is returned so the caller can drop it as a world pickup.
+    /// sourcePrefab is optional - pass it when known (WeaponPickup has it directly) so
+    /// ActivePrefab/PrefabFor can hand this weapon on to something else later (see
+    /// PlayerAllySwap) without needing to re-derive a prefab from a live instance.</summary>
+    public GameObject Store(GameObject weapon, bool equipImmediately, GameObject sourcePrefab = null)
     {
         Slot slot = SlotFor(weapon);
         GameObject displaced = slot == Slot.Primary ? primary : secondary;
         if (displaced == weapon) displaced = null;
 
-        if (slot == Slot.Primary) primary = weapon; else secondary = weapon;
+        if (slot == Slot.Primary) { primary = weapon; primaryPrefab = sourcePrefab; }
+        else { secondary = weapon; secondaryPrefab = sourcePrefab; }
 
         if (equipImmediately) Equip(slot);
         else Holster(weapon, slot);
@@ -116,11 +132,15 @@ public class WeaponInventory : MonoBehaviour
 
     public GameObject GetSlot(Slot slot) => slot == Slot.Primary ? primary : secondary;
     public GameObject Active => activeSlot == Slot.Primary ? primary : secondary;
+    /// <summary>Source prefab for the currently active weapon, if it's known (null for
+    /// whatever the player started the scene already holding, since nothing recorded a
+    /// prefab for that one).</summary>
+    public GameObject ActivePrefab => activeSlot == Slot.Primary ? primaryPrefab : secondaryPrefab;
 
     public void Remove(GameObject weapon)
     {
-        if (primary == weapon) primary = null;
-        if (secondary == weapon) secondary = null;
+        if (primary == weapon) { primary = null; primaryPrefab = null; }
+        if (secondary == weapon) { secondary = null; secondaryPrefab = null; }
     }
 
     public void Equip(Slot slot)

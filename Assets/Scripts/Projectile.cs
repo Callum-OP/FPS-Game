@@ -76,14 +76,20 @@ public class Projectile : MonoBehaviour
     // they own a Health rather than a PlayerHealth.
     bool CanDamage(Collider col)
     {
-        bool isAlly = col.GetComponentInParent<FriendlyAI>() != null;
+        var allyAI = col.GetComponentInParent<FriendlyAI>();
+        bool isAlly = allyAI != null;
         var health = col.GetComponentInParent<Health>();
         var pHealth = col.GetComponentInParent<PlayerHealth>();
         if (health == null && pHealth == null) return false;
 
         if (firedByEnemy) return pHealth != null || isAlly;
         if (firedByFriendly) return health != null && !isAlly && pHealth == null;
-        return health != null && !isAlly; // player's own bullets
+
+        // Player's own bullets. An ally is normally immune so you can't accidentally
+        // gun down your own squad, but each FriendlyAI can opt in via
+        // allowFriendlyFireFromPlayer for testing/experimentation.
+        if (isAlly) return allyAI.allowFriendlyFireFromPlayer;
+        return health != null;
     }
 
     void ApplyDamage(Collider col, float amount, Vector3 travelDirection)

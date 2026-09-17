@@ -28,7 +28,8 @@ public class LowerWeapon : MonoBehaviour
     [Header("Settings")]
     public float lowerSpeed = 8f;
     public float raisedSpeed = 10f;
-    public float fastWalkMultiplier = 1.5f; // Speed boost
+    [Tooltip("Speed multiplier while lowered - this IS the sprint replacement now that there's no dedicated sprint key. Lowered further from 1.5 since even that was reading as faster than the old sprint used to be.")]
+    public float fastWalkMultiplier = 1.15f; // Speed boost
 
     [Header("References")]
     public PlayerMovement playerMovement;

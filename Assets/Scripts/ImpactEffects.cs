@@ -47,6 +47,16 @@ public class ImpactEffects : MonoBehaviour
     [Tooltip("Seconds before a decal fades out. 0 keeps it until it's recycled.")]
     public float lifetime = 45f;
 
+    [Header("Surface Conforming")]
+    [Tooltip("Build wall decals as a small fan mesh that samples the surface at several points around the hit and follows it, instead of a single flat floating plane. This is what actually makes them read as 'projected onto' a corner or an uneven surface rather than hovering over it - a real projector/decal-shader system would do better still, but this needs no render-pipeline features and works with the existing prefabs' materials.")]
+    public bool conformToSurface = true;
+    [Tooltip("How many points around the rim are sampled - higher wraps corners more smoothly but costs more per decal.")]
+    [Range(4, 16)] public int conformSegments = 10;
+    [Tooltip("How far past the decal's own radius to search for the real surface at each sample point - covers a corner or ledge just past the edge of the hole. Too large starts picking up unrelated geometry.")]
+    public float conformSearchMargin = 0.15f;
+    [Tooltip("What counts as surface to conform to.")]
+    public LayerMask conformSurfaceMask = ~0;
+
     [Header("Budget")]
     [Tooltip("Hard cap on decals in the world. The oldest is recycled past this.")]
     public int maxDecals = 250;
@@ -79,7 +89,14 @@ public class ImpactEffects : MonoBehaviour
         var prefab = wallDecals[Random.Range(0, wallDecals.Length)];
         if (prefab == null) return;
 
-        var decal = Place(prefab, point, normal, decalSize);
+        // Conforming needs a static-ish surface to sample around; a moving/animated one
+        // (a ragdoll bone, say) would need re-sampling every frame to stay glued to it,
+        // which wounds don't do either - so this only applies to wall/scenery holes,
+        // which is also exactly where the "floating flat plane" look is most obvious.
+        var decal = conformToSurface
+            ? PlaceConforming(prefab, point, normal)
+            : Place(prefab, point, normal, decalSize);
+
         // Parented to whatever was hit, so holes in a moving object travel with it.
         if (decal != null && surface != null) decal.transform.SetParent(surface, true);
     }
@@ -134,8 +151,7 @@ public class ImpactEffects : MonoBehaviour
         // is always Vector3.up, producing an undefined/garbage rotation there. Falling
         // back to a different hint whenever the two are nearly parallel fixes decals on
         // floors and ceilings; ordinary walls still use Vector3.up as before.
-        Vector3 upHint = Mathf.Abs(Vector3.Dot(normal, Vector3.up)) > 0.99f
-            ? Vector3.forward : Vector3.up;
+        Vector3 upHint = UpHintFor(normal);
 
         // This mesh's local axes need an extra 90-degree twist on top of a plain
         // LookRotation to sit flush and upright rather than sideways - confirmed
@@ -173,5 +189,125 @@ public class ImpactEffects : MonoBehaviour
         live.Enqueue(decal);
         if (lifetime > 0f) Destroy(decal, lifetime);
         return decal;
+    }
+
+    // Robust up-hint for LookRotation, shared by Place and PlaceConforming - see the
+    // comment in Place for why this is needed (LookRotation degenerates on floors/ceilings).
+    static Vector3 UpHintFor(Vector3 normal) =>
+        Mathf.Abs(Vector3.Dot(normal, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
+
+    /// <summary>Builds the wall decal as a small fan mesh instead of a single flat quad:
+    /// a centre vertex at the impact point plus a ring of rim vertices, each independently
+    /// raycast back onto the surface a little past the decal's own radius. On an ordinary
+    /// flat wall every rim sample lands on the same plane and this looks identical to a
+    /// flat quad; on a corner, a doorframe edge, or a ledge, whichever rim samples cross
+    /// onto the other surface follow it there instead of continuing to float across empty
+    /// space - which is what actually reads as "projected onto the object" rather than a
+    /// plane hovering in front of it. Reuses the source prefab's material so the existing
+    /// hole textures/wallDecals array need no changes.</summary>
+    GameObject PlaceConforming(GameObject prefab, Vector3 point, Vector3 normal)
+    {
+        while (live.Count >= Mathf.Max(1, maxDecals))
+        {
+            var old = live.Dequeue();
+            if (old != null) Destroy(old);
+        }
+
+        var sourceRenderer = prefab.GetComponentInChildren<Renderer>();
+        Material material = sourceRenderer != null ? sourceRenderer.sharedMaterial : null;
+        if (material == null) return Place(prefab, point, normal, decalSize); // nothing to build a mesh with - fall back
+
+        Vector3 upHint = UpHintFor(normal);
+        Vector3 tangent = Vector3.Cross(upHint, normal).normalized;
+        if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.Cross(Vector3.right, normal).normalized;
+        Vector3 bitangent = Vector3.Cross(normal, tangent);
+
+        float radius = decalSize * 0.5f;
+        float rotationOffset = Random.Range(0f, Mathf.PI * 2f); // per-decal variety, same idea as the old random spin
+
+        var vertices = new Vector3[conformSegments + 1];
+        var normals = new Vector3[conformSegments + 1];
+        var uvs = new Vector2[conformSegments + 1];
+        // Double-sided (both winding orders) rather than betting on getting the winding
+        // direction exactly right for every possible surface orientation - the small
+        // amount of extra overdraw on a handful of small decals is a much better trade
+        // than a decal that's invisible from the wrong side.
+        var triangles = new int[conformSegments * 6];
+
+        Vector3 centerWorld = point + normal * surfaceOffset;
+        uvs[0] = new Vector2(0.5f, 0.5f);
+
+        for (int i = 0; i < conformSegments; i++)
+        {
+            float angle = rotationOffset + (i / (float)conformSegments) * Mathf.PI * 2f;
+            Vector3 dir = tangent * Mathf.Cos(angle) + bitangent * Mathf.Sin(angle);
+            Vector3 flatRim = point + dir * radius;
+
+            // Search from a little in front of the flat rim point, back along -normal,
+            // far enough to catch a surface just past the decal's own edge (a corner
+            // bending away) without reaching so far it picks up unrelated geometry.
+            Vector3 searchStart = flatRim + normal * (radius + conformSearchMargin);
+            Vector3 rimWorld;
+            Vector3 rimNormal;
+            if (Physics.Raycast(searchStart, -normal, out RaycastHit hit,
+                    radius + conformSearchMargin * 2f, conformSurfaceMask, QueryTriggerInteraction.Ignore))
+            {
+                rimWorld = hit.point + hit.normal * surfaceOffset;
+                rimNormal = hit.normal;
+            }
+            else
+            {
+                // No surface found nearby (an edge of the geometry, or a gap) - lie flat
+                // in the original plane rather than guessing.
+                rimWorld = flatRim + normal * surfaceOffset;
+                rimNormal = normal;
+            }
+
+            vertices[i + 1] = rimWorld;
+            normals[i + 1] = rimNormal;
+            uvs[i + 1] = new Vector2(0.5f + 0.5f * Mathf.Cos(angle), 0.5f + 0.5f * Mathf.Sin(angle));
+
+            int next = (i + 1) % conformSegments;
+            triangles[i * 6 + 0] = 0;
+            triangles[i * 6 + 1] = i + 1;
+            triangles[i * 6 + 2] = next + 1;
+            // Reverse winding for the back face - see the comment above the array.
+            triangles[i * 6 + 3] = 0;
+            triangles[i * 6 + 4] = next + 1;
+            triangles[i * 6 + 5] = i + 1;
+        }
+
+        var go = new GameObject("BulletHoleDecal");
+        go.transform.position = centerWorld;
+        go.transform.rotation = Quaternion.LookRotation(-normal, upHint);
+
+        // Vertices were built in world space above (raycasting needs world space); convert
+        // to the new GameObject's local space now that its transform is set.
+        vertices[0] = Vector3.zero;
+        normals[0] = go.transform.InverseTransformDirection(normal);
+        for (int i = 1; i < vertices.Length; i++)
+        {
+            Vector3 worldPos = vertices[i];
+            vertices[i] = go.transform.InverseTransformPoint(worldPos);
+            normals[i] = go.transform.InverseTransformDirection(normals[i]);
+        }
+
+        var mesh = new Mesh { name = "BulletHoleDecalMesh" };
+        mesh.SetVertices(vertices);
+        mesh.SetNormals(normals);
+        mesh.SetUVs(0, uvs);
+        mesh.SetTriangles(triangles, 0);
+        mesh.RecalculateBounds();
+        mesh.RecalculateTangents();
+
+        var mf = go.AddComponent<MeshFilter>();
+        mf.sharedMesh = mesh;
+        var mr = go.AddComponent<MeshRenderer>();
+        mr.sharedMaterial = material;
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        live.Enqueue(go);
+        if (lifetime > 0f) Destroy(go, lifetime);
+        return go;
     }
 }

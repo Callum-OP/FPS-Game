@@ -39548,6 +39548,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba323454735e4d548a90aa12eec2d51c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  loweredHeight: -0.4
   loweredPosition: {x: 0, y: -0.4, z: 0.3}
   loweredRotation: {x: 30, y: 0, z: 0}
   lowerSpeed: 8
@@ -39587,7 +39588,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -25.765099, y: 1.1199999, z: 0.19965935}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.3, y: 1.2, z: 1.2}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8772617044774800299}
@@ -39654,6 +39655,7 @@ MonoBehaviour:
   fireRate: 0.1
   maxAmmo: 8
   reloadTime: 1
+  reloadCycles: 1
   isAutomatic: 0
   isShotgun: 1
   pelletCount: 8
@@ -39700,18 +39702,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1c919d80a8ec704db0554b1cba6a1dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponReloadHandler
+  usesMagazine: 1
   magazinePrefab: {fileID: 4598212022487192858, guid: 60ad67d5e4dd3f34cbdc756f4555976a, type: 3}
   magSeatPoint: {fileID: 2260027330663070636}
+  weaponMagVisual: {fileID: 0}
   handReloadPoint: {fileID: 2260027330663070636}
-  magHandOffsetPosition: {x: 0, y: 0, z: 0}
-  magHandOffsetRotation: {x: 0, y: 0, z: 0}
-  handMoveOutTime: 0.05
-  magDropTime: 0.15
-  magSeatTime: 0.75
+  reloadGrabPointOverride: {fileID: 0}
+  magHandAttachPointOverride: {fileID: 0}
+  handGrabTime: 0.2
+  handReloadTime: 0.55
   handReturnTime: 0.9
-  weaponLiftPivot: {fileID: 867525230156697492}
-  weaponLiftPosition: {x: 0, y: 0.02, z: 0}
-  weaponLiftRotation: {x: -6, y: 0, z: 0}
+  weaponReloadPivot: {fileID: 0}
+  carriedMagOffsetPosition: {x: 0, y: 0.096, z: 0}
+  carriedMagOffsetRotationEuler: {x: -90, y: 0, z: -98.034}
   dropForce: 1.5
   dropTorque: 3
   destroyDelay: 5
