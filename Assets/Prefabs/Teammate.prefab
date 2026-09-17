@@ -42,7 +42,6 @@ GameObject:
   - component: {fileID: 1974036301361946662}
   - component: {fileID: 4571212422672409181}
   - component: {fileID: 3714461844059609211}
-  - component: {fileID: 6584046625278314045}
   - component: {fileID: 5500162237225312280}
   - component: {fileID: 4624442065000214829}
   - component: {fileID: 4799998883464736613}
@@ -50,8 +49,9 @@ GameObject:
   - component: {fileID: 3211400689782095061}
   - component: {fileID: 7738536188537177383}
   - component: {fileID: 4092626673707240009}
+  - component: {fileID: -8467075519014609456}
   m_Layer: 0
-  m_Name: Enemy
+  m_Name: Teammate
   m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -95,8 +95,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.39523697, y: 1.8329961, z: 0.7}
-  m_Center: {x: -0.020432472, y: 0.9027201, z: -0.00000008940697}
+  m_Size: {x: 0.4005283, y: 1.7971162, z: 0.56719995}
+  m_Center: {x: -0.008253238, y: 0.9250464, z: 0.06639979}
 --- !u!114 &3714461844059609211
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -117,55 +117,6 @@ MonoBehaviour:
   onDamaged:
     m_PersistentCalls:
       m_Calls: []
---- !u!114 &6584046625278314045
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 910542812212260045}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: de9889f18bee3f54994b308e9b8bb5b2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: '::'
-  sightRange: 20
-  allyEngageRange: 14
-  sightAngle: 90
-  hearingRange: 8
-  investigateTime: 4
-  sightBlockers:
-    serializedVersion: 2
-    m_Bits: 1
-  attackRange: 2
-  attackDamage: 10
-  attackCooldown: 1.2
-  shootRange: 15
-  InjuredHealthFraction: 0.3
-  useCover: 1
-  timeInOpenBeforeCover: 3.5
-  coverHideTime: 1.6
-  peekDuration: 1.8
-  crouchInCover: 1
-  walkSpeed: 2.5
-  chaseSpeed: 5
-  turnSpeed: 8
-  waypoints:
-  - {fileID: 769428879450509391}
-  - {fileID: 7264578887553031615}
-  - {fileID: 7384592350414615947}
-  waypointWaitTime: 2
-  loopPatrol: 0
-  canShoot: 1
-  weaponClass: 1
-  bulletPrefab: {fileID: 4598212022487192858, guid: 9046df2f69dd06b40870ea927989d7f6, type: 3}
-  muzzlePoint: {fileID: 0}
-  bulletSpeed: 40
-  baseInaccuracy: 5
-  maxInaccuracy: 15
-  aimDownTime: 1.5
-  movingInaccuracyBonus: 5
-  alertInaccuracyBonus: 5
 --- !u!195 &5500162237225312280
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -318,6 +269,39 @@ MonoBehaviour:
   injuredHealthFraction: 0.3
   playerHealth: {fileID: 0}
   health: {fileID: 3714461844059609211}
+--- !u!114 &-8467075519014609456
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910542812212260045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a590f750f5564034781b09e7d735c471, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FriendlyAI
+  followDistance: 4
+  leashDistance: 18
+  walkSpeed: 3.5
+  chaseSpeed: 5.5
+  turnSpeed: 8
+  canShoot: 1
+  sightRange: 22
+  shootRange: 18
+  attackCooldown: 0.9
+  inaccuracy: 4
+  bulletPrefab: {fileID: 4598212022487192858, guid: 9046df2f69dd06b40870ea927989d7f6, type: 3}
+  muzzlePoint: {fileID: 0}
+  bulletSpeed: 40
+  sightBlockers:
+    serializedVersion: 2
+    m_Bits: 0
+  InjuredHealthFraction: 0.3
+  useCover: 1
+  timeInOpenBeforeCover: 4
+  coverHideTime: 1.4
+  peekDuration: 2
 --- !u!1 &3014967846191164479
 GameObject:
   m_ObjectHideFlags: 0

@@ -84,7 +84,7 @@ public class WeaponController : MonoBehaviour
             weaponRecoil = GetComponentInChildren<WeaponRecoil>();
 
         fireAction   = new InputAction("Fire",   binding: "<Mouse>/leftButton");
-        reloadAction = new InputAction("Reload", binding: "<Keyboard>/r");
+        reloadAction = new InputAction("Reload", binding: PlayerInputMap.Reload);
         fireAction.Enable();
         reloadAction.Enable();
 
@@ -125,6 +125,7 @@ public class WeaponController : MonoBehaviour
     {
         if (isReloading) return;
 
+        // R is reload only now - pickup moved to its own key (1).
         if (reloadAction.WasPressedThisFrame() && currentAmmo < maxAmmo)
         {
             StartCoroutine(Reload());

@@ -35,6 +35,7 @@ public class CharacterAnimationDriver : MonoBehaviour
     static readonly int DeadHash = Animator.StringToHash("Dead");
     static readonly int InjuredHash = Animator.StringToHash("Injured");
     static readonly int DeathFromBackHash = Animator.StringToHash("DeathFromBack");
+    static readonly int GrenadeHash = Animator.StringToHash("Grenade");
     static readonly int MoveXHash = Animator.StringToHash("MoveX");
     static readonly int MoveYHash = Animator.StringToHash("MoveY");
 
@@ -92,6 +93,9 @@ public class CharacterAnimationDriver : MonoBehaviour
     public void PlayShoot() { if (CanAnimate()) animator.SetTrigger(FireHash); }
     public void PlayReload() { if (CanAnimate()) animator.SetTrigger(ReloadHash); }
     public void PlayMelee() { if (CanAnimate()) animator.SetTrigger(MeleeHash); }
+
+    /// <summary>Plays the grenade throw on the masked upper body - legs keep walking.</summary>
+    public void PlayGrenade() { if (CanAnimate()) animator.SetTrigger(GrenadeHash); }
 
     public void SetDead(bool dead) { if (CanAnimate()) animator.SetBool(DeadHash, dead); }
 

@@ -75,7 +75,8 @@ public class PlayerMovement : MonoBehaviour
     private InputAction moveAction;
     private InputAction lookAction;
     private InputAction jumpAction;
-    private InputAction sprintAction;
+    // No dedicated sprint InputAction any more - see the "fast" bool derived from the
+    // speed multiplier in HandleMovement below.
     private InputAction crouchAction;
 
     [Header("Footsteps")]
@@ -87,11 +88,10 @@ public class PlayerMovement : MonoBehaviour
     void Awake()
     {
         // Define all inputs
-        moveAction   = new InputAction("Move",   binding: "<Keyboard>/w");
-        lookAction   = new InputAction("Look",   binding: "<Mouse>/delta");
-        jumpAction   = new InputAction("Jump",   binding: "<Keyboard>/space");
-        sprintAction = new InputAction("Sprint", binding: "<Keyboard>/f");
-        crouchAction = new InputAction("Crouch", binding: "<Keyboard>/c");
+        // All bindings live in PlayerInputMap now - see that file for the full layout.
+        lookAction   = new InputAction("Look", binding: "<Mouse>/delta");
+        jumpAction   = new InputAction("Jump",   binding: PlayerInputMap.Jump);
+        crouchAction = new InputAction("Crouch", binding: PlayerInputMap.Crouch);
 
         // WASD
         moveAction = new InputAction("Move");
@@ -104,7 +104,6 @@ public class PlayerMovement : MonoBehaviour
         moveAction.Enable();
         lookAction.Enable();
         jumpAction.Enable();
-        sprintAction.Enable();
         crouchAction.Enable();
     }
 
@@ -204,16 +203,22 @@ public class PlayerMovement : MonoBehaviour
         if (isGrounded && velocity.y < 0f) velocity.y = -2f;
 
         Vector2 moveInput = moveAction.ReadValue<Vector2>();
-        bool isSprinting  = sprintAction.ReadValue<float>() > 0.5f;
-
         if (crouchAction.WasPressedThisFrame())
         {
             isCrouching = !isCrouching;
-            if (isCrouching) isSprinting = false;
             animationDriver?.SetCrouching(isCrouching);
         }
 
-        float speed = isSprinting ? runSpeed : walkSpeed;
+        // No sprint key any more - lowering the gun (LowerWeapon, key 2) is what makes
+        // the player move fast, purely via SetSpeedMultiplier below. This used to ALSO
+        // jump the base speed from walkSpeed up to runSpeed on top of that multiplier -
+        // 5 * 1.5 became 9 * 1.5 = 13.5, a double boost - which is why lowering the gun
+        // ended up faster than sprinting ever was. Base speed now always starts from
+        // walkSpeed; the multiplier alone (fastWalkMultiplier on LowerWeapon, still
+        // 1.5x by default) is the entire "sprint replacement".
+        bool isFast = speedMultiplier > 1.01f;
+
+        float speed = walkSpeed;
 
         // Apply all multipliers
         speed *= speedMultiplier;
@@ -234,9 +239,9 @@ public class PlayerMovement : MonoBehaviour
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
 
-        HandleFootsteps(speed, isSprinting, isGrounded);
+        HandleFootsteps(speed, isFast, isGrounded);
 
-        void HandleFootsteps(float speed, bool isSprinting, bool isGrounded)
+        void HandleFootsteps(float speed, bool isFast, bool isGrounded)
         {
             if (!isGrounded || moveInput.magnitude < 0.1f)
             {
@@ -247,7 +252,7 @@ public class PlayerMovement : MonoBehaviour
             footstepTimer -= Time.deltaTime;
             if (footstepTimer <= 0f)
             {
-                footstepTimer = isSprinting ? footstepSprintInterval : footstepInterval;
+                footstepTimer = isFast ? footstepSprintInterval : footstepInterval;
 
                 if (footstepClips.Length > 0)
                     AudioManager.Instance?.Play(
@@ -261,7 +266,6 @@ public class PlayerMovement : MonoBehaviour
         moveAction.Disable();
         lookAction.Disable();
         jumpAction.Disable();
-        sprintAction.Disable();
         crouchAction.Disable();
     }
 }

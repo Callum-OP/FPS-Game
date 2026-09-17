@@ -12,12 +12,14 @@ public class WeaponPickup : MonoBehaviour
 
     void Awake()
     {
-        pickupAction = new InputAction("Pickup", binding: "<Keyboard>/h");
+        pickupAction = new InputAction("Pickup", binding: PlayerInputMap.Pickup);
         pickupAction.Enable();
     }
 
     void Update()
     {
+        // Pickup has its own key (1) now, separate from reload (R), so no sharing/
+        // suppression logic is needed any more.
         if (playerInRange && pickupAction.WasPressedThisFrame())
             Pickup();
     }
@@ -26,26 +28,32 @@ public class WeaponPickup : MonoBehaviour
     {
         if (playerSetup == null) return;
 
-        // Drop current weapon first if holding one
-        WeaponDrop drop = playerSetup.GetComponent<WeaponDrop>();
-        drop?.Drop();
+        var inventory = playerSetup.GetComponent<WeaponInventory>();
 
-        // Find or instantiate the held version under camera
-        GameObject held = playerSetup.fpCamera.transform
-            .Find(heldWeaponPrefab.name)?.gameObject;
-
-        if (held == null)
-            held = Instantiate(heldWeaponPrefab,
-                playerSetup.fpCamera.transform);
-
-        held.transform.localPosition = new Vector3(0f, -0.1f, 0.5f);
+        GameObject held = Instantiate(heldWeaponPrefab, playerSetup.fpCamera.transform);
+        held.name = heldWeaponPrefab.name; // keep the prefab name - the slot and the world-drop lookup both match on it
+        held.transform.localPosition = Vector3.zero;
         held.transform.localRotation = Quaternion.identity;
         held.SetActive(true);
 
-        WeaponController weapon = held.GetComponent<WeaponController>();
-        playerSetup.WireWeapon(weapon);
+        if (inventory != null)
+        {
+            // Only whatever was already in THIS weapon's slot gets dropped - the rifle
+            // stays on your back when you pick up a pistol. That's the whole point of
+            // carrying two.
+            GameObject displaced = inventory.Store(held, equipImmediately: true);
+            if (displaced != null)
+            {
+                playerSetup.GetComponent<WeaponDrop>()?.DropSpecific(displaced);
+                inventory.Remove(displaced);
+            }
+        }
+        else
+        {
+            playerSetup.GetComponent<WeaponDrop>()?.Drop();
+            playerSetup.WireWeapon(held.GetComponent<WeaponController>());
+        }
 
-        // Destroy the world object
         Destroy(gameObject);
     }
 

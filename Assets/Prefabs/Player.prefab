@@ -1,5 +1,67 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &84174191592328820
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1360689303547601258}
+  m_Layer: 0
+  m_Name: BackHolster
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1360689303547601258
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 84174191592328820}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.0000000037252899, y: 0.6704378, z: -0.0000000037252899, w: 0.74196583}
+  m_LocalPosition: {x: -0.00000011832344, y: 0.17599998, z: -0.10199987}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6681637651828853669}
+  m_LocalEulerAnglesHint: {x: 0, y: 84.202, z: 0}
+--- !u!1 &1700662327973192238
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2627726432354409722}
+  m_Layer: 0
+  m_Name: HipHolster
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2627726432354409722
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1700662327973192238}
+  serializedVersion: 2
+  m_LocalRotation: {x: -3.0554866e-12, y: 0.3586625, z: 9.346233e-12, w: 0.9334673}
+  m_LocalPosition: {x: 0.124999814, y: 0.00000006324055, z: 0.09500019}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6399909585974999094}
+  m_LocalEulerAnglesHint: {x: 0, y: 42.036, z: 0}
 --- !u!1 &3871780428311571160
 GameObject:
   m_ObjectHideFlags: 0
@@ -227,7 +289,7 @@ MonoBehaviour:
   injuredFollow: 0.6
   injuredForwardPush: 0.03
   maxOffset: 0.01
-  followSmooth: 12
+  smoothTime: 0.12
   restingDrift: 0.2
   injuredBlendSpeed: 2
   playerMovement: {fileID: 7265401261218519411}
@@ -257,6 +319,8 @@ GameObject:
   - component: {fileID: 8719003296114661464}
   - component: {fileID: 2851115830741363710}
   - component: {fileID: 8784270823998979221}
+  - component: {fileID: 3579103132014354902}
+  - component: {fileID: 3272267351875027821}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -274,7 +338,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -10.7, y: 2.33, z: -13.74}
-  m_LocalScale: {x: 1.6, y: 1.6, z: 1.6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7430708228133973812}
@@ -457,6 +521,14 @@ MonoBehaviour:
   throwForce: 15
   throwUpward: 5
   maxGrenades: 3
+  heldGrenadeVisual: {fileID: 0}
+  heldOffset: {x: 0.18, y: -0.18, z: 0.35}
+  releaseAtFraction: 0.45
+  throwAnimationLength: 1.1
+  cookedThrow: 1
+  stayEquippedAfterThrow: 1
+  inventory: {fileID: 0}
+  animationDriver: {fileID: 0}
 --- !u!114 &7013886737931384741
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -494,6 +566,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ragdoll
   animator: {fileID: 4783233763987129048}
+  deathAnimationChance: 0.5
+  ragdollTakeoverPoint: 0.45
+  maxDeathAnimationTime: 1.2
+  velocityInheritance: 1
+  groundClamp: 1
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundClampDuration: 4
+  groundClampTolerance: 0.35
+  explosionRagdollForce: 9
 --- !u!114 &7219984608590271071
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -602,8 +685,52 @@ MonoBehaviour:
     pinkyCurl: 50
   maxPullBack: 0.3
   pullBackSpeed: 10
+  pullBackDeadzone: 0.04
+  pullBackSmoothTime: 0.25
+  lateralPullBackFraction: 0
+  measureReachFromRestingShoulder: 1
   maxTorsoLean: 8
   torsoLeanSpeed: 6
+--- !u!114 &3579103132014354902
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43be3d264b203e1428356bfc36d481fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TorsoMotionDampener
+  normalDampen: 0
+  injuredDampen: 0.7
+  headDampenScale: 0.5
+  averageFollow: 3
+  blendSpeed: 2
+  injuredHealthFraction: 0.3
+  playerHealth: {fileID: 3727270317031304332}
+  health: {fileID: 0}
+--- !u!114 &3272267351875027821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23d77ffd53fc2f74d9fceae6ea8e0e4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponInventory
+  playerSetup: {fileID: 8380861452952741765}
+  bodyAnimator: {fileID: 4783233763987129048}
+  primaryHolsterPointName: BackHolster
+  secondaryHolsterPointName: HipHolster
+  backHolsterOffset: {x: -0.12, y: 0.05, z: -0.18}
+  backHolsterRotation: {x: 0, y: 90, z: 25}
+  hipHolsterOffset: {x: -0.18, y: 0, z: 0.02}
+  hipHolsterRotation: {x: 0, y: 90, z: 0}
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -666,7 +793,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 8698138359917383769, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2627726432354409722}
+    - targetCorrespondingSourceObject: {fileID: 8997355430075786186, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1360689303547601258}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 4353316099925526828, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
       insertIndex: -1
@@ -1551,6 +1684,16 @@ CharacterJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!4 &6399909585974999094 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8698138359917383769, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &6681637651828853669 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8997355430075786186, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &7565181437125148854 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5230958951209789657, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}

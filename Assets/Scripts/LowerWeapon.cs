@@ -52,8 +52,8 @@ public class LowerWeapon : MonoBehaviour
 
     void Awake()
     {
-        lowerAction = new InputAction("LowerWeapon", binding: "<Keyboard>/x");
-        fireAction  = new InputAction("FireCheck",   binding: "<Mouse>/leftButton");
+        lowerAction = new InputAction("LowerWeapon", binding: PlayerInputMap.LowerWeapon);
+        fireAction  = new InputAction("FireCheck",   binding: PlayerInputMap.Fire);
 
         lowerAction.Enable();
         fireAction.Enable();
@@ -82,7 +82,7 @@ public class LowerWeapon : MonoBehaviour
 
     void Update()
     {
-        // Toggle lower on X press
+        // Toggle lower (key 2)
         if (lowerAction.WasPressedThisFrame())
             isLowered = !isLowered;
 

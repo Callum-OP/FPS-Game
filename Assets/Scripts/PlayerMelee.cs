@@ -23,7 +23,7 @@ public class PlayerMelee : MonoBehaviour
 
     void Awake()
     {
-        meleeAction = new InputAction("Melee", binding: "<Keyboard>/v");
+        meleeAction = new InputAction("Melee", binding: PlayerInputMap.Melee);
         meleeAction.AddBinding("<Mouse>/middleButton");
         meleeAction.Enable();
         cam = GetComponentInChildren<Camera>();

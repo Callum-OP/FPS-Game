@@ -18,7 +18,8 @@ using UnityEngine;
 /// added to the enemy to IK the hands onto the weapon's own grip points every
 /// frame.
 /// </summary>
-[RequireComponent(typeof(EnemyAI))]
+// No RequireComponent(EnemyAI) any more: FriendlyAI uses this too, and an ally is not
+// an enemy. The one thing that needed EnemyAI (auto-wiring muzzlePoint) is null-checked.
 public class EnemyWeapon : MonoBehaviour
 {
     [Header("Held weapon (visual only)")]
@@ -60,6 +61,7 @@ public class EnemyWeapon : MonoBehaviour
     public GameObject worldPickupPrefab;
 
     EnemyAI enemyAI;
+    FriendlyAI friendlyAI; // set instead of enemyAI when this is on an ally
     WeaponHandIK handIK;
     GameObject weaponInstance;
     Transform anchor;
@@ -78,7 +80,8 @@ public class EnemyWeapon : MonoBehaviour
     {
         if (weaponPrefab == null) return;
 
-        enemyAI = GetComponent<EnemyAI>();
+        enemyAI = GetComponent<EnemyAI>();     // may be null on an ally
+        friendlyAI = GetComponent<FriendlyAI>(); // may be null on an enemy
         ammo = Mathf.Max(1, magazineSize);
         animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
 
@@ -124,8 +127,14 @@ public class EnemyWeapon : MonoBehaviour
             // animation happened to leave it, so its own muzzle point is a more
             // reliable bullet-spawn reference than a hand-placed empty transform -
             // auto-wire it in rather than leaving Enemy.muzzlePoint stale.
-            if (wc.muzzlePoint != null && enemyAI != null)
-                enemyAI.muzzlePoint = wc.muzzlePoint;
+            if (wc.muzzlePoint != null)
+            {
+                if (enemyAI != null) enemyAI.muzzlePoint = wc.muzzlePoint;
+                // This was missing entirely for allies, which is why they never fired -
+                // FriendlyAI.TryShoot bails out silently when muzzlePoint is null, and
+                // nothing was ever setting it.
+                if (friendlyAI != null) friendlyAI.muzzlePoint = wc.muzzlePoint;
+            }
         }
 
         foreach (var mb in weaponInstance.GetComponentsInChildren<MonoBehaviour>(true))

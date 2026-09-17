@@ -9,10 +9,15 @@ public class Projectile : MonoBehaviour
     [Range(0, 1)]
     public float minDamagePercent = 0.1f; // 10%
 
+    [Tooltip("Physical shove this round gives a body on a killing/near-killing hit. A rifle round's default is small on its own; a shotgun's per-pellet force is meant to be smaller still but the pellets hit in the same frame and ADD UP on the Ragdoll, so a shotgun blast naturally ends up shoving much harder than any single rifle round without needing a special case per weapon type.")]
+    public float knockbackForce = 5f;
+
     public static bool debugLog = false; // set by test tools to trace impacts
 
-    [Tooltip("Set by EnemyAI on its own bullets: damages only the player, never other enemies.")]
+    [Tooltip("Set by EnemyAI on its own bullets: damages only the player and the player's allies, never other enemies.")]
     public bool firedByEnemy = false;
+    [Tooltip("Set by FriendlyAI on its own bullets: damages enemies, never the player or other allies.")]
+    public bool firedByFriendly = false;
 
     private Rigidbody rb;
     private float spawnTime;
@@ -39,15 +44,10 @@ public class Projectile : MonoBehaviour
 
         float currentDamage = CalculateFalloff();
 
-        // search parents: hitboxes (ragdoll bone colliders) sit below the object that owns Health
-        var health = collision.collider.GetComponentInParent<Health>();
-        if (health != null && !firedByEnemy)
-            health.TakeDamage(currentDamage);
+        var contact = collision.contacts[0];
+        ImpactEffects.SpawnImpact(contact.point, contact.normal, collision.collider.transform);
 
-        var pHealth = collision.collider.GetComponentInParent<PlayerHealth>();
-        if (pHealth != null && firedByEnemy)
-            pHealth.TakeDamage(currentDamage);
-
+        ApplyDamage(collision.collider, currentDamage, rb.linearVelocity.normalized);
         Destroy(gameObject);
     }   
 
@@ -56,18 +56,44 @@ public class Projectile : MonoBehaviour
     void OnTriggerEnter(Collider other)
     {
         if (hasHit) return;
-        var health = firedByEnemy ? null : other.GetComponentInParent<Health>();
-        var pHealth = firedByEnemy ? other.GetComponentInParent<PlayerHealth>() : null;
-        if (health == null && pHealth == null) return; // scenery trigger or friendly body — pass through
+        if (!CanDamage(other)) return; // scenery trigger or a body on our own side - pass through
 
         hasHit = true;
         if (debugLog)
             Debug.Log($"BULLET '{name}' trigger-hit '{other.name}' root='{other.transform.root.name}'");
 
-        float currentDamage = CalculateFalloff();
-        if (health != null) health.TakeDamage(currentDamage);
-        if (pHealth != null) pHealth.TakeDamage(currentDamage);
+        // Triggers give no contact point, so approximate one on the collider's surface.
+        Vector3 point = other.ClosestPoint(transform.position);
+        ImpactEffects.SpawnImpact(point, (transform.position - point).normalized, other.transform);
+
+        ApplyDamage(other, CalculateFalloff(), transform.forward);
         Destroy(gameObject);
+    }
+
+    // Who this bullet is allowed to hurt. Three sides: the player (and their allies),
+    // the enemies, and neutral scenery. Allies are identified by carrying a FriendlyAI -
+    // without this an enemy bullet would sail straight through your own squad, since
+    // they own a Health rather than a PlayerHealth.
+    bool CanDamage(Collider col)
+    {
+        bool isAlly = col.GetComponentInParent<FriendlyAI>() != null;
+        var health = col.GetComponentInParent<Health>();
+        var pHealth = col.GetComponentInParent<PlayerHealth>();
+        if (health == null && pHealth == null) return false;
+
+        if (firedByEnemy) return pHealth != null || isAlly;
+        if (firedByFriendly) return health != null && !isAlly && pHealth == null;
+        return health != null && !isAlly; // player's own bullets
+    }
+
+    void ApplyDamage(Collider col, float amount, Vector3 travelDirection)
+    {
+        if (!CanDamage(col)) return;
+
+        var pHealth = col.GetComponentInParent<PlayerHealth>();
+        if (pHealth != null) { pHealth.TakeDamage(amount, travelDirection, knockbackForce); return; }
+
+        col.GetComponentInParent<Health>()?.TakeDamage(amount, travelDirection, knockbackForce);
     }
 
     float CalculateFalloff()

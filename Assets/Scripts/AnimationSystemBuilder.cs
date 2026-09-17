@@ -98,6 +98,15 @@ public static class AnimationSystemBuilder
         // import just logs it as missing and the back-death state falls back to the
         // front clip - nothing else breaks.
         new ClipDef("ri_death_back",     "Pro Rifle Pack", "death from the back", false),
+        new ClipDef("ri_death_right",    "Pro Rifle Pack", "death from right", false),
+        new ClipDef("ri_death_head_f",   "Pro Rifle Pack", "death from front headshot", false),
+        new ClipDef("ri_death_head_b",   "Pro Rifle Pack", "death from back headshot", false),
+        new ClipDef("ri_death_crouch",   "Pro Rifle Pack", "death crouching headshot front", false),
+        // Sprint set - the pack has proper sprint clips, so running flat out no longer
+        // has to reuse the run cycle played faster.
+        new ClipDef("ri_sprint_fwd",     "Pro Rifle Pack", "sprint forward", true),
+        new ClipDef("ri_sprint_fwd_l",   "Pro Rifle Pack", "sprint forward left", true),
+        new ClipDef("ri_sprint_fwd_r",   "Pro Rifle Pack", "sprint forward right", true),
 
         // Rifle crouch - Pro Rifle Pack
         new ClipDef("rc_idle",       "Pro Rifle Pack", "idle crouching aiming", true),
@@ -107,6 +116,18 @@ public static class AnimationSystemBuilder
         new ClipDef("rc_walk_back",  "Pro Rifle Pack", "walk crouching backward", true),
         new ClipDef("rc_walk_left",  "Pro Rifle Pack", "walk crouching left", true),
         new ClipDef("rc_walk_right", "Pro Rifle Pack", "walk crouching right", true),
+        new ClipDef("rc_idle_plain", "Pro Rifle Pack", "idle crouching", true),
+
+        // Cover - Action Adventure Pack. Enemies (and allies) use these to drop into and
+        // rise from cover instead of just crouching where they stand.
+        new ClipDef("cov_enter",     "Action Adventure Pack", "stand to cover", false),
+        new ClipDef("cov_exit",      "Action Adventure Pack", "cover to stand", false),
+        new ClipDef("cov_sneak_l",   "Action Adventure Pack", "left cover sneak", true),
+        new ClipDef("cov_sneak_r",   "Action Adventure Pack", "right cover sneak", true),
+
+        // Pistol crouch - the Pistol pack has its own kneeling pose, which reads far
+        // better under a handgun than the rifle crouch's two-handed arms did.
+        new ClipDef("pi_kneel_idle", "Pistol_Handgun Locomotion Pack", "pistol kneeling idle", true),
 
         // Shared actions - Basic Shooter Pack (rifle-style, reused for both weapon classes
         // since the supplied packs don't include a dedicated pistol firing clip)
@@ -278,7 +299,24 @@ public static class AnimationSystemBuilder
         clipSettings.lockRootRotation = true;
         clipSettings.keepOriginalOrientation = false;
         clipSettings.lockRootHeightY = true;
-        clipSettings.keepOriginalPositionY = !def.rootMotion;
+        // "Original" is right for every pack except the Male Injured Pack, which is
+        // authored with a hunched, lowered pelvis that doesn't match the standing pose
+        // every other pack assumes.
+        //
+        // IMPORTANT, and the actual cause of "every character is halfway under the
+        // map": keepOriginalPositionY = false does NOT mean "Feet" on its own - it
+        // means "Center of Mass" unless heightFromFeet is ALSO set true. An earlier
+        // version of this file set keepOriginalPositionY false (for one pack, then
+        // briefly for every pack) without ever touching heightFromFeet, so every clip
+        // that had it was baked against center-of-mass height instead - roughly
+        // mid-torso on a standing human - which drops the whole skeleton about half a
+        // body height below the CharacterController/NavMeshAgent that never moved.
+        // That's shared across the player, enemies and allies because all three
+        // animate off this one AnimatorController. Both flags below have to be set
+        // together to actually get Feet-based baking.
+        bool useFeetBasis = def.pack == "Male Injured Pack";
+        clipSettings.keepOriginalPositionY = !useFeetBasis;
+        clipSettings.heightFromFeet = useFeetBasis;
         clipSettings.lockRootPositionXZ = true;
         clipSettings.keepOriginalPositionXZ = def.rootMotion;
 
@@ -356,6 +394,7 @@ public static class AnimationSystemBuilder
         controller.AddParameter("Fire", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Reload", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Melee", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("Grenade", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Dead", AnimatorControllerParameterType.Bool);
         controller.AddParameter("Injured", AnimatorControllerParameterType.Bool);
         // Which death clip to play - set by CharacterAnimationDriver.SetDead(dead, fromBack).
@@ -542,10 +581,15 @@ public static class AnimationSystemBuilder
         AnimatorState fire   = AddMotionState(sm, "UB_Fire", C("act_fire_rifle"), new Vector3(220, 140, 0));
         AnimatorState reload = AddMotionState(sm, "UB_Reload", C("act_reload"), new Vector3(0, 280, 0));
         AnimatorState melee  = AddMotionState(sm, "UB_Melee", C("act_melee"), new Vector3(0, 140, 0));
+        AnimatorState grenade = AddMotionState(sm, "UB_Grenade", C("act_grenade"), new Vector3(220, 280, 0));
         // Pistol upper body, masked over whatever the legs are doing. This is what makes
         // the shared (rifle-authored) crouch tree usable for a handgun: the legs crouch,
         // this replaces the arms/spine with the pistol pack's own ready stance.
-        AnimatorState pistolPose = AddMotionState(sm, "UB_PistolPose", C("pi_idle"), new Vector3(440, 0, 0));
+        // Pistol kneeling idle while crouched (the handgun pack's own pose), plain pistol
+        // idle otherwise - both are upper-body only here, so the legs keep doing whatever
+        // the base layer says.
+        AnimatorState pistolPose = AddMotionState(sm, "UB_PistolPose",
+            C("pi_kneel_idle") != null ? C("pi_kneel_idle") : C("pi_idle"), new Vector3(440, 0, 0));
         sm.defaultState = idle;
 
         AddInstantTransition(idle, pistolPose, AnimatorConditionMode.If, 0, "IsCrouching",
@@ -576,6 +620,10 @@ public static class AnimationSystemBuilder
             var tm = s.AddTransition(melee);
             tm.hasExitTime = false; tm.duration = 0.05f;
             tm.AddCondition(AnimatorConditionMode.If, 0, "Melee");
+
+            var tg = s.AddTransition(grenade);
+            tg.hasExitTime = false; tg.duration = 0.1f;
+            tg.AddCondition(AnimatorConditionMode.If, 0, "Grenade");
         }
 
         // Fire is a short loud loop while the trigger stays fresh; return to aim shortly after.
@@ -585,6 +633,9 @@ public static class AnimationSystemBuilder
 
         var backFromReload = reload.AddTransition(idle);
         backFromReload.hasExitTime = true; backFromReload.exitTime = 0.95f; backFromReload.duration = 0.1f;
+
+        var backFromGrenade = grenade.AddTransition(idle);
+        backFromGrenade.hasExitTime = true; backFromGrenade.exitTime = 0.95f; backFromGrenade.duration = 0.15f;
 
         var backFromMelee = melee.AddTransition(idle);
         backFromMelee.hasExitTime = true; backFromMelee.exitTime = 0.9f; backFromMelee.duration = 0.15f;

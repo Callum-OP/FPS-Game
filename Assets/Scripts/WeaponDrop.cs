@@ -16,7 +16,7 @@ public class WeaponDrop : MonoBehaviour
 
     void Awake()
     {
-        dropAction = new InputAction("Drop", binding: "<Keyboard>/g");
+        dropAction = new InputAction("Drop", binding: PlayerInputMap.Drop);
         dropAction.Enable();
     }
 
@@ -34,10 +34,17 @@ public class WeaponDrop : MonoBehaviour
             return;
         }
 
-        WeaponController weapon = playerSetup.activeWeapon;
-        Debug.Log($"Dropping: {weapon.gameObject.name}");
+        DropSpecific(playerSetup.activeWeapon.gameObject);
+    }
 
-        GameObject worldPrefab = GetWorldPrefab(weapon.gameObject.name);
+    /// <summary>Drops one particular held weapon - used when picking a new one up into a
+    /// slot that's already full, so the other slot isn't disturbed.</summary>
+    public void DropSpecific(GameObject heldWeapon)
+    {
+        if (heldWeapon == null) return;
+        Debug.Log($"Dropping: {heldWeapon.name}");
+
+        GameObject worldPrefab = GetWorldPrefab(heldWeapon.name);
         Debug.Log($"World prefab found: {worldPrefab != null}");
 
         if (worldPrefab != null)
@@ -51,8 +58,12 @@ public class WeaponDrop : MonoBehaviour
                 rb.linearVelocity = transform.forward * 2f + Vector3.up * 1f;
         }
 
-        weapon.gameObject.SetActive(false);
-        playerSetup.UnequipWeapon();
+        bool wasActive = playerSetup.activeWeapon != null
+            && playerSetup.activeWeapon.gameObject == heldWeapon;
+
+        GetComponent<WeaponInventory>()?.Remove(heldWeapon);
+        Destroy(heldWeapon);
+        if (wasActive) playerSetup.UnequipWeapon();
     }
 
     GameObject GetWorldPrefab(string weaponName)

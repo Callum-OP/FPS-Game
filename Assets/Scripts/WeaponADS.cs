@@ -62,8 +62,8 @@ public class WeaponADS : MonoBehaviour
         if (animationDriver == null) animationDriver = GetComponentInParent<CharacterAnimationDriver>();
         if (animationDriver == null) animationDriver = FindFirstObjectByType<CharacterAnimationDriver>();
 
-        // Use left shift to aim
-        aimAction = new InputAction("Aim", binding: "<Keyboard>/leftShift");
+        // Right mouse to aim - see PlayerInputMap for the full layout (shift is sprint now).
+        aimAction = new InputAction("Aim", binding: PlayerInputMap.Aim);
         aimAction.Enable();
     }
 

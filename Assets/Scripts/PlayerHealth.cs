@@ -22,6 +22,8 @@ public class PlayerHealth : MonoBehaviour
     private float lastHurtTime = -999f;
     public float hurtSoundCooldown = 1.5f;
 
+    Ragdoll ragdoll;
+
     // Events for HUD
     public System.Action<float> onHealthChanged;
     public System.Action onDeath;
@@ -31,6 +33,8 @@ public class PlayerHealth : MonoBehaviour
     {
         currentHealth = maxHealth;
         onHealthChanged?.Invoke(1f);
+        ragdoll = GetComponentInChildren<Ragdoll>();
+        if (ragdoll == null) ragdoll = GetComponent<Ragdoll>();
     }
 
     void Update()
@@ -53,8 +57,14 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
-    // Player is hit
-    public void TakeDamage(float amount)
+    /// <summary>Plain damage - no physical shove.</summary>
+    public void TakeDamage(float amount) => TakeDamage(amount, Vector3.zero, 0f);
+
+    /// <summary>Damage with a direction and a knockback amount, same idea as
+    /// Health.TakeDamage - see that file's comment for why this accumulates rather than
+    /// judging each hit alone (that's what makes a shotgun blast to the player fling
+    /// them backward on death the same way it does an enemy).</summary>
+    public void TakeDamage(float amount, Vector3 hitDirection, float hitForce)
     {
         if (isDead) return;
 
@@ -63,6 +73,8 @@ public class PlayerHealth : MonoBehaviour
 
         onHealthChanged?.Invoke(currentHealth / maxHealth);
         onDamaged?.Invoke();
+
+        if (hitForce > 0f) ragdoll?.AccumulateHitForce(hitDirection, hitForce);
 
         // Play random hurt sound with cooldown
         if (Time.time - lastHurtTime >= hurtSoundCooldown)
@@ -73,8 +85,8 @@ public class PlayerHealth : MonoBehaviour
                     hurtClips[Random.Range(0, hurtClips.Length)]);
         }
 
-            if (currentHealth <= 0f) Die();
-        }
+        if (currentHealth <= 0f) Die();
+    }
 
     public void Heal(float amount)
     {

@@ -22,8 +22,8 @@ public class WeaponCant : MonoBehaviour
 
     void Awake()
     {
-        cantLeftAction  = new InputAction("CantLeft",  binding: "<Keyboard>/q");
-        cantRightAction = new InputAction("CantRight", binding: "<Keyboard>/e");
+        cantLeftAction  = new InputAction("CantLeft",  binding: PlayerInputMap.CantLeft);
+        cantRightAction = new InputAction("CantRight", binding: PlayerInputMap.CantRight);
         cantLeftAction.Enable();
         cantRightAction.Enable();
     }

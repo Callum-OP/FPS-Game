@@ -29,6 +29,22 @@ public class Ragdoll : MonoBehaviour
     public LayerMask groundLayers = ~0;
     [Tooltip("How long the clamp stays active after death.")]
     public float groundClampDuration = 4f;
+    [Tooltip("How far below the ground the hips have to be before the body is lifted. Must stay comfortably above the depth a normal collapse reaches, or a corpse lying on a slope gets nudged every step.")]
+    public float groundClampTolerance = 0.35f;
+
+    [Header("Explosions")]
+    [Tooltip("Extra impulse applied to each bone when killed by an explosion, on top of whatever the blast itself pushed.")]
+    public float explosionRagdollForce = 9f;
+
+    [Header("Gunfire Knockback")]
+    [Tooltip("Total accumulated hit force (see AccumulateHitForce) needed on the killing blow to skip the death animation entirely and go straight to a shoved ragdoll. A single rifle round should stay well under this; several shotgun pellets landing the same frame add up past it, which is what makes a shotgun kill fling the body backward while a rifle kill still gets its death animation.")]
+    public float knockbackSkipAnimationThreshold = 16f;
+    [Tooltip("Multiplies the accumulated hit force into an actual physics impulse spread across every bone when the threshold above is exceeded.")]
+    public float knockbackImpulseScale = 5f;
+    Vector3 pendingHitDirectionSum;  // running sum of direction*force for the current death
+    float pendingHitForceSum;
+    bool knockedBack;                // this death's force cleared the threshold above
+
     Rigidbody[] bones;
     Transform[] allBones;      // every skeleton transform, for pose repair on death
     Vector3[] restLocalPos;    // their sane local positions captured before any pose writer runs
@@ -161,12 +177,15 @@ public class Ragdoll : MonoBehaviour
             elapsed += Time.deltaTime;
 
             // Cast from well above the hips so the ray starts outside any floor the body
-            // may already be inside.
+            // may already be inside - and ignore the corpse's OWN colliders on the way
+            // down. Without that filter the ray hits the body's head/shoulder first, reads
+            // "the ground is above the hips", lifts the whole thing, and does it again the
+            // next frame: that's what was launching bodies (and the player) into the air.
             Vector3 origin = hipsBone.position + Vector3.up * 3f;
-            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 12f, groundLayers, QueryTriggerInteraction.Ignore))
+            if (RaycastIgnoringSelf(origin, Vector3.down, 12f, out RaycastHit hit))
             {
                 float sunk = hit.point.y - hipsBone.position.y;
-                if (sunk > 0.25f) // hips are a quarter of a metre below the floor surface
+                if (sunk > groundClampTolerance)
                 {
                     // Move every bone up together, so the pose is preserved and nothing
                     // gets torn apart by its joints, then kill the downward velocity that
@@ -187,6 +206,52 @@ public class Ragdoll : MonoBehaviour
 
             yield return new WaitForFixedUpdate();
         }
+    }
+
+    // A downward cast that skips every collider belonging to this character.
+    bool RaycastIgnoringSelf(Vector3 origin, Vector3 direction, float distance, out RaycastHit best)
+    {
+        best = default;
+        var hits = Physics.RaycastAll(origin, direction, distance, groundLayers, QueryTriggerInteraction.Ignore);
+        float nearest = float.PositiveInfinity;
+        bool found = false;
+        Transform self = transform.root;
+
+        foreach (var h in hits)
+        {
+            if (h.collider.transform.root == self) continue;
+            if (h.distance < nearest) { nearest = h.distance; best = h; found = true; }
+        }
+        return found;
+    }
+
+    /// <summary>Called by Explosive just before the killing damage lands. An explosive
+    /// death skips the death animation entirely - a body being thrown by a blast has no
+    /// business playing a scripted collapse - and if the blast was close enough, the body
+    /// comes apart.</summary>
+    public void NotifyExplosion(Vector3 blastCentre, float force, bool dismember)
+    {
+        killedByExplosion = true;
+        explosionCentre = blastCentre;
+        explosionForceReceived = force;
+        explosionDismembers = dismember;
+    }
+
+    bool killedByExplosion;
+    Vector3 explosionCentre;
+    float explosionForceReceived;
+    bool explosionDismembers;
+
+    /// <summary>Called by Health/PlayerHealth on every hit that carries a knockback
+    /// amount - not just the killing one. Force ACCUMULATES rather than being judged
+    /// per-hit, so several shotgun pellets landing in the same frame add up to a real
+    /// shove even though each pellet's own force is modest; a single rifle round stays
+    /// small. Whatever total is on the books when Die() fires is what decides the death.</summary>
+    public void AccumulateHitForce(Vector3 direction, float force)
+    {
+        if (force <= 0f || direction.sqrMagnitude < 0.0001f) return;
+        pendingHitDirectionSum += direction.normalized * force;
+        pendingHitForceSum += force;
     }
 
     public void Die()
@@ -216,7 +281,17 @@ public class Ragdoll : MonoBehaviour
     // body freezing and then dropping.
     IEnumerator DeathSequence()
     {
+        // A big enough gunfire shove (several shotgun pellets in one frame, typically)
+        // skips the death animation the same way an explosion does - a body being
+        // punched backward has no business playing a scripted collapse first, and this
+        // is also what fixes it standing still through the whole animation and only
+        // THEN rocketing backward: if the animation plays, no extra shove is added on
+        // top of it (below), so it just settles where it fell.
+        knockedBack = !killedByExplosion && pendingHitForceSum >= knockbackSkipAnimationThreshold;
+
         bool playAnimation = animator != null && animator.enabled
+            && !killedByExplosion                       // blown up: straight to physics
+            && !knockedBack                              // shoved hard: straight to physics
             && Random.value < deathAnimationChance;
 
         if (playAnimation)
@@ -337,6 +412,44 @@ public class Ragdoll : MonoBehaviour
                 bones[i].linearVelocity = Vector3.ClampMagnitude(v * velocityInheritance, MaxSafeSpeed);
             }
         }
+
+        if (killedByExplosion)
+        {
+            // Throw the bones outward from the blast, then (if it was a close one) take
+            // the body apart. Order matters: the limbs have to still be attached when the
+            // impulse lands so the whole corpse launches together, then separates.
+            foreach (var rb in bones)
+            {
+                if (rb == null) continue;
+                rb.AddExplosionForce(explosionForceReceived + explosionRagdollForce * 100f,
+                    explosionCentre, 8f, 0.8f, ForceMode.Impulse);
+                rb.linearVelocity = Vector3.ClampMagnitude(rb.linearVelocity, MaxSafeSpeed);
+            }
+
+            if (explosionDismembers)
+                GetComponentInChildren<Dismemberment>()?.SeverRandomLimbs(explosionCentre);
+        }
+        else if (knockedBack)
+        {
+            // Same idea as the explosion branch but a directional shove rather than a
+            // radial one - every bone gets pushed the same way, roughly like the whole
+            // body being punched backward, using the direction the accumulated hits
+            // actually came from rather than always "straight back" so it still looks
+            // right if the shots came from an angle.
+            Vector3 direction = pendingHitDirectionSum.sqrMagnitude > 0.0001f
+                ? pendingHitDirectionSum.normalized : transform.forward;
+            float impulse = pendingHitForceSum * knockbackImpulseScale;
+
+            foreach (var rb in bones)
+            {
+                if (rb == null) continue;
+                rb.AddForce(direction * impulse, ForceMode.Impulse);
+                rb.linearVelocity = Vector3.ClampMagnitude(rb.linearVelocity, MaxSafeSpeed);
+            }
+        }
+
+        pendingHitDirectionSum = Vector3.zero;
+        pendingHitForceSum = 0f;
 
         StartCoroutine(GroundSafetyNet());
         if (groundClamp) StartCoroutine(GroundClamp());

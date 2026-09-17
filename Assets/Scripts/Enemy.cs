@@ -10,6 +10,8 @@ public class EnemyAI : MonoBehaviour
 
     [Header("Detection")]
     public float sightRange = 20f;
+    [Tooltip("An ally within this range and in sight becomes the fire target instead of the player - lets enemies engage a friendly AI that gets close rather than only ever shooting the player.")]
+    public float allyEngageRange = 14f;
     public float sightAngle = 90f;
     public float hearingRange = 8f; // Detect player without line of sight
     public float investigateTime = 4f; // Look for player
@@ -79,6 +81,8 @@ public class EnemyAI : MonoBehaviour
     private float attackTimer;
     private float waypointWaitTimer;
     private bool playerInSight;
+    private Transform fireTarget;   // player, or a nearby ally - recomputed each Update
+    private bool fireTargetIsAlly;
 
     private bool isStunned = false;
 
@@ -142,6 +146,7 @@ public class EnemyAI : MonoBehaviour
         if (currentState == State.Dead || isStunned) return;
 
         playerInSight = CanSeePlayer();
+        ChooseFireTarget();
 
         // Always update last known position when player is visible
         if (playerInSight)
@@ -253,8 +258,12 @@ public class EnemyAI : MonoBehaviour
         // Switch to attack if close enough
         if (dist <= attackRange) { EnterAttack(); return; }
 
-        // Shoot if in range and has sight
-        if (canShoot && dist <= shootRange && playerInSight)
+        // Shoot if in range and has sight of the player, OR there's a closer ally to
+        // engage instead (that's what makes an enemy break off toward a nearby ally
+        // rather than only ever caring about the player).
+        bool engagingAlly = fireTargetIsAlly && fireTarget != null
+            && Vector3.Distance(transform.position, fireTarget.position) <= shootRange;
+        if (canShoot && ((dist <= shootRange && playerInSight) || engagingAlly))
         {
             // Out of ammo, or been standing in the open too long - go find something to
             // stand behind rather than reloading in the middle of a firefight.
@@ -482,6 +491,47 @@ public class EnemyAI : MonoBehaviour
         agent.SetDestination(waypoints[currentWaypointIndex].position);
     }
 
+    // Picks who to actually shoot at this frame: the nearest visible ally within
+    // allyEngageRange if there is one, otherwise the player. This runs independently of
+    // playerInSight/state - it only changes AIM, not the chase/investigate logic, which
+    // still tracks the player as before.
+    void ChooseFireTarget()
+    {
+        fireTarget = playerInSight ? player : null;
+        fireTargetIsAlly = false;
+
+        float best = allyEngageRange;
+        foreach (var ally in FindObjectsByType<FriendlyAI>(FindObjectsSortMode.None))
+        {
+            if (ally == null || !ally.enabled) continue; // FriendlyAI disables itself on death
+            float d = Vector3.Distance(transform.position, ally.transform.position);
+            if (d > best) continue;
+            if (!HasLineOfSightTo(ally.transform.position + Vector3.up * 1.2f)) continue;
+            fireTarget = ally.transform;
+            fireTargetIsAlly = true;
+            best = d;
+        }
+    }
+
+    // Same raycast CanSeePlayer uses, generalised to any point - characters standing
+    // between the shooter and the target don't block this (only real geometry should).
+    bool HasLineOfSightTo(Vector3 targetPoint)
+    {
+        Vector3 from = transform.position + Vector3.up * 1.5f;
+        Vector3 dir = targetPoint - from;
+        float dist = dir.magnitude;
+        if (dist < 0.05f) return true;
+
+        foreach (var hit in Physics.RaycastAll(from, dir / dist, dist, sightBlockers, QueryTriggerInteraction.Ignore))
+        {
+            if (hit.transform.GetComponentInParent<EnemyAI>() != null) continue;
+            if (hit.transform.GetComponentInParent<FriendlyAI>() != null) continue;
+            if (hit.transform.CompareTag("Player")) continue;
+            return false;
+        }
+        return true;
+    }
+
     // Detection
     bool CanSeePlayer()
     {
@@ -520,7 +570,8 @@ public class EnemyAI : MonoBehaviour
     // Combat
     void FacePlayer()
     {
-        Vector3 dir = (player.position - transform.position).normalized;
+        Transform facing = fireTarget != null ? fireTarget : player;
+        Vector3 dir = (facing.position - transform.position).normalized;
         dir.y = 0f;
         if (dir == Vector3.zero) return;
 
@@ -573,8 +624,10 @@ public class EnemyAI : MonoBehaviour
 
         inaccuracy = Mathf.Max(0f, inaccuracy);
 
+        if (fireTarget == null) return;
+
         // Apply random spread
-        Vector3 direction = (player.position - muzzlePoint.position).normalized;
+        Vector3 direction = (fireTarget.position - muzzlePoint.position).normalized;
         direction = Quaternion.Euler(
             Random.Range(-inaccuracy, inaccuracy),
             Random.Range(-inaccuracy, inaccuracy),
@@ -587,7 +640,8 @@ public class EnemyAI : MonoBehaviour
 
         bullet.transform.forward = direction;
 
-        // enemy bullets only hurt the player — no friendly fire between enemies
+        // firedByEnemy covers both cases: Projectile.CanDamage lets an enemy bullet hurt
+        // the player OR anything carrying a FriendlyAI, never another EnemyAI.
         Projectile proj = bullet.GetComponent<Projectile>();
         if (proj != null) proj.firedByEnemy = true;
 

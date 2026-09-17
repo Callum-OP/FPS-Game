@@ -28,6 +28,12 @@ public class EnemyCover : MonoBehaviour
     [Tooltip("Don't bother with cover closer than this - shuffling half a metre looks like indecision.")]
     public float minDistance = 2.5f;
 
+    [Header("Obstacle Requirement")]
+    [Tooltip("A candidate only counts as cover if there's real geometry within this radius of it (as opposed to it just happening to be out of sight/range with nothing nearby) - this is the fix for enemies crouching in open ground. Should be roughly a body-width.")]
+    public float obstacleCheckRadius = 1.2f;
+    [Tooltip("Layers that count as an obstacle worth hiding behind. Leave empty (0) to fall back to sightBlockers.")]
+    public LayerMask obstacleLayers;
+
     [Header("Geometry")]
     [Tooltip("Height off the ground used for the line-of-sight tests - roughly where the enemy's chest sits while standing.")]
     public float eyeHeight = 1.5f;
@@ -56,6 +62,12 @@ public class EnemyCover : MonoBehaviour
             Vector3 candidate = navHit.position;
 
             if (Vector3.Distance(candidate, transform.position) < minDistance) continue;
+
+            // There has to be something solid actually next to this point, or "hidden"
+            // just means "far enough away that nothing is in the way" - which reads as
+            // crouching in the middle of open ground for no reason. This is checked
+            // before the sight test below because it's the cheaper rejection.
+            if (!HasNearbyObstacle(candidate)) continue;
 
             // Must actually be hidden while crouched there...
             if (HasLineOfSight(candidate + Vector3.up * crouchedHeight, playerPosition)) continue;
@@ -96,7 +108,10 @@ public class EnemyCover : MonoBehaviour
         return found;
     }
 
-    /// <summary>True if the given world point can see the player's chest.</summary>
+    /// <summary>True if the given world point can see the player's chest. Other
+    /// characters are transparent to this check - two enemies standing near each other
+    /// would otherwise "block" each other's sight and register as valid cover, which is
+    /// the other way a spot with no real geometry could look like cover.</summary>
     public bool HasLineOfSight(Vector3 from, Vector3 playerPosition)
     {
         Vector3 target = playerPosition + Vector3.up * 1.2f;
@@ -104,10 +119,31 @@ public class EnemyCover : MonoBehaviour
         float dist = dir.magnitude;
         if (dist < 0.01f) return true;
 
-        if (Physics.Raycast(from, dir / dist, out RaycastHit hit, dist, sightBlockers, QueryTriggerInteraction.Ignore))
-            return hit.transform.CompareTag("Player");
+        foreach (var hit in Physics.RaycastAll(from, dir / dist, dist, sightBlockers, QueryTriggerInteraction.Ignore))
+        {
+            if (IsCharacter(hit.collider)) continue; // characters don't count as cover geometry
+            if (hit.transform.CompareTag("Player")) continue;
+            return false;
+        }
         return true;
     }
+
+    /// <summary>Is there actual level geometry within obstacleCheckRadius of this point?
+    /// Characters don't count - only this stops enemies "hiding" behind each other.</summary>
+    bool HasNearbyObstacle(Vector3 point)
+    {
+        LayerMask mask = obstacleLayers.value != 0 ? obstacleLayers : sightBlockers;
+        var hits = Physics.OverlapSphere(point, obstacleCheckRadius, mask, QueryTriggerInteraction.Ignore);
+        foreach (var col in hits)
+            if (!IsCharacter(col) && !col.transform.IsChildOf(transform))
+                return true;
+        return false;
+    }
+
+    static bool IsCharacter(Collider col) =>
+        col.GetComponentInParent<EnemyAI>() != null
+        || col.GetComponentInParent<FriendlyAI>() != null
+        || col.CompareTag("Player");
 
     /// <summary>Whether the enemy is currently hidden where it stands (used to decide
     /// when it's safe to reload).</summary>
