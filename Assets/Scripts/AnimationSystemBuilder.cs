@@ -12,15 +12,13 @@ using UnityEngine;
 ///  1. Finds every Mixamo .fbx clip this system needs under Assets/LocalAssets/Mixamo,
 ///     forces it to Humanoid rig + its own avatar, renames the clip and sets sane
 ///     loop/root-motion settings.
-///  2. Builds Assets/Animations/UpperBodyMask.mask (arms/fingers/head only - no legs,
-///     no hips/spine/chest, so masked clips can never fight the base layer's hip motion).
+///  2. Builds Assets/Animations/UpperBodyMask.mask (arms/spine/head only, no legs).
 ///  3. Builds Assets/Animations/CharacterAnimator.controller with:
 ///       Base layer   - full body locomotion: Unarmed / Pistol / Rifle / RifleCrouch /
 ///                       Airborne / Death states, each a 2D directional blend tree
 ///                       driven by MoveX/MoveY, switched by the WeaponClass int.
 ///       UpperBody    - masked layer for Aim pose, Fire, Reload, Melee, only ever
-///                       touches arms/fingers/head so the legs never stop walking and
-///                       the hips/spine/chest stay entirely owned by the base layer.
+///                       touches arms/spine/head so the legs never stop walking.
 ///
 /// Run this from the Unity Editor (Tools/FPS Game/Build Animation System). It is
 /// idempotent - re-running it after adding/renaming clips just rebuilds the assets.
@@ -356,29 +354,17 @@ public static class AnimationSystemBuilder
         for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
         {
             var part = (AvatarMaskBodyPart)i;
-            // AvatarMaskBodyPart.Body is Unity's single group for the whole spine chain -
-            // Hips, Spine, Chest, UpperChest - there's no humanoid body-part granular
-            // enough to keep Chest/Spine masked while excluding just Hips. Leaving Body
-            // active (as this used to) meant every UpperBody-layer clip - Aim, Fire,
-            // Reload, Melee - drove the Hips bone directly with Override blending,
-            // stomping whatever position the base locomotion layer's walk cycle had just
-            // put them at. That's invisible standing still (the idle base pose and the
-            // clip's own resting hips are close together), but while walking the base
-            // layer swings the hips every step, so the instant a masked clip takes over
-            // (e.g. pressing reload) the hips snap to the clip's authored pose - exactly
-            // the sudden jump WeaponMovementBob (which reads the Hips bone every frame to
-            // drive the weapon) turns into the gun jumping forward mid-reload while
-            // moving. Excluding Body here stops any masked clip from touching
-            // Hips/Spine/Chest at all - the UpperBody layer only ever drives
-            // arms/fingers/head now. Torso lean for two-handed aiming is unaffected since
-            // it's applied by WeaponHandIK/TorsoMotionDampener directly on the chest bone
-            // at runtime, not by clip data.
+            // NOTE: AvatarMaskBodyPart.Root already excludes root motion (the Hips
+            // bone's own translate/rotate curves), so the Hips bone's position was never
+            // actually driven by this masked layer - Body only bends the spine/chest
+            // shape above it. Excluding Body here was tried as a fix for the
+            // reload-while-walking gun jump and did NOT resolve it, so it's reverted -
+            // see WeaponHandIK for the actual cause.
             bool active = part != AvatarMaskBodyPart.LeftLeg &&
                           part != AvatarMaskBodyPart.RightLeg &&
                           part != AvatarMaskBodyPart.LeftFootIK &&
                           part != AvatarMaskBodyPart.RightFootIK &&
-                          part != AvatarMaskBodyPart.Root &&
-                          part != AvatarMaskBodyPart.Body;
+                          part != AvatarMaskBodyPart.Root;
             mask.SetHumanoidBodyPartActive(part, active);
         }
 

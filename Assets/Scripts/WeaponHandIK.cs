@@ -330,6 +330,18 @@ public class WeaponHandIK : MonoBehaviour
         Vector3 rightExcessVec = ApplyHand(AvatarIKGoal.RightHand, effectiveRight, rightWeight, rightElbowHint, AvatarIKHint.RightElbow, rightShoulder, rightArmReach);
         Vector3 leftExcessVec = ApplyHand(AvatarIKGoal.LeftHand, effectiveLeft, leftWeight, leftElbowHint, AvatarIKHint.LeftElbow, leftShoulder, leftArmReach);
 
+        // A reload override sends a hand somewhere on the BODY (the hip mag pouch, then
+        // back) - deliberately away from its weapon grip. That's not the weapon being out
+        // of reach, so it must never feed the pull-back below, or the gun gets yanked
+        // toward the hand every time the hip-mounted anchor happens to swing far enough
+        // from the shoulder. Standing still the anchor barely moves and rarely crosses
+        // the reach threshold, so this was invisible - but walking, the hips (and the
+        // anchor riding on them) swing through the gait cycle every stride, so the
+        // "excess" trips intermittently in time with footfalls and yanks the weapon by up
+        // to maxPullBack. That's the reload-while-walking forward jump.
+        if (reloadRightOverride != null) rightExcessVec = Vector3.zero;
+        if (reloadLeftOverride != null) leftExcessVec = Vector3.zero;
+
         if (!firstPassThisFrame) return;
 
         // Whichever hand is short of its grip by more drives the pull-back - the left

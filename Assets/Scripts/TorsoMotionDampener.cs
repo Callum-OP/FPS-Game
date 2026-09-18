@@ -89,6 +89,9 @@ public class TorsoMotionDampener : MonoBehaviour
 
         for (int i = 0; i < bones.Length; i++)
         {
+            // Safeguard against destroyed or unassigned bone transforms (e.g. during ragdoll)
+            if (bones[i] == null) continue;
+
             Quaternion live = bones[i].localRotation;
             if (!primed) averages[i] = live;
             averages[i] = Quaternion.Slerp(averages[i], live, follow);
