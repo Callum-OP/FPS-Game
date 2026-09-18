@@ -27,8 +27,8 @@ Transform:
   m_GameObject: {fileID: 1364643297917646266}
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0.2049255, y: -0.37, z: -0.204}
-  m_LocalScale: {x: 55, y: 55, z: 50}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 5.5, y: 5.5, z: 5.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1295036153093600429}
@@ -119,7 +119,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: -0.70364, y: -1.69813, z: 0.03831}
-  m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6220580529574042966}
@@ -144,10 +144,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.3350404
-  m_Height: 0.9285194
+  m_Radius: 0.03289891
+  m_Height: 0.11714352
   m_Direction: 1
-  m_Center: {x: 0.21009833, y: -0.17808257, z: -0.19658217}
+  m_Center: {x: 0.00042247772, y: 0.020181451, z: -0.0033138534}
 --- !u!54 &3277748134110225489
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -191,3 +191,6 @@ MonoBehaviour:
   damage: 40
   lifetime: 5
   minDamagePercent: 0.1
+  knockbackForce: 5
+  firedByEnemy: 0
+  firedByFriendly: 0

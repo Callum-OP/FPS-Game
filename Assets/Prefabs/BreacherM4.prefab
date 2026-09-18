@@ -39588,7 +39588,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -25.765099, y: 1.1199999, z: 0.19965935}
-  m_LocalScale: {x: 1.3, y: 1.2, z: 1.2}
+  m_LocalScale: {x: 1.1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8772617044774800299}
@@ -39608,8 +39608,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   animationDriver: {fileID: 0}
-  hipPosition: {x: 0, y: -0.366154, z: 0.215385}
-  adsPosition: {x: 0, y: -0.175, z: 0.5}
+  hipPosition: {x: 0, y: -0.2, z: 0.28}
+  adsPosition: {x: 0, y: -0.09, z: 0.5}
   hipRotation: {x: -1, y: 1.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
@@ -39670,7 +39670,7 @@ MonoBehaviour:
   emptyClickClip: {fileID: 8300000, guid: 008eac17c20e4254ab612e8d007163aa, type: 3}
   casingEjector: {fileID: 171540251199544824}
   gunSlide: {fileID: 0}
-  reloadHandler: {fileID: 0}
+  reloadHandler: {fileID: 4159098038463464570}
   muzzleFlash: {fileID: 3602602296311612006}
 --- !u!114 &171540251199544824
 MonoBehaviour:
@@ -39712,7 +39712,7 @@ MonoBehaviour:
   handGrabTime: 0.2
   handReloadTime: 0.55
   handReturnTime: 0.9
-  weaponReloadPivot: {fileID: 0}
+  weaponReloadPivot: {fileID: 867525230156697492}
   carriedMagOffsetPosition: {x: 0, y: 0.096, z: 0}
   carriedMagOffsetRotationEuler: {x: -90, y: 0, z: -98.034}
   dropForce: 1.5

@@ -20173,7 +20173,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -9.3212, y: -0.8, z: -15.75681}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 476886982750752122}
@@ -20193,8 +20193,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   animationDriver: {fileID: 0}
-  hipPosition: {x: 0, y: -0.376923, z: 0.215385}
-  adsPosition: {x: 0, y: -0.30625, z: 0.5}
+  hipPosition: {x: 0, y: -0.25, z: 0.3}
+  adsPosition: {x: 0, y: -0.19, z: 0.5}
   hipRotation: {x: -1, y: 1.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
@@ -20240,6 +20240,7 @@ MonoBehaviour:
   fireRate: 0.06
   maxAmmo: 30
   reloadTime: 2
+  reloadCycles: 1
   isAutomatic: 1
   isShotgun: 0
   pelletCount: 8
@@ -20286,18 +20287,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1c919d80a8ec704db0554b1cba6a1dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponReloadHandler
+  usesMagazine: 1
   magazinePrefab: {fileID: 4598212022487192858, guid: 41682073f5c50ff4e88784eb9e1a2667, type: 3}
   magSeatPoint: {fileID: 3210823933366247771}
+  weaponMagVisual: {fileID: 3059704872734029267}
   handReloadPoint: {fileID: 3210823933366247771}
-  magHandOffsetPosition: {x: 0, y: 0, z: 0}
-  magHandOffsetRotation: {x: 0, y: 0, z: 0}
-  handMoveOutTime: 0.05
-  magDropTime: 0.15
-  magSeatTime: 0.75
+  reloadGrabPointOverride: {fileID: 0}
+  magHandAttachPointOverride: {fileID: 0}
+  handGrabTime: 0.2
+  handReloadTime: 0.55
   handReturnTime: 0.9
-  weaponLiftPivot: {fileID: 8032110994227857892}
-  weaponLiftPosition: {x: 0, y: 0.02, z: 0}
-  weaponLiftRotation: {x: -6, y: 0, z: 0}
+  weaponReloadPivot: {fileID: 8032110994227857892}
+  carriedMagOffsetPosition: {x: 0, y: 0.096, z: 0}
+  carriedMagOffsetRotationEuler: {x: -90, y: 0, z: -98.034}
   dropForce: 1.5
   dropTorque: 3
   destroyDelay: 5
@@ -25558,6 +25560,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba323454735e4d548a90aa12eec2d51c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  loweredHeight: -0.4
   loweredPosition: {x: 0, y: -0.4, z: 0.3}
   loweredRotation: {x: 30, y: 0, z: 0}
   lowerSpeed: 8
