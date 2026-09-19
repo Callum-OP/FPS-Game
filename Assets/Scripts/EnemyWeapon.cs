@@ -170,25 +170,54 @@ public class EnemyWeapon : MonoBehaviour
             mb.enabled = false;
     }
 
+    [Header("Secondary (carried, not held)")]
+    [Tooltip("A spare weapon this ally is carrying but not actively using. Set on the prefab to start an ally with a backup, or left for EquipWeapon to fill automatically - see its comment.")]
+    public GameObject secondaryWeaponPrefab;
+
+    /// <summary>The spare weapon this ally is carrying, if any - the ally-side equivalent
+    /// of WeaponInventory.GetSlot(Secondary) on the player.</summary>
+    public GameObject SecondaryPrefab => secondaryWeaponPrefab;
+
     /// <summary>Swaps the held weapon for a different held-weapon prefab (one of the
-    /// player's own, e.g. what a WeaponPickup would hand the player) - used by
-    /// FriendlyAI to upgrade an ally's weapon on the fly. The old weapon is simply
-    /// discarded rather than dropped as a world pickup - there's no per-prefab mapping
-    /// to the matching world-drop prefab available here the way WeaponDrop has for the
-    /// player, so extending this to actually drop the old gun means wiring that mapping
-    /// in too (see WeaponDrop.GetWorldPrefab for the pattern).</summary>
+    /// player's own, e.g. what a WeaponPickup would hand the player, or what
+    /// PlayerAllySwap trades in) - used by FriendlyAI to upgrade an ally's weapon on the
+    /// fly. The weapon being replaced is kept as this ally's secondary rather than being
+    /// discarded, so a trade doesn't just erase whatever they were already carrying - it
+    /// gives them their own two-weapon inventory, the same idea as the player's
+    /// WeaponInventory Primary/Secondary slots. If a secondary is already held, IT is the
+    /// one discarded (there's nowhere left to put it) - this should be rare in practice
+    /// since SwapWith on the player side only ever trades the ACTIVE weapon.</summary>
     public void EquipWeapon(GameObject newHeldWeaponPrefab)
     {
         if (newHeldWeaponPrefab == null) return;
 
         reloading = false;
         aiming = false;
+
+        if (weaponPrefab != null && weaponPrefab != newHeldWeaponPrefab)
+            secondaryWeaponPrefab = weaponPrefab;
+
         weaponPrefab = newHeldWeaponPrefab;
 
         if (weaponInstance != null) Destroy(weaponInstance);
         weaponInstance = null;
 
         SpawnWeapon(newHeldWeaponPrefab);
+    }
+
+    /// <summary>Brings the carried secondary into the ally's hands, storing whatever was
+    /// previously held as the new secondary. No-op if there's no secondary to swap to.
+    /// Not called automatically anywhere yet (e.g. on running dry with no time to
+    /// reload) - hook it into FriendlyAI's combat state if that behaviour is wanted.</summary>
+    public void SwapToSecondary()
+    {
+        if (secondaryWeaponPrefab == null) return;
+
+        GameObject incoming = secondaryWeaponPrefab;
+        GameObject outgoing = weaponPrefab;
+        secondaryWeaponPrefab = outgoing; // may be null if this is the ally's first weapon
+        weaponPrefab = null; // prevents EquipWeapon from stashing 'outgoing' a second time
+        EquipWeapon(incoming);
     }
 
     /// <summary>The currently held weapon's WeaponController, for comparing this

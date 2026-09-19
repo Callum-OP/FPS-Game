@@ -19,7 +19,8 @@ public class WeaponSway : MonoBehaviour
 
     [Header("ADS Reduction")]
     public WeaponADS weaponADS;
-    public float adsSwayMultiplier = 0.2f;
+    [Tooltip("Sway multiplier while aiming down sights. Sway is a small positional offset - fine hip-fire, since there's no precise sight picture to hold - but that same tiny offset visibly shifts the sight alignment once you're actually eyeballing front/rear sight posts, and reads as the gun dragging behind fast turns. Keep this at (or very near) 0; it isn't a 'reduce sway while aiming' knob so much as a 'how much precision are you willing to give up' one.")]
+    public float adsSwayMultiplier = 0f;
 
     private InputAction lookAction;
     private Vector3 currentSwayOffset;

@@ -43,6 +43,10 @@ public class WeaponInventory : MonoBehaviour
     public Vector3 hipHolsterOffset = new Vector3(-0.18f, 0f, 0.02f);
     public Vector3 hipHolsterRotation = new Vector3(0f, 90f, 0f);
 
+    [Header("Starting Weapon")]
+    [Tooltip("The prefab that matches whatever weapon is already equipped in the scene at Start (e.g. AR.prefab). Without this, that weapon has no recorded source prefab - Store() only records one for pickups it instantiates itself - so ActivePrefab is null until the player picks something up, and PlayerAllySwap silently refuses to trade a weapon it can't hand to the ally. Leave empty if the player starts unarmed.")]
+    public GameObject startingWeaponPrefab;
+
     GameObject primary, secondary;
     GameObject primaryPrefab, secondaryPrefab; // source prefabs, for handing a weapon to something else (see PlayerAllySwap)
     Slot activeSlot = Slot.Primary;
@@ -67,7 +71,7 @@ public class WeaponInventory : MonoBehaviour
 
         // Adopt whatever the player already has equipped.
         if (playerSetup != null && playerSetup.activeWeapon != null)
-            Store(playerSetup.activeWeapon.gameObject, true);
+            Store(playerSetup.activeWeapon.gameObject, true, startingWeaponPrefab);
     }
 
     Transform ResolveHolster(Transform assigned, string pointName, HumanBodyBones fallbackBone, Vector3 offset, Vector3 rotation)

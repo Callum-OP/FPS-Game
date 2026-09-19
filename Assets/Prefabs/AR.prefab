@@ -20046,7 +20046,7 @@ Transform:
   m_GameObject: {fileID: 3018766322530207663}
   serializedVersion: 2
   m_LocalRotation: {x: -0.05005881, y: -0, z: -0, w: 0.9987463}
-  m_LocalPosition: {x: 0, y: 0.12400001, z: 0.42100048}
+  m_LocalPosition: {x: 0, y: 0.165, z: 0.239}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -20219,7 +20219,7 @@ MonoBehaviour:
   swaySmooth: 6
   maxSwayAmount: 0.06
   weaponADS: {fileID: 3928102241211913328}
-  adsSwayMultiplier: 0.2
+  adsSwayMultiplier: 0.03
 --- !u!114 &923902513769590798
 MonoBehaviour:
   m_ObjectHideFlags: 0
