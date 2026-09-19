@@ -29528,6 +29528,26 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+      propertyPath: leftGripPose.ringCurl
+      value: 68.9
+      objectReference: {fileID: 0}
+    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+      propertyPath: leftGripPose.indexCurl
+      value: 70.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+      propertyPath: leftGripPose.pinkyCurl
+      value: 73.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+      propertyPath: leftGripPose.thumbCurl
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+      propertyPath: leftGripPose.middleCurl
+      value: 70.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: rightGripPose.indexCurl
       value: 25
       objectReference: {fileID: 0}

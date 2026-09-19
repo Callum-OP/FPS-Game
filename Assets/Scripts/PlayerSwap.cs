@@ -53,6 +53,7 @@ public class PlayerAllySwap : MonoBehaviour
 
         FriendlyAI nearest = FindNearestAlly();
         if (nearest != null) SwapWith(nearest);
+        else Debug.Log($"{name}: no ally within {swapRange}m to swap weapons with.", this);
     }
 
     FriendlyAI FindNearestAlly()
@@ -71,16 +72,33 @@ public class PlayerAllySwap : MonoBehaviour
     void SwapWith(FriendlyAI ally)
     {
         var allyWeapon = ally.GetComponent<EnemyWeapon>();
-        if (allyWeapon == null) return;
+        if (allyWeapon == null)
+        {
+            Debug.LogWarning($"{ally.name} has no EnemyWeapon component - can't swap with it.", ally);
+            return;
+        }
 
         GameObject allyPrefab = allyWeapon.weaponPrefab;
         GameObject playerPrefab = inventory.ActivePrefab;
 
         // The weapon the player started the game already holding was never given a
-        // recorded prefab (nothing instantiated it through Store), so there's nothing
-        // to hand the ally in that one specific case - decline the swap rather than
-        // silently doing half of it.
-        if (allyPrefab == null || playerPrefab == null) return;
+        // recorded prefab (nothing instantiated it through Store) UNLESS
+        // WeaponInventory.startingWeaponPrefab is set - there's nothing to hand the ally
+        // in that one specific case otherwise, so decline the swap rather than silently
+        // doing half of it. Logged rather than silent so this misconfiguration is
+        // actually visible instead of looking like the whole feature is broken.
+        if (allyPrefab == null)
+        {
+            Debug.LogWarning($"{ally.name}'s EnemyWeapon has no weaponPrefab assigned - nothing to swap for.", ally);
+            return;
+        }
+        if (playerPrefab == null)
+        {
+            Debug.LogWarning($"{name}'s active weapon has no recorded source prefab - " +
+                $"if this is the weapon you started the scene holding, set WeaponInventory.startingWeaponPrefab " +
+                $"in the Inspector to that weapon's prefab (e.g. AR.prefab) so a swap has something to hand over.", this);
+            return;
+        }
 
         allyWeapon.EquipWeapon(playerPrefab);
 
