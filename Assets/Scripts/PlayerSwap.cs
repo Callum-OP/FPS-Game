@@ -50,6 +50,7 @@ public class PlayerAllySwap : MonoBehaviour
         if (weaponPickupHandledThisKey) return;
         if (!pickupAction.WasPressedThisFrame()) return;
         if (inventory == null) return;
+        if (!inventory.CanSwitch) return; // shared delay - see WeaponInventory.switchCooldown
 
         FriendlyAI nearest = FindNearestAlly();
         if (nearest != null) SwapWith(nearest);
@@ -80,7 +81,6 @@ public class PlayerAllySwap : MonoBehaviour
 
         GameObject allyPrefab = allyWeapon.weaponPrefab;
         GameObject playerPrefab = inventory.ActivePrefab;
-        GameObject playerWeaponInstance = inventory.Active; // the live weapon we're about to give away
 
         // The weapon the player started the game already holding was never given a
         // recorded prefab (nothing instantiated it through Store) UNLESS
@@ -101,7 +101,69 @@ public class PlayerAllySwap : MonoBehaviour
             return;
         }
 
-        allyWeapon.EquipWeapon(playerPrefab);
+        // GIFT: the ally only has a pistol and you're holding a primary (and still have a
+        // pistol of your own to fall back on) - hand your primary over for nothing in
+        // return. They holster their pistol as a spare and carry your weapon.
+        if (allyPrefab.name != playerPrefab.name
+            && allyWeapon.SecondaryPrefab == null
+            && inventory.SlotFor(allyPrefab) == WeaponInventory.Slot.Secondary
+            && inventory.SlotFor(playerPrefab) == WeaponInventory.Slot.Primary
+            && inventory.GetSlot(WeaponInventory.Slot.Secondary) != null)
+        {
+            inventory.StartSwitchCooldown();
+
+            GameObject gifted = inventory.Active;
+            if (gifted != null)
+            {
+                if (playerSetup != null && playerSetup.activeWeapon != null
+                    && playerSetup.activeWeapon.gameObject == gifted)
+                    playerSetup.UnequipWeapon();
+                inventory.Remove(gifted);
+                Destroy(gifted);
+            }
+
+            allyWeapon.EquipWeapon(playerPrefab, stashOutgoing: true); // pistol becomes their spare
+            inventory.Equip(WeaponInventory.Slot.Secondary);           // you carry on with your pistol
+            Debug.Log($"Gave {playerPrefab.name} to {ally.name}; they keep their {allyPrefab.name} as a spare.", this);
+            return;
+        }
+
+        // Refuse anything that would leave the same weapon on both sides (or twice on
+        // the player) - a trade should only ever move weapons, never copy them.
+        if (allyPrefab.name == playerPrefab.name)
+        {
+            Debug.Log($"{ally.name} is already holding a {allyPrefab.name} - nothing to swap.", this);
+            return;
+        }
+        if (inventory.Carries(allyPrefab))
+        {
+            Debug.Log($"You already carry a {allyPrefab.name} - swap refused so it isn't duplicated.", this);
+            return;
+        }
+        if (allyWeapon.SecondaryPrefab != null && allyWeapon.SecondaryPrefab.name == playerPrefab.name)
+        {
+            Debug.Log($"{ally.name} is already carrying a {playerPrefab.name} - swap refused so it isn't duplicated.", this);
+            return;
+        }
+
+        inventory.StartSwitchCooldown();
+
+        // The weapon going to the ally leaves the player entirely. It used to be left
+        // behind (holstered, or dropped as a "displaced" pickup when both weapons shared
+        // a slot), which is where the duplicate rifles came from.
+        GameObject given = inventory.Active;
+        if (given != null)
+        {
+            if (playerSetup != null && playerSetup.activeWeapon != null
+                && playerSetup.activeWeapon.gameObject == given)
+                playerSetup.UnequipWeapon();
+            inventory.Remove(given);
+            Destroy(given);
+        }
+
+        // stashOutgoing: false - the ally's old weapon is going to the player, so the
+        // ally must not also keep it as a spare (that was the duplicate pistol).
+        allyWeapon.EquipWeapon(playerPrefab, stashOutgoing: false);
 
         GameObject held = Instantiate(allyPrefab, playerSetup != null && playerSetup.fpCamera != null
             ? playerSetup.fpCamera.transform : Camera.main.transform);
@@ -110,29 +172,12 @@ public class PlayerAllySwap : MonoBehaviour
         held.transform.localRotation = Quaternion.identity;
         held.SetActive(true);
 
+        // Only a weapon already in the incoming weapon's slot can be displaced now (e.g.
+        // you gave a rifle and got a pistol while carrying a different pistol) - that one
+        // is dropped as a normal world pickup, same as picking a weapon up off the floor.
         GameObject displaced = inventory.Store(held, equipImmediately: true, sourcePrefab: allyPrefab);
-
-        // Store() only clears out whatever was already sitting in the INCOMING weapon's
-        // own slot. That's exactly right when the ally hands back the same class of
-        // weapon (rifle for rifle) - it lands in the same slot and naturally displaces
-        // our old one. But when the ally only has, say, a pistol (Secondary) and we gave
-        // away a rifle (Primary), the incoming pistol never touches the Primary slot, so
-        // our outgoing rifle was never removed - just holstered, since it's no longer the
-        // active weapon - and stayed on our back despite having supposedly been handed
-        // over. It really has been given away (the ally's EquipWeapon just spawned a
-        // fresh instance from playerPrefab), so our old copy is now a stale duplicate and
-        // needs to go.
-        if (playerWeaponInstance != null && playerWeaponInstance != displaced && playerWeaponInstance != held)
-        {
-            inventory.Remove(playerWeaponInstance);
-            Destroy(playerWeaponInstance);
-        }
-
         if (displaced != null)
         {
-            // The player's OTHER slot (not the one just handed to the ally) still needs
-            // to go somewhere if it happens to collide with the new gun's slot - drop it
-            // as a world pickup, same as picking up any other weapon off the ground.
             playerSetup?.GetComponent<WeaponDrop>()?.DropSpecific(displaced);
             inventory.Remove(displaced);
         }

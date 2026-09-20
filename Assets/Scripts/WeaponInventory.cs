@@ -47,6 +47,16 @@ public class WeaponInventory : MonoBehaviour
     [Tooltip("The prefab that matches whatever weapon is already equipped in the scene at Start (e.g. AR.prefab). Without this, that weapon has no recorded source prefab - Store() only records one for pickups it instantiates itself - so ActivePrefab is null until the player picks something up, and PlayerAllySwap silently refuses to trade a weapon it can't hand to the ally. Leave empty if the player starts unarmed.")]
     public GameObject startingWeaponPrefab;
 
+    [Header("Switch Delay")]
+    [Tooltip("Seconds after any weapon change (toggle, pickup, ally swap) before another is allowed - stops a held or mashed key cycling through weapons faster than you can see what's happening.")]
+    public float switchCooldown = 0.5f;
+
+    float nextSwitchTime;
+    /// <summary>False for a short time after any weapon change. Everything that changes what
+    /// the player is holding (3 to toggle, 1 to pick up or swap) checks this first.</summary>
+    public bool CanSwitch => Time.unscaledTime >= nextSwitchTime;
+    public void StartSwitchCooldown() => nextSwitchTime = Time.unscaledTime + switchCooldown;
+
     GameObject primary, secondary;
     GameObject primaryPrefab, secondaryPrefab; // source prefabs, for handing a weapon to something else (see PlayerAllySwap)
     Slot activeSlot = Slot.Primary;
@@ -200,8 +210,20 @@ public class WeaponInventory : MonoBehaviour
     /// filled this is a no-op - there's nothing to swap to.</summary>
     public void ToggleActive()
     {
+        if (!CanSwitch) return;
         Slot other = activeSlot == Slot.Primary ? Slot.Secondary : Slot.Primary;
-        if (GetSlot(other) != null) Equip(other);
+        if (GetSlot(other) == null) return;
+        Equip(other);
+        StartSwitchCooldown();
+    }
+
+    /// <summary>True if the player already carries a weapon made from this prefab (either
+    /// slot) - used to refuse trades/pickups that would hand over a duplicate.</summary>
+    public bool Carries(GameObject prefab)
+    {
+        if (prefab == null) return false;
+        return (primaryPrefab != null && primaryPrefab.name == prefab.name)
+            || (secondaryPrefab != null && secondaryPrefab.name == prefab.name);
     }
 
     // A holstered weapon must not read input, sway, recoil, or take part in the hand IK -

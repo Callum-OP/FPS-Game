@@ -9790,11 +9790,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1454482104356440768, guid: 38be789410d69ef40a29459dfa506f11, type: 3}
   m_PrefabInstance: {fileID: 279705331}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &280017318 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &284730783
 GameObject:
   m_ObjectHideFlags: 0
@@ -18866,11 +18861,6 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 5412017221204367677, guid: abe3d47b915ca924a9e06dd6d3321396, type: 3}
   m_PrefabInstance: {fileID: 505645386}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &506118807 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 1360689303547601258, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &506424864 stripped
 Transform:
@@ -29452,38 +29442,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 3272267351875027821, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: primaryHolsterPoint
-      value: 
-      objectReference: {fileID: 506118807}
-    - target: {fileID: 3272267351875027821, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: startingWeaponPrefab
-      value: 
-      objectReference: {fileID: 819495769}
-    - target: {fileID: 3272267351875027821, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: secondaryHolsterPoint
-      value: 
-      objectReference: {fileID: 1388348303}
-    - target: {fileID: 3579103132014354902, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: injuredDampen
-      value: 0.9
-      objectReference: {fileID: 0}
-    - target: {fileID: 3579103132014354902, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: headDampenScale
-      value: 0.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 4253706166033543944, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4253706166033543944, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4253706166033543944, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 4253706166033543944, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: m_LocalPosition.x
       value: 198.87317
@@ -29524,138 +29482,35 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 7209459024370866370, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: inventory
-      value: 
-      objectReference: {fileID: 819495768}
-    - target: {fileID: 7209459024370866370, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: animationDriver
-      value: 
-      objectReference: {fileID: 819495772}
-    - target: {fileID: 7219984608590271071, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: animationDriver
-      value: 
-      objectReference: {fileID: 819495772}
-    - target: {fileID: 7265401261218519411, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: animationDriver
-      value: 
-      objectReference: {fileID: 819495772}
-    - target: {fileID: 7421916209617835111, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: reloadGrabPointOverride
-      value: 
-      objectReference: {fileID: 819495771}
-    - target: {fileID: 7421916209617835111, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: magHandAttachPointOverride
-      value: 
-      objectReference: {fileID: 819495770}
-    - target: {fileID: 8380861452952741765, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: debugLogAttachPoints
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
     - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: maxPullBack
-      value: 0.35
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: maxTorsoLean
-      value: 20
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: armReachSafety
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: debugLogLeftHand
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: leftGripPose.ringCurl
-      value: 90
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: leftGripPose.indexCurl
-      value: 90
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: leftGripPose.pinkyCurl
-      value: 90
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: leftGripPose.thumbCurl
-      value: 90
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.curlAxis.x
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.curlAxis.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.curlAxis.z
-      value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
       propertyPath: leftGripPose.middleCurl
-      value: 90
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: rightGripPose.indexCurl
-      value: 25
+      value: 50
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1287099814}
-    - targetCorrespondingSourceObject: {fileID: 2290794801485185560, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 846423443}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
---- !u!114 &819495768 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 3272267351875027821, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 280017318}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 23d77ffd53fc2f74d9fceae6ea8e0e4e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WeaponInventory
---- !u!1 &819495769 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 6466554159311269021, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &819495770 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 1469647892830923607, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &819495771 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 7093395693155034486, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &819495772 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 8719003296114661464, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 280017318}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 749d3505beb843842ad1e9e031a92c06, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CharacterAnimationDriver
 --- !u!1001 &819586449
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -31076,32 +30931,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5412017221204367677, guid: abe3d47b915ca924a9e06dd6d3321396, type: 3}
   m_PrefabInstance: {fileID: 845898296}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &846423438 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 2290794801485185560, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &846423443
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 846423438}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f9a9cd03d7a19af46b575633890bfde8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CharacterAttachPoints
-  points:
-  - pointName: ReloadGrab
-    point: {fileID: 819495771}
-  - pointName: HipHolster
-    point: {fileID: 1388348303}
-  - pointName: BackHolster
-    point: {fileID: 506118807}
-  - pointName: MagHand
-    point: {fileID: 819495770}
 --- !u!1001 &846926173
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -45936,23 +45765,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5412017221204367677, guid: abe3d47b915ca924a9e06dd6d3321396, type: 3}
   m_PrefabInstance: {fileID: 1283850118}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1287099814
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 280017318}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f9a9cd03d7a19af46b575633890bfde8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CharacterAttachPoints
-  points:
-  - pointName: ReloadGrab
-    point: {fileID: 819495771}
-  - pointName: ReloadGrab
-    point: {fileID: 819495771}
 --- !u!1001 &1287279765
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -49222,11 +49034,6 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 8125521008550867370, guid: 38fcb473a8f39364e919afa6fc18e6d7, type: 3}
   m_PrefabInstance: {fileID: 1385914247}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &1388348303 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2627726432354409722, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1388641764
 PrefabInstance:

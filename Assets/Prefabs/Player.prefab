@@ -332,7 +332,7 @@ MonoBehaviour:
   lookDownLimit: 65
   weaponCant: {fileID: 6775967902253439011}
   cantSpeedMultiplier: 0.5
-  animationDriver: {fileID: 0}
+  animationDriver: {fileID: 8719003296114661464}
   crouchSpeedMultiplier: 0.5
   crouchCameraDrop: 0.5
   crouchHeightFraction: 0.6
@@ -425,6 +425,7 @@ MonoBehaviour:
   lowerWeapon: {fileID: 0}
   playerHUD: {fileID: 0}
   ammoHUD: {fileID: 0}
+  debugLogAttachPoints: 1
 --- !u!114 &802424425183540071
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -466,8 +467,8 @@ MonoBehaviour:
   throwAnimationLength: 1.1
   cookedThrow: 1
   stayEquippedAfterThrow: 1
-  inventory: {fileID: 0}
-  animationDriver: {fileID: 0}
+  inventory: {fileID: 3272267351875027821}
+  animationDriver: {fileID: 8719003296114661464}
 --- !u!114 &7013886737931384741
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -534,7 +535,7 @@ MonoBehaviour:
   damage: 40
   cooldown: 0.8
   stunDuration: 1.2
-  animationDriver: {fileID: 0}
+  animationDriver: {fileID: 8719003296114661464}
   legacyBodyPose: {fileID: 0}
 --- !u!95 &2714943959344486485
 Animator:
@@ -609,28 +610,29 @@ MonoBehaviour:
   blendSpeed: 8
   rightElbowHint: {fileID: 3501758186824354529}
   leftElbowHint: {fileID: 8492838950576652720}
-  armReachSafety: 0.95
+  armReachSafety: 1
   rightGripPose:
     curlAxis: {x: 1, y: 0, z: 0}
     thumbCurl: 25
-    indexCurl: 45
+    indexCurl: 25
     middleCurl: 50
     ringCurl: 50
     pinkyCurl: 50
   leftGripPose:
-    curlAxis: {x: 1, y: 0, z: 0}
-    thumbCurl: 25
-    indexCurl: 45
-    middleCurl: 50
-    ringCurl: 50
-    pinkyCurl: 50
-  maxPullBack: 0.3
+    curlAxis: {x: -1, y: 0, z: 0}
+    thumbCurl: 10
+    indexCurl: 11.4
+    middleCurl: 11.4
+    ringCurl: 8.7
+    pinkyCurl: 8.7
+  mirrorLeftCurlFromRight: 1
+  maxPullBack: 0.35
   pullBackSpeed: 10
   pullBackDeadzone: 0.04
   pullBackSmoothTime: 0.25
   lateralPullBackFraction: 0
   measureReachFromRestingShoulder: 1
-  maxTorsoLean: 8
+  maxTorsoLean: 20
   torsoLeanSpeed: 6
 --- !u!114 &3579103132014354902
 MonoBehaviour:
@@ -645,8 +647,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TorsoMotionDampener
   normalDampen: 0
-  injuredDampen: 0.7
-  headDampenScale: 0.5
+  injuredDampen: 0.9
+  headDampenScale: 0.8
   averageFollow: 3
   blendSpeed: 2
   injuredHealthFraction: 0.3
@@ -666,15 +668,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponInventory
   playerSetup: {fileID: 8380861452952741765}
   bodyAnimator: {fileID: 4783233763987129048}
-  primaryHolsterPoint: {fileID: 0}
-  secondaryHolsterPoint: {fileID: 0}
+  primaryHolsterPoint: {fileID: 1360689303547601258}
+  secondaryHolsterPoint: {fileID: 2627726432354409722}
   primaryHolsterPointName: BackHolster
   secondaryHolsterPointName: HipHolster
   backHolsterOffset: {x: -0.12, y: 0.05, z: -0.18}
   backHolsterRotation: {x: 0, y: 90, z: 25}
   hipHolsterOffset: {x: -0.18, y: 0, z: 0.02}
   hipHolsterRotation: {x: 0, y: 90, z: 0}
-  startingWeaponPrefab: {fileID: 0}
+  startingWeaponPrefab: {fileID: 6466554159311269021}
+  switchCooldown: 0.5
 --- !u!114 &7850456022116762550
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1067,6 +1070,16 @@ CharacterJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!4 &1360689303547601258 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3640833376809371909, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1469647892830923607 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3747498346066838328, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &2021800609630904643 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4353316099925526828, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
@@ -1122,6 +1135,11 @@ CapsuleCollider:
   m_Height: 0.32
   m_Direction: 0
   m_Center: {x: -0.045619234, y: -0.033285927, z: -0.0002769836}
+--- !u!4 &2627726432354409722 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 293712920223200405, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &2722018812807178754 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 406019600538813037, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
@@ -1637,6 +1655,11 @@ CharacterJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!4 &7093395693155034486 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4761493173005552921, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 2334260011061684335}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &7565181437125148854 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5230958951209789657, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
@@ -2094,6 +2117,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6579001472306139828, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
+      propertyPath: reloadGrabPointOverride
+      value: 
+      objectReference: {fileID: 7093395693155034486}
+    - target: {fileID: 6579001472306139828, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
+      propertyPath: magHandAttachPointOverride
+      value: 
+      objectReference: {fileID: 1469647892830923607}
     - target: {fileID: 7210103834045770318, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
       propertyPath: m_Name
       value: Mono19
@@ -2113,12 +2144,17 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2559716683699181159, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
   m_PrefabInstance: {fileID: 4445826353130391251}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 6466554159311269021}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e9a38ad043d189342a96126048654387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!1 &6466554159311269021 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7210103834045770318, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
+  m_PrefabInstance: {fileID: 4445826353130391251}
+  m_PrefabAsset: {fileID: 0}
 --- !u!114 &6775967902253439011 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7186528306817900272, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
@@ -2135,7 +2171,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5665828315263583112, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
   m_PrefabInstance: {fileID: 4445826353130391251}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 6466554159311269021}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 18564f2c79f014d43bddf85325a069b2, type: 3}
