@@ -46,6 +46,22 @@ public class WeaponADS : MonoBehaviour
     private InputAction aimAction;
     private bool isAiming = false;
 
+    // AI mode (EnemyWeapon): the same component that holds the player's tuned hip/ADS
+    // pose also holds allies' and enemies' guns, so they sit exactly like the player's.
+    // Aim comes from code instead of the mouse, and it never touches the player's
+    // camera FOV or the player's animation driver.
+    bool externalControl;
+    bool externalAim;
+    public void SetExternalControl(bool on)
+    {
+        externalControl = on;
+        if (!on) return;
+        aimAction?.Disable();
+        fpCamera = null;
+        animationDriver = null;
+    }
+    public void SetExternalAim(bool aiming) => externalAim = aiming;
+
     // Own state - the aim lerp runs on these, never on the live transform.
     private Vector3 basePosition;
     private Quaternion baseRotation = Quaternion.identity;
@@ -102,8 +118,8 @@ public class WeaponADS : MonoBehaviour
     void Update()
     {
         bool wasAiming = isAiming;
-        isAiming = aimAction.ReadValue<float>() > 0.5f;
-        if (isAiming != wasAiming) animationDriver?.SetAiming(isAiming);
+        isAiming = externalControl ? externalAim : aimAction.ReadValue<float>() > 0.5f;
+        if (isAiming != wasAiming && !externalControl) animationDriver?.SetAiming(isAiming);
 
         Vector3 targetPos = isAiming ? adsPosition : hipPosition;
         Vector3 targetRot = isAiming ? adsRotation : hipRotation;

@@ -68,10 +68,16 @@ public class FriendlyAI : MonoBehaviour
     [Header("Auto Weapon Upgrade")]
     [Tooltip("Automatically switch to a strictly better dropped weapon lying nearby.")]
     public bool autoUpgradeWeapon = true;
-    [Tooltip("How close a dropped weapon has to be to be considered.")]
-    public float weaponDetectRadius = 3f;
-    [Tooltip("How long a better weapon has to sit in range, uninterrupted, before the ally takes it - gives the player time to grab it first.")]
-    public float autoPickupDelay = 4f;
+    [HideInInspector] public float weaponDetectRadius = 3f; // replaced by scavengeRadius
+    [HideInInspector] public float autoPickupDelay = 4f;    // replaced by scavengeDelay
+    [Tooltip("How far away a dropped weapon is noticed. The ally walks over to it.")]
+    public float scavengeRadius = 8f;
+    [Tooltip("Seconds a better weapon has to stay the chosen target before it's taken - a short window for the player to grab it first.")]
+    public float scavengeDelay = 0.8f;
+    [Tooltip("How close (metres) the ally has to get to grab it.")]
+    public float scavengeReach = 1.4f;
+    [Tooltip("Ignore weapons that appeared less than this many seconds ago, so an ally doesn't snatch what you've just dropped or swapped away.")]
+    public float scavengeMinPickupAge = 1f;
     [Tooltip("Only look for an upgrade while just following/patrolling, never mid-fight.")]
     public bool onlyUpgradeOutOfCombat = true;
 
@@ -96,9 +102,6 @@ public class FriendlyAI : MonoBehaviour
     bool patrolWaiting;
     float patrolPauseTimer;
 
-    // Weapon upgrade
-    WeaponPickup pendingPickup;
-    float pendingPickupTimer;
 
     void Start()
     {
@@ -129,6 +132,7 @@ public class FriendlyAI : MonoBehaviour
         if (currentState == State.Dead || player == null) return;
 
         target = FindNearestVisibleEnemy();
+        allyWeapon?.SetAimPoint(target != null, target != null ? target.position + Vector3.up * 1.1f : Vector3.zero);
 
         switch (currentState)
         {
@@ -212,46 +216,10 @@ public class FriendlyAI : MonoBehaviour
     // out immediately unless actually idle/patrolling, so it never interrupts a fight.
     void HandleWeaponUpgrade()
     {
-        if (!autoUpgradeWeapon || allyWeapon == null) return;
-        if (onlyUpgradeOutOfCombat && currentState != State.Follow)
-        {
-            pendingPickup = null;
-            return;
-        }
-
-        float currentScore = ScoreOf(allyWeapon.GetWeaponController());
-
-        WeaponPickup best = null;
-        float bestScore = currentScore;
-        foreach (var pickup in FindObjectsByType<WeaponPickup>(FindObjectsSortMode.None))
-        {
-            if (pickup == null || pickup.heldWeaponPrefab == null) continue;
-            if (Vector3.Distance(transform.position, pickup.transform.position) > weaponDetectRadius) continue;
-
-            float score = ScoreOf(pickup.heldWeaponPrefab.GetComponent<WeaponController>());
-            if (score > bestScore) { best = pickup; bestScore = score; }
-        }
-
-        if (best == null)
-        {
-            pendingPickup = null;
-            pendingPickupTimer = 0f;
-            return;
-        }
-
-        if (best != pendingPickup)
-        {
-            pendingPickup = best;
-            pendingPickupTimer = autoPickupDelay;
-        }
-
-        pendingPickupTimer -= Time.deltaTime;
-        if (pendingPickupTimer <= 0f)
-        {
-            allyWeapon.EquipWeapon(pendingPickup.heldWeaponPrefab);
-            Destroy(pendingPickup.gameObject);
-            pendingPickup = null;
-        }
+        if (allyWeapon == null) return;
+        bool allowed = autoUpgradeWeapon && (!onlyUpgradeOutOfCombat || currentState == State.Follow);
+        allyWeapon.UpdateScavenge(allowed, scavengeRadius, scavengeDelay, scavengeReach,
+                                  scavengeMinPickupAge, agent, chaseSpeed);
     }
 
     // Rough DPS estimate - damage per pellet times pellets, over the time between shots.

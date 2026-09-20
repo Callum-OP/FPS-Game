@@ -15,6 +15,8 @@ public class WeaponPickup : MonoBehaviour
     public float pickupDelay = 0.75f;
 
     private float spawnTime;
+    /// <summary>Seconds since this pickup appeared (AI uses it so they don't snatch a weapon the instant it's dropped).</summary>
+    public float Age => Time.unscaledTime - spawnTime;
     private bool playerInRange = false;
     private PlayerSetup playerSetup;
     private InputAction pickupAction;

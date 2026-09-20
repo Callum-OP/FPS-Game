@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// Gives an enemy a visible held weapon and lets it drop as a world pickup on
@@ -76,6 +77,22 @@ public class EnemyWeapon : MonoBehaviour
     [Tooltip("Where a carried SECONDARY-class weapon (pistols - matched the same way WeaponInventory.SlotFor does on the player) rests when not held - the equivalent of the player's hip holster. Same fallback chain as primaryHolsterPoint, but looks for \"HipHolster\".")]
     public Transform secondaryHolsterPoint;
 
+    [Header("Player-Identical Hold")]
+    [Tooltip("Hold the gun exactly the way the player does: the weapon's own WeaponADS (the hip/ADS pose you tuned on the player), its walk bob and its hand pull-back all run on the AI, hung off a virtual 'eye' placed where the player's camera sits relative to the body. Untick for the old fixed-anchor hold.")]
+    public bool useEyeRigHold = true;
+    [Tooltip("Max degrees the gun (eye rig) pitches up/down to follow its target - the equivalent of the player looking up/down.")]
+    public float maxAimPitch = 40f;
+    [Tooltip("Degrees per second the pitch follows the target.")]
+    public float aimPitchSpeed = 240f;
+
+    [Header("Weapon Switching")]
+    [Tooltip("In combat, an empty magazine swaps to the carried spare (e.g. a pistol) instead of reloading, if the spare has rounds. Out of combat they go back to their primary.")]
+    public bool switchInsteadOfReload = true;
+    [Tooltip("Seconds a weapon swap takes (holster one, draw the other).")]
+    public float switchTime = 0.7f;
+    [Tooltip("Seconds out of combat before returning from a sidearm to the primary.")]
+    public float returnToPrimaryDelay = 1.5f;
+
     EnemyAI enemyAI;
     FriendlyAI friendlyAI; // set instead of enemyAI when this is on an ally
     WeaponHandIK handIK;
@@ -93,6 +110,21 @@ public class EnemyWeapon : MonoBehaviour
     Transform weaponReloadPoint; // the gun's own magwell point, if the prefab has one
     GameObject secondaryInstance; // the actual holstered weapon on the body, if any
     int secondaryAmmo; // remembered so swapping back doesn't just hand back a full mag
+
+    // Player-identical hold
+    WeaponADS weaponADS;
+    Vector3 eyeLocalPosition;
+    float eyePitch;
+    bool hasAimPoint;
+    Vector3 aimPoint;
+    float calmTimer;
+
+    // Scavenging
+    WeaponPickup scavTarget;
+    float scavTimer, scavSearchTimer;
+
+    static bool hasEyeSample;
+    static Vector3 eyeInModel;
 
     void Start()
     {
@@ -121,6 +153,8 @@ public class EnemyWeapon : MonoBehaviour
 
         foreach (var mb in weaponInstance.GetComponentsInChildren<MonoBehaviour>(true))
             mb.enabled = false;
+
+        ApplyAIHold(weaponInstance);
     }
 
     bool EnsureAnchorAndHandIK()
@@ -150,6 +184,7 @@ public class EnemyWeapon : MonoBehaviour
             anchorGo.transform.localEulerAngles = restRotationOffset;
             anchor = anchorGo.transform;
         }
+        eyeLocalPosition = ComputeEyeLocal(anim);
 
         return true;
     }
@@ -195,6 +230,169 @@ public class EnemyWeapon : MonoBehaviour
         }
     }
 
+    /// <summary>Everything player-input-driven on a held weapon stays off - except its own
+    /// hip/ADS pose holder and walk bob, which are switched to AI control so the gun sits
+    /// and moves exactly as it does for the player (see useEyeRigHold). Also used when a
+    /// holstered weapon is drawn again, since holstering disables every script on it.</summary>
+    void ApplyAIHold(GameObject instance)
+    {
+        weaponADS = null;
+        if (!useEyeRigHold || instance == null) return;
+        weaponADS = instance.GetComponent<WeaponADS>();
+        if (weaponADS == null) return;
+
+        weaponADS.SetExternalControl(true);
+        weaponADS.enabled = true;
+        var bob = instance.GetComponent<WeaponMovementBob>();
+        if (bob != null) { bob.aiAgent = GetComponent<NavMeshAgent>(); bob.enabled = true; }
+    }
+
+    // ------------------------------------------------------------------
+    // Player-identical hold
+    // ------------------------------------------------------------------
+
+    /// <summary>Where the player's camera sits, re-expressed on THIS body (in root-local
+    /// space). Sampled once from the player's own model space, so it holds for any
+    /// character that shares the player's rig. Falls back to just in front of the head.</summary>
+    Vector3 ComputeEyeLocal(Animator anim)
+    {
+        if (!hasEyeSample)
+        {
+            var pm = FindFirstObjectByType<PlayerMovement>();
+            if (pm != null && pm.cameraTransform != null && !pm.IsCrouching)
+            {
+                foreach (var a in pm.GetComponentsInChildren<Animator>(true))
+                {
+                    if (a.avatar == null || !a.avatar.isHuman) continue;
+                    eyeInModel = a.transform.InverseTransformPoint(pm.cameraTransform.position);
+                    hasEyeSample = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasEyeSample)
+            return transform.InverseTransformPoint(anim.transform.TransformPoint(eyeInModel));
+
+        Transform head = anim.GetBoneTransform(HumanBodyBones.Head);
+        Vector3 world = head != null
+            ? head.position + anim.transform.up * 0.08f + anim.transform.forward * 0.1f
+            : transform.position + Vector3.up * 1.6f;
+        return transform.InverseTransformPoint(world);
+    }
+
+    /// <summary>Tell the weapon what it's aiming at so the gun pitches up/down towards it
+    /// like the player looking up/down. Call every frame from the AI (has=false when idle).</summary>
+    public void SetAimPoint(bool has, Vector3 worldPoint)
+    {
+        hasAimPoint = has;
+        aimPoint = worldPoint;
+    }
+
+    void UpdateEyePitch()
+    {
+        float target = 0f;
+        if (hasAimPoint)
+        {
+            Vector3 d = aimPoint - transform.TransformPoint(eyeLocalPosition);
+            float horiz = new Vector2(d.x, d.z).magnitude;
+            target = Mathf.Clamp(-Mathf.Atan2(d.y, horiz) * Mathf.Rad2Deg, -maxAimPitch, maxAimPitch);
+        }
+        eyePitch = Mathf.MoveTowardsAngle(eyePitch, target, aimPitchSpeed * Time.deltaTime);
+    }
+
+    // ------------------------------------------------------------------
+    // Weapon classes (holster class matching is IsSecondaryClass, further down)
+    // ------------------------------------------------------------------
+
+    static CharacterWeaponClass ClassFor(GameObject prefab)
+    {
+        var wc = prefab != null ? prefab.GetComponent<WeaponController>() : null;
+        if (wc == null) return CharacterWeaponClass.Rifle;
+        return wc.isAutomatic || wc.isShotgun ? CharacterWeaponClass.Rifle : CharacterWeaponClass.Pistol;
+    }
+
+    /// <summary>True if the held weapon or the carried spare is made from this prefab.</summary>
+    public bool IsCarried(GameObject prefab)
+    {
+        if (prefab == null) return false;
+        return (weaponPrefab != null && weaponPrefab.name == prefab.name)
+            || (secondaryWeaponPrefab != null && secondaryWeaponPrefab.name == prefab.name);
+    }
+
+    // Rough DPS estimate - damage per pellet times pellets, over the time between shots.
+    public static float ScoreOf(WeaponController wc)
+    {
+        if (wc == null || wc.bulletPrefab == null) return 0f;
+        var proj = wc.bulletPrefab.GetComponent<Projectile>();
+        float dmg = proj != null ? proj.damage : 0f;
+        int pellets = Mathf.Max(1, wc.pelletCount);
+        float rate = Mathf.Max(0.01f, wc.fireRate);
+        return dmg * pellets / rate;
+    }
+
+    // ------------------------------------------------------------------
+    // Scavenging - shared by allies (FriendlyAI) and enemies (EnemyAI)
+    // ------------------------------------------------------------------
+
+    /// <summary>Looks for a strictly better weapon lying on the ground, walks to it and
+    /// takes it (the old held weapon becomes the holstered spare). Call every frame; pass
+    /// allowed=false whenever the AI shouldn't be doing this (in combat, alerted...).</summary>
+    /// <param name="delay">Seconds a pickup has to be the chosen target before it's taken.</param>
+    /// <param name="reach">Flat distance at which the weapon is grabbed.</param>
+    /// <param name="minPickupAge">Ignore pickups that appeared less than this long ago.</param>
+    public void UpdateScavenge(bool allowed, float radius, float delay, float reach,
+                               float minPickupAge, NavMeshAgent agent, float moveSpeed)
+    {
+        if (!allowed || dropped || reloading || weaponInstance == null) { scavTarget = null; return; }
+
+        scavSearchTimer -= Time.deltaTime;
+        if (scavSearchTimer <= 0f)
+        {
+            scavSearchTimer = 0.3f;
+
+            WeaponPickup best = null;
+            float bestScore = ScoreOf(GetWeaponController());
+            foreach (var pickup in FindObjectsByType<WeaponPickup>(FindObjectsSortMode.None))
+            {
+                if (pickup == null || pickup.heldWeaponPrefab == null) continue;
+                if (pickup.Age < minPickupAge) continue;
+                if (Vector3.Distance(transform.position, pickup.transform.position) > radius) continue;
+                if (IsCarried(pickup.heldWeaponPrefab)) continue;
+
+                float score = ScoreOf(pickup.heldWeaponPrefab.GetComponent<WeaponController>());
+                if (score > bestScore) { best = pickup; bestScore = score; }
+            }
+
+            if (best != scavTarget) { scavTarget = best; scavTimer = delay; }
+        }
+
+        if (scavTarget == null) return;
+
+        Vector3 to = scavTarget.transform.position - transform.position;
+        to.y = 0f;
+        if (to.magnitude > reach)
+        {
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.isStopped = false;
+                agent.speed = moveSpeed;
+                Vector3 dest = scavTarget.transform.position;
+                if (NavMesh.SamplePosition(dest, out NavMeshHit hit, 2f, NavMesh.AllAreas)) dest = hit.position;
+                agent.SetDestination(dest);
+            }
+            return;
+        }
+
+        scavTimer -= Time.deltaTime;
+        if (scavTimer > 0f) return;
+
+        GameObject prefab = scavTarget.heldWeaponPrefab;
+        Destroy(scavTarget.gameObject);
+        scavTarget = null;
+        EquipWeapon(prefab);
+    }
+
     [Header("Secondary (carried, not held)")]
     [Tooltip("A spare weapon this ally is carrying but not actively using. Set on the prefab to start an ally with a backup, or left for EquipWeapon to fill automatically - see its comment.")]
     public GameObject secondaryWeaponPrefab;
@@ -214,12 +412,29 @@ public class EnemyWeapon : MonoBehaviour
     /// is already held, IT is the one destroyed (there's nowhere left to put it) - this
     /// should be rare in practice since SwapWith on the player side only ever trades the
     /// ACTIVE weapon.</summary>
-    public void EquipWeapon(GameObject newHeldWeaponPrefab)
+    /// <param name="stashOutgoing">True (default) holsters the replaced weapon as the spare.
+    /// Pass false when the replaced weapon is being handed to someone else (a swap with the
+    /// player): it's destroyed instead, and any carried spare is left alone - holstering it
+    /// too is what used to duplicate it.</param>
+    public void EquipWeapon(GameObject newHeldWeaponPrefab, bool stashOutgoing = true)
     {
         if (newHeldWeaponPrefab == null) return;
 
+        // A reload or weapon swap already under way belongs to the old gun.
+        StopAllCoroutines();
+        handIK?.SetReloadOverride(null, null);
         reloading = false;
         aiming = false;
+
+        if (!stashOutgoing)
+        {
+            if (weaponInstance != null) Destroy(weaponInstance);
+            weaponInstance = null;
+            weaponPrefab = newHeldWeaponPrefab;
+            SpawnWeapon(newHeldWeaponPrefab);
+            animationDriver?.SetWeaponClass(ClassFor(newHeldWeaponPrefab));
+            return;
+        }
 
         // Figure out which of the ally's two slots (whatever's HELD, whatever's
         // CARRIED/holstered) is the same class as the incoming weapon - that's the one
@@ -275,6 +490,7 @@ public class EnemyWeapon : MonoBehaviour
         weaponInstance = null;
 
         SpawnWeapon(newHeldWeaponPrefab);
+        animationDriver?.SetWeaponClass(ClassFor(newHeldWeaponPrefab)); // pistol vs rifle hold follows the gun in hand
     }
 
     /// <summary>Brings the carried secondary into the ally's hands, storing whatever was
@@ -310,6 +526,7 @@ public class EnemyWeapon : MonoBehaviour
             incomingInstance.transform.localRotation = Quaternion.identity;
             WireHeldInstance(incomingInstance);
             weaponInstance = incomingInstance;
+            ApplyAIHold(weaponInstance); // holstering switched its scripts off
             ammo = Mathf.Clamp(incomingAmmo, 0, magazineSize);
         }
         else
@@ -319,7 +536,23 @@ public class EnemyWeapon : MonoBehaviour
             // fresh, same as a first-time equip.
             SpawnWeapon(incomingPrefab);
         }
+        animationDriver?.SetWeaponClass(ClassFor(incomingPrefab));
     }
+
+    IEnumerator SwitchRoutine()
+    {
+        reloading = true;   // holds fire, and the AI treats it like a reload
+        aiming = false;
+        yield return new WaitForSeconds(switchTime * 0.5f);
+        SwapToSecondary();
+        reloading = true;   // SwapToSecondary clears it; hold fire until the draw finishes
+        yield return new WaitForSeconds(switchTime * 0.5f);
+        reloading = false;
+    }
+
+    // The carried spare has rounds to shoot: it was holstered with some left, or it's a
+    // fresh one that hasn't been fired yet.
+    bool SpareHasRounds => secondaryWeaponPrefab != null && (secondaryInstance == null || secondaryAmmo > 0);
 
     void HolsterSecondaryVisual()
     {
@@ -368,13 +601,37 @@ public class EnemyWeapon : MonoBehaviour
     {
         if (anchor == null) return;
 
+        // Back to the primary once the fighting's over (a sidearm is for emergencies).
+        if (combatReady) calmTimer = 0f; else calmTimer += Time.deltaTime;
+        if (!combatReady && calmTimer > returnToPrimaryDelay && !reloading && !dropped
+            && secondaryWeaponPrefab != null && IsSecondaryClass(weaponPrefab) && !IsSecondaryClass(secondaryWeaponPrefab))
+            StartCoroutine(SwitchRoutine());
+
         // Aiming only counts while the gun is actually up.
         float target = (aiming && !reloading) ? 1f : 0f;
         aimBlend = Mathf.MoveTowards(aimBlend, target, aimBlendSpeed * Time.deltaTime);
         combatBlend = Mathf.MoveTowards(combatBlend, combatReady ? 1f : 0f, lowerBlendSpeed * Time.deltaTime);
 
-        // Two blends, composed: lowered -> ready -> aiming. Nothing else writes this
-        // transform, same single-owner rule the player's weapon follows.
+        if (weaponADS != null)
+        {
+            // Player-identical hold: the weapon's own WeaponADS composes hip/ADS + bob +
+            // pull-back under this anchor; the anchor itself acts as the player's camera,
+            // sitting at eye position and pitching towards the target.
+            weaponADS.SetExternalAim(aiming && !reloading);
+            UpdateEyePitch();
+
+            // Lowered pose: same world pose the gun had before (the anchor is offset to
+            // cancel WeaponADS's hip offset, so it still ends up where loweredPositionOffset says).
+            Quaternion hipRot = Quaternion.Euler(weaponADS.hipRotation);
+            Quaternion lowRot = Quaternion.Euler(loweredRotationOffset) * Quaternion.Inverse(hipRot);
+            Vector3 lowPos = loweredPositionOffset - lowRot * weaponADS.hipPosition;
+
+            anchor.localPosition = Vector3.Lerp(lowPos, eyeLocalPosition, combatBlend);
+            anchor.localRotation = Quaternion.Slerp(lowRot, Quaternion.Euler(eyePitch, 0f, 0f), combatBlend);
+            return;
+        }
+
+        // Legacy fixed-anchor hold (no WeaponADS on the prefab, or useEyeRigHold off).
         Vector3 readyPos = Vector3.Lerp(restPositionOffset, aimPositionOffset, aimBlend);
         Quaternion readyRot = Quaternion.Slerp(
             Quaternion.Euler(restRotationOffset), Quaternion.Euler(aimRotationOffset), aimBlend);
@@ -404,6 +661,14 @@ public class EnemyWeapon : MonoBehaviour
     public void Reload()
     {
         if (reloading || weaponInstance == null) return;
+
+        // In a fight, an empty gun swaps to the spare (if it has rounds) rather than
+        // spending seconds reloading in the open.
+        if (switchInsteadOfReload && combatReady && ammo <= 0 && SpareHasRounds)
+        {
+            StartCoroutine(SwitchRoutine());
+            return;
+        }
         StartCoroutine(ReloadRoutine());
     }
 
@@ -440,13 +705,18 @@ public class EnemyWeapon : MonoBehaviour
                 t += Time.deltaTime;
                 float frac = reloadTime > 0f ? Mathf.Clamp01(t / reloadTime) : 1f;
 
-                Vector3 seatPos = weaponReloadPoint != null ? weaponReloadPoint.position : gripStart;
-                Quaternion seatRot = weaponReloadPoint != null ? weaponReloadPoint.rotation : gripStartRot;
+                Vector3 seatPos = weaponReloadPoint != null ? weaponReloadPoint.position
+                    : (gripPoint != null ? gripPoint.position : gripStart);
+                Quaternion seatRot = weaponReloadPoint != null ? weaponReloadPoint.rotation
+                    : (gripPoint != null ? gripPoint.rotation : gripStartRot);
 
                 Vector3 fromPos, toPos; Quaternion fromRot, toRot; float segStart, segEnd;
                 if (frac <= handGrabTime)
                 {
-                    fromPos = gripStart; fromRot = gripStartRot;
+                    // Live grip, not the snapshot from reload start - the gun moves as the
+                    // AI turns/pitches, and a stale world position drags the hand back there.
+                    fromPos = gripPoint != null ? gripPoint.position : gripStart;
+                    fromRot = gripPoint != null ? gripPoint.rotation : gripStartRot;
                     toPos = grabPoint.position; toRot = grabPoint.rotation;
                     segStart = 0f; segEnd = handGrabTime;
                 }

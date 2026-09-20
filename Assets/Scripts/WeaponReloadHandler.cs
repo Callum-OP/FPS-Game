@@ -88,6 +88,10 @@ public class WeaponReloadHandler : MonoBehaviour
     public Transform weaponReloadPivot;
 
     [Header("Carried Mag Offset")]
+    [Tooltip("Centre the carried mag/shell's VISIBLE mesh exactly on the mag hand point, whatever the prefab's own pivot or child offsets are - so different mags no longer need per-weapon offset tuning. When on, carriedMagOffsetPosition is ignored and carriedMagNudge is the only positional tweak.")]
+    public bool centerCarriedMagOnHand = true;
+    [Tooltip("Extra offset (in the mag hand's own space) applied after centring. Zero = the mag's centre sits exactly on the mag hand point.")]
+    public Vector3 carriedMagNudge = Vector3.zero;
     [Tooltip("Local position offset applied to the carried mag prop relative to its attach point, to correct for the mag mesh's own pivot not being centred on the mag. Defaults to a sensible in-palm offset - tune further if it still looks off for a particular mag mesh.")]
     public Vector3 carriedMagOffsetPosition = new Vector3(0f, 0.096f, 0f);
     [Tooltip("Local rotation offset (Euler) applied to the carried mag prop relative to its attach point.")]
@@ -111,6 +115,8 @@ public class WeaponReloadHandler : MonoBehaviour
     Quaternion reloadMoveDeltaRot = Quaternion.identity;
     Vector3 appliedMoveDeltaPos;
     Quaternion appliedMoveDeltaRot = Quaternion.identity;
+    // Kept so the hand target can be re-placed later in the frame (RefreshHandAnchor).
+    Vector3 pathGripPos; Quaternion pathGripRot; Transform pathGrabPoint, pathGripT; bool pathActive;
     float moveFrac;   // 0-1 through the current reload, drives the sine hump; read by LateUpdate
     bool moveActive;
     bool magVisualHidden;
@@ -177,7 +183,9 @@ public class WeaponReloadHandler : MonoBehaviour
         if (canReposition)
         {
             handAnchor.SetPositionAndRotation(gripStartPos, gripStartRot);
-            handIK.SetReloadOverride(null, handAnchor);
+            pathGripPos = gripStartPos; pathGripRot = gripStartRot; pathGrabPoint = grabPoint;
+            pathGripT = weapon != null ? weapon.leftHandGrip : null; pathActive = true;
+            handIK.SetReloadOverride(null, handAnchor, RefreshHandAnchor);
         }
 
         if (movedWeaponPart != null && weaponReloadPivot != null)
@@ -210,7 +218,7 @@ public class WeaponReloadHandler : MonoBehaviour
             moveFrac = frac; // read by LateUpdate()
 
             if (canReposition)
-                UpdateHandAnchor(frac, gripStartPos, gripStartRot, grabPoint);
+                UpdateHandAnchor(frac, LiveGripPos(), LiveGripRot(), grabPoint);
 
             if (debugLogReload && grabPoint != null && handAnchor != null && Time.frameCount % 15 == 0)
                 Debug.Log($"{name}: frac={frac:F2} handAnchor={handAnchor.position} " +
@@ -234,6 +242,7 @@ public class WeaponReloadHandler : MonoBehaviour
             yield return null;
         }
 
+        pathActive = false;
         if (canReposition)
             handIK.SetReloadOverride(null, null);
 
@@ -280,6 +289,21 @@ public class WeaponReloadHandler : MonoBehaviour
 
     Vector3 lastFallbackBasePos;
     Quaternion lastFallbackBaseRot = Quaternion.identity;
+
+    // The grip's CURRENT pose, not a snapshot from when the reload began. A world-space
+    // snapshot goes stale the moment you look up or down mid-reload (the gun moves with
+    // the camera), which sent the hand back to where the grip used to be.
+    Vector3 LiveGripPos() => pathGripT != null ? pathGripT.position : pathGripPos;
+    Quaternion LiveGripRot() => pathGripT != null ? pathGripT.rotation : pathGripRot;
+
+    /// <summary>Re-places the hand target for the current point in the reload. WeaponHandIK
+    /// calls this in LateUpdate, after the gun's reload movement has been applied, so the
+    /// hand meets the reload point on the gun's FINAL pose.</summary>
+    public void RefreshHandAnchor()
+    {
+        if (!pathActive || handAnchor == null) return;
+        UpdateHandAnchor(moveFrac, LiveGripPos(), LiveGripRot(), pathGrabPoint);
+    }
 
     // Eases handAnchor through grip -> grabPoint -> handReloadPoint -> grip, skipping
     // any waypoint left unassigned. Interpolated every frame (not snapped between
@@ -354,14 +378,36 @@ public class WeaponReloadHandler : MonoBehaviour
         if (parent == null) return;
 
         carriedMag = Instantiate(magazinePrefab, parent);
-        carriedMag.transform.localPosition = carriedMagOffsetPosition;
+        carriedMag.transform.localPosition = centerCarriedMagOnHand ? Vector3.zero : carriedMagOffsetPosition;
         carriedMag.transform.localRotation = Quaternion.Euler(carriedMagOffsetRotationEuler);
+
+        if (centerCarriedMagOnHand) CenterOnParent(carriedMag.transform, parent);
 
         // Purely cosmetic while it's "in hand" - strip physics so it doesn't fall or collide.
         Rigidbody rb = carriedMag.GetComponent<Rigidbody>();
         if (rb != null) Destroy(rb);
         Collider col = carriedMag.GetComponent<Collider>();
         if (col != null) Destroy(col);
+    }
+
+    // Moves `prop` so the centre of its visible meshes sits exactly on `hand`. Prefab
+    // pivots and child offsets differ from mag to mag (a base-pivoted rifle mag vs a
+    // centre-pivoted shell), which is why one fixed offset could never suit them all -
+    // this measures the actual geometry instead.
+    void CenterOnParent(Transform prop, Transform hand)
+    {
+        bool any = false;
+        Bounds bounds = new Bounds(prop.position, Vector3.zero);
+        foreach (var r in prop.GetComponentsInChildren<Renderer>(false))
+        {
+            if (!(r is MeshRenderer) && !(r is SkinnedMeshRenderer)) continue;
+            if (!any) { bounds = r.bounds; any = true; }
+            else bounds.Encapsulate(r.bounds);
+        }
+        if (!any) return;
+
+        prop.position += hand.position - bounds.center;
+        prop.position += hand.TransformVector(carriedMagNudge);
     }
 
     void CleanupCarriedMag()

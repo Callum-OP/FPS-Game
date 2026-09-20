@@ -54,6 +54,15 @@ public class EnemyAI : MonoBehaviour
     public Transform muzzlePoint;
     public float bulletSpeed = 40f;
 
+    [Header("Scavenging")]
+    [Tooltip("While calm (patrolling/idle), walk over to a better weapon lying on the ground (e.g. a dead comrade's or one you dropped) and take it. Their old weapon becomes a holstered spare.")]
+    public bool scavengeWeapons = true;
+    public float scavengeRadius = 7f;
+    [Tooltip("Seconds a better weapon has to stay the chosen target before it's taken.")]
+    public float scavengeDelay = 1.5f;
+    [Tooltip("Ignore weapons that appeared less than this many seconds ago, so they don't snatch what you've just dropped.")]
+    public float scavengeMinPickupAge = 2f;
+
     [Header("Accuracy")]
     public float baseInaccuracy = 5f;
     public float maxInaccuracy = 15f;
@@ -147,6 +156,7 @@ public class EnemyAI : MonoBehaviour
 
         playerInSight = CanSeePlayer();
         ChooseFireTarget();
+        enemyWeapon?.SetAimPoint(fireTarget != null, fireTarget != null ? fireTarget.position + Vector3.up * 1.1f : Vector3.zero);
 
         // Always update last known position when player is visible
         if (playerInSight)
@@ -169,6 +179,12 @@ public class EnemyAI : MonoBehaviour
             || currentState == State.TakeCover || currentState == State.InCover
             || (currentState == State.Investigate && playerInSight);
         enemyWeapon?.SetCombatReady(inCombat);
+
+        // Calm and armed: go and grab a better weapon if one's lying about.
+        if (enemyWeapon != null)
+            enemyWeapon.UpdateScavenge(scavengeWeapons && canShoot
+                && (currentState == State.Patrol || currentState == State.Idle) && !playerInSight,
+                scavengeRadius, scavengeDelay, 1.4f, scavengeMinPickupAge, agent, walkSpeed * 1.4f);
     }
 
     // State handlers

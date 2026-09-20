@@ -54,6 +54,8 @@ public class WeaponMovementBob : MonoBehaviour
     [Header("References")]
     public WeaponADS weaponADS;
     public PlayerMovement playerMovement;
+    [Tooltip("Set automatically on allies/enemies (no PlayerMovement there) - their NavMeshAgent supplies the speed instead.")]
+    public UnityEngine.AI.NavMeshAgent aiAgent;
 
     Transform animRoot;
     Transform hipsBone;
@@ -67,9 +69,11 @@ public class WeaponMovementBob : MonoBehaviour
         if (weaponADS == null) weaponADS = GetComponent<WeaponADS>();
         if (weaponADS == null) weaponADS = GetComponentInParent<WeaponADS>();
         if (playerMovement == null) playerMovement = GetComponentInParent<PlayerMovement>();
-        if (weaponADS == null || playerMovement == null) { enabled = false; return; }
+        if (playerMovement == null && aiAgent == null) aiAgent = GetComponentInParent<UnityEngine.AI.NavMeshAgent>();
+        if (weaponADS == null || (playerMovement == null && aiAgent == null)) { enabled = false; return; }
 
-        foreach (var a in playerMovement.GetComponentsInChildren<Animator>(true))
+        Transform bodyRoot = playerMovement != null ? playerMovement.transform : aiAgent.transform;
+        foreach (var a in bodyRoot.GetComponentsInChildren<Animator>(true))
         {
             if (a.avatar != null && a.avatar.isHuman)
             {
@@ -91,7 +95,9 @@ public class WeaponMovementBob : MonoBehaviour
 
         Vector3 deviation = local - restingLocal;
 
-        float speed = playerMovement.PlanarVelocity.magnitude;
+        float speed = playerMovement != null
+            ? playerMovement.PlanarVelocity.magnitude
+            : new Vector2(aiAgent.velocity.x, aiAgent.velocity.z).magnitude;
         float speedScale = Mathf.Lerp(idleAmount, 1f, Mathf.Clamp01(speed / Mathf.Max(0.01f, fullEffectSpeed)));
         float aimScale = weaponADS.IsAiming() ? aimMultiplier : 1f;
         float scale = positionAmount * speedScale * aimScale;

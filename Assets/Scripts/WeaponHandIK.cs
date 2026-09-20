@@ -109,6 +109,7 @@ public class WeaponHandIK : MonoBehaviour
     Transform leftGrip;
     Transform reloadRightOverride;
     Transform reloadLeftOverride;
+    System.Action reloadAnchorRefresh; // re-places the reload hand target against the FINAL weapon pose (see LateUpdate)
     WeaponHandIKAnimatorBridge animatorBridge;
     float rightWeight;
     Transform lockRightGrip, lockLeftGrip;      // set by ApplyIK each pass; null during reload overrides
@@ -344,6 +345,7 @@ public class WeaponHandIK : MonoBehaviour
         // A new weapon means any in-progress reload pose from the old one is meaningless.
         reloadRightOverride = null;
         reloadLeftOverride = null;
+        reloadAnchorRefresh = null;
 
         // Re-resolved per weapon so the pull-back always acts on whatever's actually
         // equipped now, and reset so a leftover amount from the previous weapon doesn't
@@ -360,10 +362,15 @@ public class WeaponHandIK : MonoBehaviour
     /// underlying grip targets set by SetGripTargets. Pass null for either hand to hand
     /// control of that hand back to its normal grip - the blend weight (rightWeight/
     /// leftWeight) fades smoothly either way since ApplyIK never snaps.</summary>
-    public void SetReloadOverride(Transform right, Transform left)
+    /// <param name="refresh">Optional. Called in LateUpdate, after everything else has moved
+    /// the weapon this frame, so the reload hand target can be re-placed against the
+    /// weapon's FINAL pose (a reload that shifts the gun after the IK pass would
+    /// otherwise leave the hand aimed at where the gun WAS).</param>
+    public void SetReloadOverride(Transform right, Transform left, System.Action refresh = null)
     {
         reloadRightOverride = right;
         reloadLeftOverride = left;
+        reloadAnchorRefresh = (right != null || left != null) ? refresh : null;
     }
 
     void OnAnimatorIK(int layerIndex)
@@ -400,10 +407,10 @@ public class WeaponHandIK : MonoBehaviour
             leftWeight = Mathf.MoveTowards(leftWeight, leftTarget, blendSpeed * Time.deltaTime);
         }
 
-        // Only real weapon grips get the strict lock - a reload override sends the hand to
-        // a spot on the body on purpose and shouldn't be forced anywhere else.
-        lockRightGrip = reloadRightOverride == null ? rightGrip : null;
-        lockLeftGrip = reloadLeftOverride == null ? leftGrip : null;
+        // The strict lock also covers reload targets: the hand has to land EXACTLY on the
+        // mag pouch / reload point, not wherever later scripts and the moving gun leave it.
+        lockRightGrip = effectiveRight;
+        lockLeftGrip = effectiveLeft;
 
         Vector3 rightExcessVec = ApplyHand(AvatarIKGoal.RightHand, effectiveRight, rightWeight, rightElbowHint, AvatarIKHint.RightElbow, rightShoulder, rightArmReach);
         Vector3 leftExcessVec = ApplyHand(AvatarIKGoal.LeftHand, effectiveLeft, leftWeight, leftElbowHint, AvatarIKHint.LeftElbow, leftShoulder, leftArmReach);
@@ -472,6 +479,12 @@ public class WeaponHandIK : MonoBehaviour
         if (anim == null) return;
         if (strictHandLock)
         {
+            // The reload hand path was placed before the gun's reload movement was applied
+            // this frame - re-place it now so the hand meets the reload point on the gun
+            // as it actually is, instead of overshooting it.
+            if (reloadAnchorRefresh != null && (reloadRightOverride != null || reloadLeftOverride != null))
+                reloadAnchorRefresh();
+
             if (lockRightGrip != null) LockHand(rightShoulder, rightLowerArm, rightHandBone, lockRightGrip, rightWeight);
             if (lockLeftGrip != null) LockHand(leftShoulder, leftLowerArm, leftHandBone, lockLeftGrip, leftWeight);
         }
