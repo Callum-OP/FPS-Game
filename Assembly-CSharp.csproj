@@ -158,7 +158,6 @@
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TeleType.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextEventCheck.cs" />
     <Compile Include="Assets\Scripts\GunSlide.cs" />
-    <Compile Include="Assets\Scripts\CarriedMagFollower.cs" />
     <Compile Include="Assets\Scripts\TorsoMotionDampener.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TextMeshProFloatingText.cs" />
     <Compile Include="Assets\Scripts\WeaponDrop.cs" />
