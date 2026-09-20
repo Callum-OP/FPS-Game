@@ -32,6 +32,18 @@ public class Ragdoll : MonoBehaviour
     [Tooltip("How far below the ground the hips have to be before the body is lifted. Must stay comfortably above the depth a normal collapse reaches, or a corpse lying on a slope gets nudged every step.")]
     public float groundClampTolerance = 0.35f;
 
+    [Header("Settling")]
+    [Tooltip("Once the corpse has stopped moving its bones are frozen (kinematic), so later gunfire, grenades or pushes can't drive it through the floor. Costs nothing per frame afterwards.")]
+    public bool freezeWhenSettled = true;
+    [Tooltip("Bones slower than this (m/s) count as settled.")]
+    public float settleSpeed = 0.2f;
+    [Tooltip("How long everything must stay slower than settleSpeed before freezing.")]
+    public float settleTime = 0.6f;
+    [Tooltip("Freeze regardless after this long.")]
+    public float maxSettleTime = 8f;
+    [Tooltip("Death-animation handover: false = the corpse drops in place (only the limbs' motion relative to the body is kept). true = also keeps the clip's overall travel, which sent bodies flying backwards.")]
+    public bool inheritBodyTravel = false;
+
     [Header("Explosions")]
     [Tooltip("Extra impulse applied to each bone when killed by an explosion, on top of whatever the blast itself pushed.")]
     public float explosionRagdollForce = 9f;
@@ -145,19 +157,28 @@ public class Ragdoll : MonoBehaviour
 
     IEnumerator GroundSafetyNet()
     {
-        float elapsed = 0f;
-        while (elapsed < 3f)
+        float elapsed = 0f, calm = 0f;
+        while (elapsed < maxSettleTime)
         {
             elapsed += Time.deltaTime;
-
+            float fastest = 0f;
             foreach (var rb in bones)
             {
-                if (rb == null) continue;
-                if (rb.linearVelocity.sqrMagnitude > MaxSafeSpeed * MaxSafeSpeed)
-                    rb.linearVelocity = rb.linearVelocity.normalized * MaxSafeSpeed;
+                if (rb == null || rb.isKinematic) continue;
+                float sp = rb.linearVelocity.magnitude;
+                if (sp > MaxSafeSpeed) rb.linearVelocity = rb.linearVelocity.normalized * MaxSafeSpeed;
+                fastest = Mathf.Max(fastest, sp);
             }
-
+            calm = fastest < settleSpeed ? calm + Time.deltaTime : 0f;
+            if (freezeWhenSettled && elapsed > 1.5f && calm >= settleTime) break;
             yield return null;
+        }
+        if (!freezeWhenSettled) yield break;
+        foreach (var rb in bones)
+        {
+            if (rb == null) continue;
+            rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
         }
     }
 
@@ -405,11 +426,23 @@ public class Ragdoll : MonoBehaviour
             // falling the way the clip was throwing it, rather than stopping dead and
             // then dropping - that pause is what makes an animation-to-ragdoll swap
             // look like two separate events.
+            // The death clips travel backwards as they play; inheriting that whole-body
+            // motion is what made corpses fly back. Remove the average sideways travel and
+            // keep only each bone's motion relative to it (plus vertical fall).
+            Vector3 meanH = Vector3.zero; int n = 0;
             for (int i = 0; i < bones.Length; i++)
             {
                 if (bones[i] == null || i >= lastBonePositions.Length) continue;
                 Vector3 v = (preSwitch[i] - lastBonePositions[i]) / Time.deltaTime;
-                bones[i].linearVelocity = Vector3.ClampMagnitude(v * velocityInheritance, MaxSafeSpeed);
+                meanH += new Vector3(v.x, 0f, v.z); n++;
+            }
+            if (n > 0) meanH /= n;
+            if (inheritBodyTravel) meanH = Vector3.zero;
+            for (int i = 0; i < bones.Length; i++)
+            {
+                if (bones[i] == null || i >= lastBonePositions.Length) continue;
+                Vector3 v = (preSwitch[i] - lastBonePositions[i]) / Time.deltaTime - meanH;
+                bones[i].linearVelocity = Vector3.ClampMagnitude(v * velocityInheritance, inheritBodyTravel ? MaxSafeSpeed : 3f);
             }
         }
 

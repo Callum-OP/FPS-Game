@@ -36,7 +36,6 @@ public class LowerWeapon : MonoBehaviour
     public WeaponADS weaponADS;
     public WeaponController weaponController;
 
-    private InputAction lowerAction;
     private InputAction fireAction;
 
     private bool isLowered = false;
@@ -53,10 +52,8 @@ public class LowerWeapon : MonoBehaviour
 
     void Awake()
     {
-        lowerAction = new InputAction("LowerWeapon", binding: PlayerInputMap.LowerWeapon);
         fireAction  = new InputAction("FireCheck",   binding: PlayerInputMap.Fire);
 
-        lowerAction.Enable();
         fireAction.Enable();
     }
 
@@ -83,9 +80,7 @@ public class LowerWeapon : MonoBehaviour
 
     void Update()
     {
-        // Toggle lower (key 2)
-        if (lowerAction.WasPressedThisFrame())
-            isLowered = !isLowered;
+        // Key 2 is read by WeaponInventory (tap = ToggleLowered, hold = holster).
 
         // Cancel lowered if player fires or aims
         if (isLowered)
@@ -116,10 +111,11 @@ public class LowerWeapon : MonoBehaviour
     }
 
     public bool IsLowered() => isLowered;
+    public void ToggleLowered() => isLowered = !isLowered;
+    public void SetLowered(bool lowered) => isLowered = lowered;
 
     void OnDestroy()
     {
-        lowerAction.Disable();
         fireAction.Disable();
     }
 }

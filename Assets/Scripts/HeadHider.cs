@@ -34,7 +34,15 @@ public class HeadHider : MonoBehaviour
     Transform head;
     Vector3 origScale = Vector3.one;
     bool active;
-    bool suppressed;   // head temporarily restored (death)
+    bool suppressed;
+    bool showHead;     // third person: keep the real head visible
+
+    /// <summary>Third-person mode shows the head; first person hides it.</summary>
+    public void SetHeadVisible(bool visible)
+    {
+        showHead = visible;
+        if (head != null && visible) head.localScale = origScale;
+    }   // head temporarily restored (death)
 
     Transform proxyRoot;
     Transform[] realBones, proxyBones;
@@ -143,7 +151,7 @@ public class HeadHider : MonoBehaviour
             if (proxyHead != null) proxyHead.localScale = origScale;
         }
 
-        head.localScale = suppressed ? origScale : origScale * 0.001f;
+        head.localScale = (suppressed || showHead) ? origScale : origScale * 0.001f;
     }
 
     Transform cachedProxyHead;

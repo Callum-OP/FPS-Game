@@ -6,7 +6,8 @@ using UnityEngine.InputSystem;
 /// how pickup ended up on H and drop on G with no single place to check for clashes.
 ///
 /// Current layout (left hand stays on WASD, everything else clusters around 1-4):
-///   1  pick up                 2  lower gun (fast walk = the sprint replacement)
+///   1  pick up                 2  tap: lower gun (fast walk) / hold: holster everything
+///   5  third-person camera (hold Alt to orbit it)
 ///   3  toggle rifle/pistol     4  grenade (hold, then left click to throw)
 ///   R  reload                  F  drop
 ///   Ctrl crouch                Shift aim                    Space jump
@@ -34,6 +35,8 @@ public static class PlayerInputMap
     public const string CantRight    = "<Keyboard>/e";
     public const string Fire         = "<Mouse>/leftButton";
     public const string Aim          = "<Keyboard>/leftShift";
+    public const string ThirdPerson  = "<Keyboard>/5";
+    public const string OrbitCamera  = "<Keyboard>/leftAlt";
 
     public static InputAction Make(string name, string binding)
     {

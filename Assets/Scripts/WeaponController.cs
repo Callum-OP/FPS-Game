@@ -176,6 +176,9 @@ public class WeaponController : MonoBehaviour
 
         // Get crosshair target
         Ray ray = fpCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        // Third person: the camera is behind the player, so start the aim ray past them
+        // (otherwise it hits the player's own collider) and fire from the muzzle.
+        if (ThirdPersonMode.Active) ray.origin += ray.direction * ThirdPersonMode.AimRayStartOffset;
         Vector3 targetPoint = Physics.Raycast(ray, out RaycastHit hit, 300f)
             ? hit.point
             : ray.GetPoint(300f);
@@ -194,7 +197,7 @@ public class WeaponController : MonoBehaviour
     {
         Vector3 spawnPos = muzzlePoint.position + muzzlePoint.forward * 0.5f;
         GameObject bullet = Instantiate(bulletPrefab, spawnPos, muzzlePoint.rotation);
-        Vector3 aimDir = (targetPoint - fpCamera.transform.position).normalized;
+        Vector3 aimDir = (targetPoint - (ThirdPersonMode.Active ? muzzlePoint.position : fpCamera.transform.position)).normalized;
         bullet.transform.forward = aimDir;
 
         SetupBullet(bullet, aimDir);
@@ -220,7 +223,7 @@ public class WeaponController : MonoBehaviour
                 + muzzlePoint.TransformDirection(offset);
 
             // Base aim direction toward crosshair
-            Vector3 aimDir = (targetPoint - fpCamera.transform.position).normalized;
+            Vector3 aimDir = (targetPoint - (ThirdPersonMode.Active ? muzzlePoint.position : fpCamera.transform.position)).normalized;
 
             // Add directional spread per pellet
             aimDir += new Vector3(

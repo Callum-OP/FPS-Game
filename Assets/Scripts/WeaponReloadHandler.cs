@@ -83,6 +83,14 @@ public class WeaponReloadHandler : MonoBehaviour
     [Range(0f, 1f)] public float handReloadTime = 0.55f; // hand arrives at handReloadPoint
     [Range(0f, 1f)] public float handReturnTime = 0.95f; // hand arrives back at its normal grip
 
+    [Header("Seat / Return Timing")]
+    [Tooltip("Seconds the hand stays at the magwell seating the mag before it heads back to the grip (capped at 15% of the reload). Before this existed the hand started leaving the instant it arrived.")]
+    public float seatHoldSeconds = 0.35f;
+    [Tooltip("The hand is back on the grip this many seconds before the reload ends (overrides handReturnTime if that is earlier), so the return uses the whole tail of the reload instead of finishing early.")]
+    public float gripSettleSeconds = 0.1f;
+    [Tooltip("The return leg never takes less than this many seconds of reload time (as a fraction of it, at least 0.2).")]
+    public float minReturnSeconds = 0.6f;
+
     [Header("Weapon Reload Move")]
     [Tooltip("Empty transform placed as a SIBLING of the weapon mesh (RightHandGrip's parent) wherever you want the weapon to move to during reload - its local position/rotation are read directly, so it must share the same parent to mean the same thing. The weapon eases there across the reload and back once done. Leave empty to skip.")]
     public Transform weaponReloadPivot;
@@ -117,6 +125,7 @@ public class WeaponReloadHandler : MonoBehaviour
     Quaternion appliedMoveDeltaRot = Quaternion.identity;
     // Kept so the hand target can be re-placed later in the frame (RefreshHandAnchor).
     Vector3 pathGripPos; Quaternion pathGripRot; Transform pathGrabPoint, pathGripT; bool pathActive;
+    float reloadDuration = 1f;
     float moveFrac;   // 0-1 through the current reload, drives the sine hump; read by LateUpdate
     bool moveActive;
     bool magVisualHidden;
@@ -207,8 +216,10 @@ public class WeaponReloadHandler : MonoBehaviour
             moveActive = false;
         }
         moveFrac = 0f;
+        reloadDuration = Mathf.Max(0.01f, reloadTime);
 
         bool droppedMag = false;
+        bool seated = false;
         float t = 0f;
 
         while (t < reloadTime)
@@ -237,6 +248,14 @@ public class WeaponReloadHandler : MonoBehaviour
                 SpawnCarriedMag();
                 HideWeaponMagVisual();
                 droppedMag = true;
+            }
+
+            // Mag goes into the gun when the hold at the magwell ends, then the empty hand leaves.
+            if (droppedMag && !seated && frac >= SeatEndFrac())
+            {
+                CleanupCarriedMag();
+                ShowWeaponMagVisual();
+                seated = true;
             }
 
             yield return null;
@@ -330,18 +349,40 @@ public class WeaponReloadHandler : MonoBehaviour
             LerpAnchor(segStart, segStartPos, segStartRot, handReloadTime, reloadP.Value, reloadR, frac);
             return;
         }
-        // Final leg back to the grip - starts from whichever real waypoint was last used.
-        float returnSegStart = reloadP.HasValue ? handReloadTime : (grabP.HasValue ? handGrabTime : 0f);
-        Vector3 returnStartPos = reloadP.HasValue ? reloadP.Value : (grabP.HasValue ? grabP.Value : p0);
-        Quaternion returnStartRot = reloadP.HasValue ? reloadR : (grabP.HasValue ? grabR : r0);
-        LerpAnchor(returnSegStart, returnStartPos, returnStartRot, handReturnTime, p1, r1, frac);
+        // Hold at the last waypoint (seating the mag), then the final leg back to the grip.
+        float lastT = reloadP.HasValue ? handReloadTime : (grabP.HasValue ? handGrabTime : 0f);
+        Vector3 lastPos = reloadP.HasValue ? reloadP.Value : (grabP.HasValue ? grabP.Value : p0);
+        Quaternion lastRot = reloadP.HasValue ? reloadR : (grabP.HasValue ? grabR : r0);
+        GetReturnWindow(lastT, out float retStart, out float retEnd);
+        if (frac <= retStart) { handAnchor.SetPositionAndRotation(lastPos, lastRot); return; }
+        LerpAnchor(retStart, lastPos, lastRot, retEnd, p1, r1, frac, true);
     }
 
-    void LerpAnchor(float tStart, Vector3 posStart, Quaternion rotStart, float tEnd, Vector3 posEnd, Quaternion rotEnd, float frac)
+    float SeatEndFrac()
+    {
+        float lastT = reloadPointT();
+        GetReturnWindow(lastT, out float s, out _);
+        return s;
+    }
+    float reloadPointT() => handReloadPoint != null ? handReloadTime : (EffectiveGrabPoint != null ? handGrabTime : handGrabTime);
+
+    void GetReturnWindow(float lastT, out float start, out float end)
+    {
+        float T = reloadDuration;
+        end = Mathf.Max(handReturnTime, 1f - gripSettleSeconds / T);
+        end = Mathf.Clamp(end, lastT + 0.1f, 1f);
+        start = lastT + Mathf.Min(seatHoldSeconds / T, 0.15f);
+        float minLen = Mathf.Max(0.2f, minReturnSeconds / T);
+        start = Mathf.Min(start, end - minLen);
+        start = Mathf.Max(start, lastT);
+    }
+
+    void LerpAnchor(float tStart, Vector3 posStart, Quaternion rotStart, float tEnd, Vector3 posEnd, Quaternion rotEnd, float frac, bool gentle = false)
     {
         float segLen = Mathf.Max(0.0001f, tEnd - tStart);
         float segT = Mathf.Clamp01((frac - tStart) / segLen);
-        segT = segT * segT * (3f - 2f * segT); // smoothstep - eases in/out of each leg instead of moving at a constant rate
+        segT = gentle ? segT * segT * segT * (segT * (segT * 6f - 15f) + 10f)  // smootherstep: slow start/finish on the return
+                      : segT * segT * (3f - 2f * segT); // smoothstep - eases in/out of each leg
         handAnchor.SetPositionAndRotation(Vector3.Lerp(posStart, posEnd, segT), Quaternion.Slerp(rotStart, rotEnd, segT));
     }
 

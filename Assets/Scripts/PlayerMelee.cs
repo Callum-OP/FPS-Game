@@ -44,8 +44,9 @@ public class PlayerMelee : MonoBehaviour
             legacyBodyPose?.TriggerMelee();
         }
 
-        Vector3 origin = cam != null ? cam.transform.position : transform.position + Vector3.up * 1.5f;
-        Vector3 dir = cam != null ? cam.transform.forward : transform.forward;
+        Transform eye = ThirdPersonMode.Active && ThirdPersonMode.Eye != null ? ThirdPersonMode.Eye : (cam != null ? cam.transform : null);
+        Vector3 origin = eye != null ? eye.position : transform.position + Vector3.up * 1.5f;
+        Vector3 dir = eye != null ? eye.forward : transform.forward;
 
         var hit = new HashSet<Health>();
         foreach (var col in Physics.OverlapSphere(origin + dir * range * 0.6f, range * 0.7f))

@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -51,6 +52,18 @@ public class WeaponInventory : MonoBehaviour
     [Tooltip("Seconds after any weapon change (toggle, pickup, ally swap) before another is allowed - stops a held or mashed key cycling through weapons faster than you can see what's happening.")]
     public float switchCooldown = 0.5f;
 
+    [Header("Holster (hold 2)")]
+    [Tooltip("Seconds key 2 must be held to holster. A quicker tap still just lowers the gun.")]
+    public float holsterHoldTime = 0.6f;
+    [Tooltip("Seconds the hand takes to carry the weapon to the hip.")]
+    public float holsterCarrySeconds = 0.45f;
+    [Tooltip("Seconds a rifle takes to go from the hip to its back holster (and back when drawing). Pistols are already at the hip.")]
+    public float holsterSlingSeconds = 0.25f;
+    [Tooltip("Seconds to bring the weapon from the hip up into the hands when drawing.")]
+    public float drawSeconds = 0.35f;
+    [Tooltip("Walk-speed multiplier while holstered (same idea as the lowered gun).")]
+    public float holsterSpeedMultiplier = 1.15f;
+
     float nextSwitchTime;
     /// <summary>False for a short time after any weapon change. Everything that changes what
     /// the player is holding (3 to toggle, 1 to pick up or swap) checks this first.</summary>
@@ -61,12 +74,36 @@ public class WeaponInventory : MonoBehaviour
     GameObject primaryPrefab, secondaryPrefab; // source prefabs, for handing a weapon to something else (see PlayerAllySwap)
     Slot activeSlot = Slot.Primary;
     Transform primaryHolster, secondaryHolster;
-    InputAction toggleWeapon;
+    InputAction toggleWeapon, holsterKey, fireKey, aimKey, reloadKey;
+    bool holstered, busy, holdArmed;
+    float pressTime;
+    public bool IsHolstered => holstered;
+    public bool IsHolsterBusy => busy;
+
+    /// <summary>Where the held weapon hangs: the camera normally, the eye mount in third person.</summary>
+    public Transform WeaponParent
+    {
+        get
+        {
+            if (ThirdPersonMode.Active && ThirdPersonMode.Eye != null) return ThirdPersonMode.Eye;
+            return playerSetup != null && playerSetup.fpCamera != null ? playerSetup.fpCamera.transform : Camera.main.transform;
+        }
+    }
+    public void ReparentActiveWeapon()
+    {
+        var a = Active;
+        if (a == null || holstered || playerSetup == null || playerSetup.activeWeapon == null || playerSetup.activeWeapon.gameObject != a) return;
+        a.transform.SetParent(WeaponParent, false);
+    }
 
     void Awake()
     {
         // Single toggle key (3) rather than a select-key per slot.
         toggleWeapon = PlayerInputMap.Make("ToggleWeapon", PlayerInputMap.ToggleWeapon);
+        holsterKey = PlayerInputMap.Make("HolsterKey", PlayerInputMap.LowerWeapon);
+        fireKey = PlayerInputMap.Make("HolsterFire", PlayerInputMap.Fire);
+        aimKey = PlayerInputMap.Make("HolsterAim", PlayerInputMap.Aim);
+        reloadKey = PlayerInputMap.Make("HolsterReload", PlayerInputMap.Reload);
     }
 
     void Start()
@@ -107,7 +144,151 @@ public class WeaponInventory : MonoBehaviour
 
     void Update()
     {
+        if (busy) return;
         if (toggleWeapon.WasPressedThisFrame()) ToggleActive();
+        UpdateHolsterInput();
+    }
+
+    void UpdateHolsterInput()
+    {
+        if (holsterKey.WasPressedThisFrame()) { holdArmed = true; pressTime = Time.unscaledTime; }
+
+        if (holdArmed && !holstered && holsterKey.IsPressed() && Time.unscaledTime - pressTime >= holsterHoldTime)
+        {
+            holdArmed = false;
+            if (CanHolster()) StartCoroutine(HolsterRoutine());
+        }
+
+        if (holsterKey.WasReleasedThisFrame())
+        {
+            if (holdArmed)
+            {
+                // A tap. Holstered -> draw straight into the lowered pose; otherwise toggle lowered.
+                if (holstered) StartCoroutine(DrawRoutine(true));
+                else playerSetup?.lowerWeapon?.ToggleLowered();
+            }
+            holdArmed = false;
+        }
+
+        // Firing, aiming or reloading takes the weapon back out.
+        if (holstered && (fireKey.WasPressedThisFrame() || aimKey.ReadValue<float>() > 0.5f || reloadKey.WasPressedThisFrame()))
+            StartCoroutine(DrawRoutine(false));
+    }
+
+    bool CanHolster()
+    {
+        if (playerSetup == null || playerSetup.activeWeapon == null || !CanSwitch) return false;
+        var g = GetComponent<GrenadeController>();
+        if (g != null && g.IsHoldingGrenade()) return false;
+        return playerSetup.activeWeapon.gameObject == Active;
+    }
+
+    // Weapon root pose at the hip: exactly the holster pose for a pistol; for anything
+    // else the same spot with the gun pointing forward/down so it reads as being put away.
+    void CarryPose(Slot slot, out Vector3 pos, out Quaternion rot)
+    {
+        Transform hip = secondaryHolster != null ? secondaryHolster : transform;
+        pos = hip.position;
+        if (slot == Slot.Secondary) { rot = hip.rotation; return; }
+        rot = Quaternion.LookRotation(transform.forward + Vector3.down * 0.35f, Vector3.up);
+    }
+
+    IEnumerator HolsterRoutine()
+    {
+        busy = true;
+        WeaponController wc = playerSetup.activeWeapon;
+        GameObject w = wc.gameObject;
+        Slot slot = activeSlot;
+        var ads = playerSetup.weaponADS;
+        playerSetup.lowerWeapon?.SetLowered(false);
+        wc.enabled = false; // no firing/reloading while it is being put away
+
+        Vector3 pos = w.transform.position; Quaternion rot = w.transform.rotation;
+        float t = 0f;
+        while (t < holsterCarrySeconds)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / Mathf.Max(0.01f, holsterCarrySeconds)));
+            CarryPose(slot, out pos, out rot);
+            ads?.SetWorldPoseBlend(k, pos, rot);
+            yield return null;
+        }
+
+        // Hand lets go: pose blend off, weapon onto the body at the hip, hands released.
+        ads?.SetWorldPoseBlend(0f, pos, rot);
+        wc.enabled = true;
+        playerSetup.UnequipWeapon();
+        SetWeaponScripts(w, false);
+        w.transform.SetPositionAndRotation(pos, rot);
+        Transform point = slot == Slot.Primary ? primaryHolster : secondaryHolster;
+        w.transform.SetParent(point, true);
+
+        if (slot == Slot.Primary && holsterSlingSeconds > 0f)
+        {
+            Vector3 lp = w.transform.localPosition; Quaternion lr = w.transform.localRotation;
+            t = 0f;
+            while (t < holsterSlingSeconds)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / holsterSlingSeconds));
+                w.transform.localPosition = Vector3.Lerp(lp, Vector3.zero, k);
+                w.transform.localRotation = Quaternion.Slerp(lr, Quaternion.identity, k);
+                yield return null;
+            }
+        }
+        w.transform.localPosition = Vector3.zero;
+        w.transform.localRotation = Quaternion.identity;
+
+        // The other weapon is already on the body, so now everything is holstered.
+        Holster(GetSlot(slot == Slot.Primary ? Slot.Secondary : Slot.Primary), slot == Slot.Primary ? Slot.Secondary : Slot.Primary);
+        holstered = true;
+        playerSetup.playerMovement?.SetSpeedMultiplier(holsterSpeedMultiplier);
+        StartSwitchCooldown();
+        busy = false;
+    }
+
+    IEnumerator DrawRoutine(bool lowered)
+    {
+        GameObject w = GetSlot(activeSlot);
+        if (w == null) { Slot o = activeSlot == Slot.Primary ? Slot.Secondary : Slot.Primary; if (GetSlot(o) != null) { activeSlot = o; w = GetSlot(o); } }
+        if (w == null) { holstered = false; yield break; }
+        busy = true;
+        Slot slot = activeSlot;
+
+        // Rifle: back -> hip first (weapon scripts are still off, so the transform is free).
+        if (slot == Slot.Primary && holsterSlingSeconds > 0f)
+        {
+            float t0 = 0f;
+            Vector3 startPos = w.transform.position; Quaternion startRot = w.transform.rotation;
+            while (t0 < holsterSlingSeconds)
+            {
+                t0 += Time.deltaTime;
+                float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t0 / holsterSlingSeconds));
+                CarryPose(slot, out Vector3 hp, out Quaternion hr);
+                w.transform.SetPositionAndRotation(Vector3.Lerp(startPos, hp, k), Quaternion.Slerp(startRot, hr, k));
+                yield return null;
+            }
+        }
+
+        Equip(slot); // clears holstered, parents to the hand rig, wires everything
+        var ads = playerSetup.weaponADS;
+        CarryPose(slot, out Vector3 pos, out Quaternion rot);
+        ads?.SetWorldPoseBlend(1f, pos, rot);
+        w.transform.SetPositionAndRotation(pos, rot); // no one-frame flash at the camera origin
+        if (lowered) playerSetup.lowerWeapon?.SetLowered(true);
+
+        float t = 0f;
+        while (t < drawSeconds)
+        {
+            t += Time.deltaTime;
+            float k = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / Mathf.Max(0.01f, drawSeconds)));
+            CarryPose(slot, out pos, out rot);
+            ads?.SetWorldPoseBlend(k, pos, rot);
+            yield return null;
+        }
+        ads?.SetWorldPoseBlend(0f, pos, rot);
+        StartSwitchCooldown();
+        busy = false;
     }
 
     /// <summary>Which slot a weapon belongs in. Pistols go to secondary, everything else
@@ -168,9 +349,9 @@ public class WeaponInventory : MonoBehaviour
             Holster(other, slot == Slot.Primary ? Slot.Secondary : Slot.Primary);
 
         activeSlot = slot;
+        holstered = false;
 
-        Transform cam = playerSetup != null && playerSetup.fpCamera != null
-            ? playerSetup.fpCamera.transform : Camera.main.transform;
+        Transform cam = WeaponParent;
 
         target.transform.SetParent(cam, false);
         target.transform.localPosition = Vector3.zero;
@@ -204,7 +385,7 @@ public class WeaponInventory : MonoBehaviour
     }
 
     /// <summary>Back to whatever was last in hand.</summary>
-    public void RestoreActive() => Equip(activeSlot);
+    public void RestoreActive() { if (!holstered) Equip(activeSlot); }
 
     /// <summary>Swaps to whichever slot isn't currently active. If only one slot is
     /// filled this is a no-op - there's nothing to swap to.</summary>
@@ -241,5 +422,6 @@ public class WeaponInventory : MonoBehaviour
     void OnDestroy()
     {
         toggleWeapon.Disable();
+        holsterKey.Disable(); fireKey.Disable(); aimKey.Disable(); reloadKey.Disable();
     }
 }

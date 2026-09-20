@@ -69,6 +69,8 @@ public class PlayerMovement : MonoBehaviour
     public bool IsGrounded => controller != null && controller.isGrounded;
     public bool IsCrouching => isCrouching;
     public float CameraPitch => xRotation;
+    /// <summary>Set by ThirdPersonMode while the camera is being orbited, so the mouse moves the camera and not the aim.</summary>
+    public bool LookDetached { get; set; }
     private float xRotation = 0f;
 
     // Input actions
@@ -188,7 +190,7 @@ public class PlayerMovement : MonoBehaviour
 
     void HandleMouseLook()
     {
-        Vector2 lookInput = lookAction.ReadValue<Vector2>();
+        Vector2 lookInput = LookDetached ? Vector2.zero : lookAction.ReadValue<Vector2>();
 
         xRotation -= lookInput.y * mouseSensitivity;
         xRotation = Mathf.Clamp(xRotation, -lookUpLimit, lookDownLimit);

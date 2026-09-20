@@ -71,6 +71,9 @@ public class WeaponADS : MonoBehaviour
     private Vector3 bobOffset;         // WeaponMovementBob (local space)
     private Quaternion bobRotation = Quaternion.identity;
     private Vector3 pullBackWorld;     // WeaponHandIK (world space direction/magnitude)
+    private float poseBlend;           // WeaponInventory holster/draw: 0 = normal pose, 1 = fully at poseWorldPos/Rot
+    private Vector3 poseWorldPos;
+    private Quaternion poseWorldRot = Quaternion.identity;
 
     void Awake()
     {
@@ -110,6 +113,15 @@ public class WeaponADS : MonoBehaviour
     /// <summary>World-space pull-back applied when the hands can't reach the grip
     /// (WeaponHandIK). Converted into this transform's parent space here.</summary>
     public void SetPullBackWorldOffset(Vector3 worldOffset) => pullBackWorld = worldOffset;
+
+    /// <summary>Blends the finished weapon pose towards a world-space pose (holster / draw
+    /// animation). Composed last, here, so this script stays the single owner of the transform.</summary>
+    public void SetWorldPoseBlend(float blend, Vector3 worldPos, Quaternion worldRot)
+    {
+        poseBlend = Mathf.Clamp01(blend);
+        poseWorldPos = worldPos;
+        poseWorldRot = worldRot;
+    }
 
     /// <summary>The aim/hip pose with no offsets applied - what the weapon would sit at
     /// if nothing were nudging it.</summary>
@@ -161,6 +173,12 @@ public class WeaponADS : MonoBehaviour
 
         transform.localPosition = basePosition + swayOffset + bobOffset + pullLocal;
         transform.localRotation = baseRotation * bobRotation;
+
+        if (poseBlend > 0f)
+        {
+            transform.position = Vector3.Lerp(transform.position, poseWorldPos, poseBlend);
+            transform.rotation = Quaternion.Slerp(transform.rotation, poseWorldRot, poseBlend);
+        }
     }
 
     public bool IsAiming() => isAiming;

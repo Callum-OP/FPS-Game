@@ -29,6 +29,8 @@ public class Projectile : MonoBehaviour
         // Set bullet velocity
         rb = GetComponent<Rigidbody>();
         rb.useGravity = false;
+        rb.mass = 0.01f; // a 1kg bullet at 80m/s slammed corpse bones through the floor
+        rb.linearDamping = 0f;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         rb.linearVelocity = transform.forward * speed;
         Destroy(gameObject, lifetime);

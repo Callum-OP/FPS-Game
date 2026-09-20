@@ -593,6 +593,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 6584250484387406686}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &6342598341672641936
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 208209976510886430}
+  m_Layer: 0
+  m_Name: MagDropPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &208209976510886430
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6342598341672641936}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.6267377, y: 0.3274139, z: -0.3255967, w: 0.6276837}
+  m_LocalPosition: {x: 0.008, y: -0.404, z: -0.104}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6584250484387406686}
+  m_LocalEulerAnglesHint: {x: -35, y: 90, z: -89.834}
 --- !u!1 &6670159704188001392
 GameObject:
   m_ObjectHideFlags: 0
@@ -787,9 +818,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1c919d80a8ec704db0554b1cba6a1dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponReloadHandler
+  debugLogReload: 0
   usesMagazine: 1
   magazinePrefab: {fileID: 4598212022487192858, guid: a6f7c7a42b894964ab1e10a9fa5ee5af, type: 3}
-  magSeatPoint: {fileID: 4823212047154599419}
+  magSeatPoint: {fileID: 208209976510886430}
   weaponMagVisual: {fileID: 1600903123651568755}
   handReloadPoint: {fileID: 4823212047154599419}
   reloadGrabPointOverride: {fileID: 0}
@@ -798,6 +830,8 @@ MonoBehaviour:
   handReloadTime: 0.55
   handReturnTime: 0.9
   weaponReloadPivot: {fileID: 913211804769230092}
+  centerCarriedMagOnHand: 1
+  carriedMagNudge: {x: 0, y: 0, z: 0}
   carriedMagOffsetPosition: {x: 0, y: 0.096, z: 0}
   carriedMagOffsetRotationEuler: {x: -90, y: 0, z: -98.034}
   dropForce: 1.5
@@ -40224,6 +40258,7 @@ Transform:
   - {fileID: 2995501037109118520}
   - {fileID: 3886476777522490002}
   - {fileID: 4823212047154599419}
+  - {fileID: 208209976510886430}
   - {fileID: 913211804769230092}
   m_Father: {fileID: 4100227949904935530}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

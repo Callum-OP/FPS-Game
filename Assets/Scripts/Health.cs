@@ -10,6 +10,7 @@ public class Health : MonoBehaviour
     public UnityEvent<float> onDamaged;
 
     Ragdoll ragdoll;
+    bool isDead;
 
     void Start()
     {
@@ -30,6 +31,7 @@ public class Health : MonoBehaviour
     /// Ragdoll.AccumulateHitForce.</summary>
     public void TakeDamage(float amount, Vector3 hitDirection, float hitForce)
     {
+        if (isDead) return; // corpses take no further damage (stops repeat death events / knockback on bodies)
         currentHealth = Mathf.Max(currentHealth - amount, 0f);
         Debug.Log($"{name} took {amount} damage — {currentHealth} HP remaining");
         onDamaged?.Invoke(currentHealth / maxHealth);
@@ -48,6 +50,7 @@ public class Health : MonoBehaviour
 
     void Die()
     {
+        isDead = true;
         Debug.Log($"{name} died!");
         onDeath?.Invoke();
     }
