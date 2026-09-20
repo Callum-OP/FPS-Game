@@ -787,6 +787,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1c919d80a8ec704db0554b1cba6a1dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponReloadHandler
+  debugLogReload: 1
   usesMagazine: 1
   magazinePrefab: {fileID: 4598212022487192858, guid: a6f7c7a42b894964ab1e10a9fa5ee5af, type: 3}
   magSeatPoint: {fileID: 4823212047154599419}
@@ -40271,13 +40272,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8838756649430544355}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.010512468, y: 0.10660577, z: -0.6858354, w: 0.7198295}
-  m_LocalPosition: {x: -0.084, y: -0.095, z: -0.123}
+  m_LocalRotation: {x: -0.105887085, y: 0.016224401, z: -0.75563467, w: -0.6461742}
+  m_LocalPosition: {x: -0.084000155, y: -0.09499994, z: -0.123000145}
   m_LocalScale: {x: 2.08, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 6584250484387406686}
-  m_LocalEulerAnglesHint: {x: 9.286, y: 8.1, z: -86.57}
+  m_LocalEulerAnglesHint: {x: 9.286, y: 8.1, z: -260.411}
 --- !u!1 &8842356923433211448
 GameObject:
   m_ObjectHideFlags: 0

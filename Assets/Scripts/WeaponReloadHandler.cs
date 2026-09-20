@@ -56,8 +56,12 @@ using System.Collections;
 [RequireComponent(typeof(WeaponController))]
 public class WeaponReloadHandler : MonoBehaviour
 {
+    [Header("Debug")]
+    [Tooltip("Logs reload hand-anchor state to the Console: at reload start (whether repositioning is even active, and the resting distance from the grip to the grab point), then every ~0.25s during the reload (the anchor's live position and its distance from the grab point). Compare a standing-still reload against a walking one - this is the actual data needed to pin down why one reaches and the other doesn't, rather than guessing again.")]
+    public bool debugLogReload = false;
+
     [Header("Magazine")]
-    [Tooltip("Untick for weapons with no detachable mag (e.g. a shotgun reloading shell by shell) - skips the drop/carry/seat visuals entirely even if a magazinePrefab is assigned.")]
+    [Tooltip("Untick for weapons with no detachable mag to eject (e.g. a shotgun reloading shell by shell) - skips dropping the old mag as a world pickup. The carried hand prop (the shell/round itself) still shows every reload cycle as long as magazinePrefab is assigned - that part isn't about mags specifically, it's whatever's being loaded into the gun.")]
     public bool usesMagazine = true;
     [Tooltip("Small mag mesh. Needs a Rigidbody + Collider for the dropped copy to fall like a casing.")]
     public GameObject magazinePrefab;
@@ -157,6 +161,11 @@ public class WeaponReloadHandler : MonoBehaviour
         Transform grabPoint = EffectiveGrabPoint;
         bool canReposition = handIK != null && (grabPoint != null || handReloadPoint != null);
 
+        if (debugLogReload)
+            Debug.Log($"{name}: reload start - canReposition={canReposition}, handIK={(handIK != null)}, " +
+                $"grabPoint={(grabPoint != null ? grabPoint.name : "null")}, handReloadPoint={(handReloadPoint != null)}, " +
+                $"gripToGrabDist={(grabPoint != null && weapon?.leftHandGrip != null ? Vector3.Distance(weapon.leftHandGrip.position, grabPoint.position).ToString("F3") : "n/a")}", this);
+
         if (canReposition && handAnchor == null)
             handAnchor = new GameObject("ReloadHandAnchor (runtime)").transform;
 
@@ -203,9 +212,20 @@ public class WeaponReloadHandler : MonoBehaviour
             if (canReposition)
                 UpdateHandAnchor(frac, gripStartPos, gripStartRot, grabPoint);
 
-            if (usesMagazine && frac >= handGrabTime && !droppedMag)
+            if (debugLogReload && grabPoint != null && handAnchor != null && Time.frameCount % 15 == 0)
+                Debug.Log($"{name}: frac={frac:F2} handAnchor={handAnchor.position} " +
+                    $"distToGrabPoint={Vector3.Distance(handAnchor.position, grabPoint.position):F3}", this);
+
+            if (frac >= handGrabTime && !droppedMag)
             {
-                DropOldMag();
+                // usesMagazine only controls whether the OLD mag is ejected as a
+                // dropped world pickup - that's the one thing that doesn't make sense
+                // for a shell-by-shell weapon (there's no old mag to eject each shot).
+                // The carried prop (SpawnCarriedMag) is the shell/round itself being
+                // loaded, which is exactly what a shotgun still needs to show every
+                // reload cycle - so it always runs whenever a magazinePrefab is
+                // assigned, regardless of this toggle.
+                if (usesMagazine) DropOldMag();
                 SpawnCarriedMag();
                 HideWeaponMagVisual();
                 droppedMag = true;

@@ -163,6 +163,8 @@ MonoBehaviour:
   groundClampDuration: 4
   groundClampTolerance: 0.35
   explosionRagdollForce: 9
+  knockbackSkipAnimationThreshold: 16
+  knockbackImpulseScale: 5
 --- !u!95 &4799998883464736613
 Animator:
   serializedVersion: 7
@@ -235,8 +237,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyWeapon
   weaponPrefab: {fileID: 7210103834045770318, guid: b3bbaab7fe8060f408973ebd0a76e1a7, type: 3}
   restPositionOffset: {x: 0.15, y: 1.1, z: 0.3}
-  restRotationOffset: {x: 0, y: 0, z: 0}
   aimPositionOffset: {x: 0.1, y: 1.18, z: 0.4}
+  restRotationOffset: {x: 0, y: 0, z: 0}
   aimRotationOffset: {x: 0, y: 0, z: 0}
   aimBlendSpeed: 8
   loweredPositionOffset: {x: 0.12, y: 0.85, z: 0.18}
@@ -249,6 +251,8 @@ MonoBehaviour:
   handGrabTime: 0.25
   handSeatTime: 0.6
   worldPickupPrefab: {fileID: 1118620770691677480, guid: 94da89d0446a7d548a00ad91176e4cdd, type: 3}
+  secondaryHolsterPoint: {fileID: 5257276938015235413}
+  secondaryWeaponPrefab: {fileID: 0}
 --- !u!114 &4092626673707240009
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -282,6 +286,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FriendlyAI
   followDistance: 4
+  activeFollowRange: 10
+  patrolRadius: 6
+  patrolMinPause: 1.5
+  patrolMaxPause: 4
   leashDistance: 18
   walkSpeed: 3.5
   chaseSpeed: 5.5
@@ -302,6 +310,11 @@ MonoBehaviour:
   timeInOpenBeforeCover: 4
   coverHideTime: 1.4
   peekDuration: 2
+  allowFriendlyFireFromPlayer: 1
+  autoUpgradeWeapon: 1
+  weaponDetectRadius: 3
+  autoPickupDelay: 4
+  onlyUpgradeOutOfCombat: 1
 --- !u!1 &3014967846191164479
 GameObject:
   m_ObjectHideFlags: 0
@@ -1145,6 +1158,11 @@ CharacterJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!4 &5257276938015235413 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 293712920223200405, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 5541366930316257728}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &5279515576953121709 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 406019600538813037, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}

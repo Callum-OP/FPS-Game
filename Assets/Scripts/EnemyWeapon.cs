@@ -70,6 +70,12 @@ public class EnemyWeapon : MonoBehaviour
     [Tooltip("The matching *Pickup prefab, e.g. ARPickup.prefab - what actually spawns in the world.")]
     public GameObject worldPickupPrefab;
 
+    [Header("Holster Points (visual, for whichever weapon isn't currently held)")]
+    [Tooltip("Where a carried PRIMARY-class weapon (anything that isn't a pistol) rests when not held - the ally/enemy equivalent of the player's back holster. Falls back to a \"BackHolster\" CharacterAttachPoints entry if left empty, or this GameObject's own root if neither exists (tune by eye in Play Mode in that case).")]
+    public Transform primaryHolsterPoint;
+    [Tooltip("Where a carried SECONDARY-class weapon (pistols - matched the same way WeaponInventory.SlotFor does on the player) rests when not held - the equivalent of the player's hip holster. Same fallback chain as primaryHolsterPoint, but looks for \"HipHolster\".")]
+    public Transform secondaryHolsterPoint;
+
     EnemyAI enemyAI;
     FriendlyAI friendlyAI; // set instead of enemyAI when this is on an ally
     WeaponHandIK handIK;
@@ -85,6 +91,8 @@ public class EnemyWeapon : MonoBehaviour
     Transform reloadHandAnchor;
     CharacterAnimationDriver animationDriver;
     Transform weaponReloadPoint; // the gun's own magwell point, if the prefab has one
+    GameObject secondaryInstance; // the actual holstered weapon on the body, if any
+    int secondaryAmmo; // remembered so swapping back doesn't just hand back a full mag
 
     void Start()
     {
@@ -102,11 +110,26 @@ public class EnemyWeapon : MonoBehaviour
     /// the weapon model and its grip/muzzle points change.</summary>
     void SpawnWeapon(GameObject prefab)
     {
+        if (!EnsureAnchorAndHandIK()) return;
+
+        weaponInstance = Instantiate(prefab, anchor);
+        weaponInstance.transform.localPosition = Vector3.zero;
+        weaponInstance.transform.localRotation = Quaternion.identity;
+
+        WireHeldInstance(weaponInstance);
+        ammo = Mathf.Max(1, magazineSize); // fresh instance - full mag, same as picking the weapon up new
+
+        foreach (var mb in weaponInstance.GetComponentsInChildren<MonoBehaviour>(true))
+            mb.enabled = false;
+    }
+
+    bool EnsureAnchorAndHandIK()
+    {
         Animator anim = GetComponentInChildren<Animator>();
         if (anim == null)
         {
             Debug.LogWarning($"EnemyWeapon on '{name}': no Animator found - can't attach the weapon.", this);
-            return;
+            return false;
         }
 
         // WeaponHandIK is fully generic (player-agnostic) - it just needs to live
@@ -128,18 +151,25 @@ public class EnemyWeapon : MonoBehaviour
             anchor = anchorGo.transform;
         }
 
-        weaponInstance = Instantiate(prefab, anchor);
-        weaponInstance.transform.localPosition = Vector3.zero;
-        weaponInstance.transform.localRotation = Quaternion.identity;
+        return true;
+    }
 
+    /// <summary>Pulls the grip/muzzle/ammo-config wiring off an already-instantiated
+    /// weapon and points this component's own AI-facing state (magazineSize, reloadTime,
+    /// muzzlePoint, hand IK grips) at it. Shared by a freshly spawned weapon and a
+    /// secondary being brought back out of its holster - either way this is now the
+    /// weapon actually being aimed and fired, so everything downstream needs to agree on
+    /// which one that is.</summary>
+    void WireHeldInstance(GameObject instance)
+    {
         // Pull the grip/muzzle transforms off the weapon's own WeaponController
         // before stripping every script it brought with it (WeaponController,
         // WeaponADS, WeaponCant... all read player input/camera state, which
         // an enemy doesn't have and shouldn't react to).
-        var reloadHandler = weaponInstance.GetComponent<WeaponReloadHandler>();
+        var reloadHandler = instance.GetComponent<WeaponReloadHandler>();
         weaponReloadPoint = reloadHandler != null ? reloadHandler.handReloadPoint : null;
 
-        WeaponController wc = weaponInstance.GetComponent<WeaponController>();
+        WeaponController wc = instance.GetComponent<WeaponController>();
         if (wc != null)
         {
             handIK.SetGripTargets(wc.rightHandGrip, wc.leftHandGrip);
@@ -163,11 +193,6 @@ public class EnemyWeapon : MonoBehaviour
             if (wc.maxAmmo > 0) magazineSize = wc.maxAmmo;
             if (wc.reloadTime > 0f) reloadTime = wc.reloadTime;
         }
-
-        ammo = Mathf.Max(1, magazineSize);
-
-        foreach (var mb in weaponInstance.GetComponentsInChildren<MonoBehaviour>(true))
-            mb.enabled = false;
     }
 
     [Header("Secondary (carried, not held)")]
@@ -181,12 +206,14 @@ public class EnemyWeapon : MonoBehaviour
     /// <summary>Swaps the held weapon for a different held-weapon prefab (one of the
     /// player's own, e.g. what a WeaponPickup would hand the player, or what
     /// PlayerAllySwap trades in) - used by FriendlyAI to upgrade an ally's weapon on the
-    /// fly. The weapon being replaced is kept as this ally's secondary rather than being
-    /// discarded, so a trade doesn't just erase whatever they were already carrying - it
-    /// gives them their own two-weapon inventory, the same idea as the player's
-    /// WeaponInventory Primary/Secondary slots. If a secondary is already held, IT is the
-    /// one discarded (there's nowhere left to put it) - this should be rare in practice
-    /// since SwapWith on the player side only ever trades the ACTIVE weapon.</summary>
+    /// fly. The weapon being replaced is HOLSTERED (visible on the body, same idea as the
+    /// player's back/hip holster) as this ally's secondary rather than being discarded,
+    /// so a trade doesn't just erase whatever they were already carrying, and it doesn't
+    /// just fall to the ground either - it gives them their own two-weapon inventory, the
+    /// same idea as the player's WeaponInventory Primary/Secondary slots. If a secondary
+    /// is already held, IT is the one destroyed (there's nowhere left to put it) - this
+    /// should be rare in practice since SwapWith on the player side only ever trades the
+    /// ACTIVE weapon.</summary>
     public void EquipWeapon(GameObject newHeldWeaponPrefab)
     {
         if (newHeldWeaponPrefab == null) return;
@@ -194,30 +221,142 @@ public class EnemyWeapon : MonoBehaviour
         reloading = false;
         aiming = false;
 
-        if (weaponPrefab != null && weaponPrefab != newHeldWeaponPrefab)
-            secondaryWeaponPrefab = weaponPrefab;
+        // Figure out which of the ally's two slots (whatever's HELD, whatever's
+        // CARRIED/holstered) is the same class as the incoming weapon - that's the one
+        // being traded away, and the other slot must be left completely alone. Getting
+        // this wrong is what used to destroy the holstered pistol and dump the previous
+        // rifle at the ally's feet whenever a rifle was swapped for another rifle: the
+        // old code always treated the currently-HELD weapon as the one to holster and
+        // always destroyed whatever was already carried, regardless of which slot the
+        // new weapon actually belonged in.
+        bool newIsSecondary = IsSecondaryClass(newHeldWeaponPrefab);
+        bool heldMatches = weaponPrefab != null && IsSecondaryClass(weaponPrefab) == newIsSecondary;
+        bool carriedMatches = secondaryWeaponPrefab != null && IsSecondaryClass(secondaryWeaponPrefab) == newIsSecondary;
+
+        if (heldMatches)
+        {
+            // Same class as what's in hand right now - just replace it. The carried
+            // spare, if any, is a different class and is untouched.
+            if (weaponInstance != null) Destroy(weaponInstance);
+        }
+        else if (carriedMatches)
+        {
+            // Same class as the carried spare - THAT'S what's being replaced, not the
+            // held weapon. The held weapon isn't going anywhere except onto the body,
+            // since the incoming weapon is what's coming into hand now.
+            if (secondaryInstance != null) Destroy(secondaryInstance);
+            secondaryInstance = null;
+            secondaryWeaponPrefab = null;
+
+            if (weaponInstance != null)
+            {
+                secondaryInstance = weaponInstance;
+                secondaryWeaponPrefab = weaponPrefab;
+                secondaryAmmo = ammo;
+                HolsterSecondaryVisual();
+            }
+        }
+        else
+        {
+            // Neither slot is this weapon's class yet (e.g. nothing's been carried
+            // before) - holster whatever's currently held, discarding any carried spare
+            // to make room (there's still only one carry slot).
+            if (secondaryInstance != null) Destroy(secondaryInstance);
+            if (weaponInstance != null)
+            {
+                secondaryInstance = weaponInstance;
+                secondaryWeaponPrefab = weaponPrefab;
+                secondaryAmmo = ammo;
+                HolsterSecondaryVisual();
+            }
+        }
 
         weaponPrefab = newHeldWeaponPrefab;
-
-        if (weaponInstance != null) Destroy(weaponInstance);
         weaponInstance = null;
 
         SpawnWeapon(newHeldWeaponPrefab);
     }
 
     /// <summary>Brings the carried secondary into the ally's hands, storing whatever was
-    /// previously held as the new secondary. No-op if there's no secondary to swap to.
-    /// Not called automatically anywhere yet (e.g. on running dry with no time to
-    /// reload) - hook it into FriendlyAI's combat state if that behaviour is wanted.</summary>
+    /// previously held as the new secondary. Reuses the actual holstered instance (rather
+    /// than destroying it and instantiating a fresh one, the way EquipWeapon does for a
+    /// genuinely new weapon) so its remaining ammo carries over instead of coming back as
+    /// a full mag. No-op if there's no secondary to swap to. Not called automatically
+    /// anywhere yet (e.g. on running dry with no time to reload) - hook it into
+    /// FriendlyAI's combat state if that behaviour is wanted.</summary>
     public void SwapToSecondary()
     {
         if (secondaryWeaponPrefab == null) return;
 
-        GameObject incoming = secondaryWeaponPrefab;
-        GameObject outgoing = weaponPrefab;
-        secondaryWeaponPrefab = outgoing; // may be null if this is the ally's first weapon
-        weaponPrefab = null; // prevents EquipWeapon from stashing 'outgoing' a second time
-        EquipWeapon(incoming);
+        GameObject incomingPrefab = secondaryWeaponPrefab;
+        GameObject incomingInstance = secondaryInstance;
+        int incomingAmmo = secondaryAmmo;
+
+        // The outgoing weapon becomes the new secondary - holstered, not destroyed.
+        secondaryWeaponPrefab = weaponPrefab;
+        secondaryInstance = weaponInstance;
+        secondaryAmmo = ammo;
+        if (secondaryInstance != null) HolsterSecondaryVisual();
+
+        weaponPrefab = incomingPrefab;
+        weaponInstance = null;
+        reloading = false;
+        aiming = false;
+
+        if (incomingInstance != null && EnsureAnchorAndHandIK())
+        {
+            incomingInstance.transform.SetParent(anchor, false);
+            incomingInstance.transform.localPosition = Vector3.zero;
+            incomingInstance.transform.localRotation = Quaternion.identity;
+            WireHeldInstance(incomingInstance);
+            weaponInstance = incomingInstance;
+            ammo = Mathf.Clamp(incomingAmmo, 0, magazineSize);
+        }
+        else
+        {
+            // No instance was ever holstered (e.g. secondaryWeaponPrefab was set directly
+            // on the prefab rather than accumulated via a swap) - fall back to spawning
+            // fresh, same as a first-time equip.
+            SpawnWeapon(incomingPrefab);
+        }
+    }
+
+    void HolsterSecondaryVisual()
+    {
+        if (secondaryInstance == null) return;
+        Transform point = ResolveHolster(secondaryWeaponPrefab);
+        secondaryInstance.transform.SetParent(point, false);
+        secondaryInstance.transform.localPosition = Vector3.zero;
+        secondaryInstance.transform.localRotation = Quaternion.identity;
+        secondaryInstance.SetActive(true);
+        // Already all disabled (SpawnWeapon strips every script off any held instance),
+        // but re-assert it in case something re-enabled one - a holstered weapon must
+        // never itself run WeaponController/WeaponADS/etc.
+        foreach (var mb in secondaryInstance.GetComponentsInChildren<MonoBehaviour>(true))
+            mb.enabled = false;
+    }
+
+    /// <summary>Pistols go to the hip holster, everything else to the back - matched the
+    /// same way WeaponInventory.SlotFor classifies weapons on the player, so an ally
+    /// carrying a rifle and a pistol wears them the same way the player does.</summary>
+    static bool IsSecondaryClass(GameObject weapon)
+    {
+        if (weapon == null) return false;
+        string n = weapon.name.ToLowerInvariant();
+        return n.Contains("mono19") || n.Contains("pistol");
+    }
+
+    Transform ResolveHolster(GameObject weaponPrefabOrInstance)
+    {
+        bool secondaryClass = IsSecondaryClass(weaponPrefabOrInstance);
+        Transform assigned = secondaryClass ? secondaryHolsterPoint : primaryHolsterPoint;
+        if (assigned != null) return assigned;
+
+        var points = GetComponentInChildren<CharacterAttachPoints>();
+        var named = points != null ? points.Get(secondaryClass ? "HipHolster" : "BackHolster") : null;
+        if (named != null) return named;
+
+        return transform; // last resort - assign primaryHolsterPoint/secondaryHolsterPoint for a real spot
     }
 
     /// <summary>The currently held weapon's WeaponController, for comparing this
@@ -369,6 +508,8 @@ public class EnemyWeapon : MonoBehaviour
 
         if (weaponInstance != null)
             weaponInstance.SetActive(false);
+        if (secondaryInstance != null)
+            secondaryInstance.SetActive(false);
     }
 
     void OnDestroy()

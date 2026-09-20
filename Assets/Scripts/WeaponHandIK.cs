@@ -67,8 +67,8 @@ public class WeaponHandIK : MonoBehaviour
     [Header("Finger Grip")]
     [Tooltip("Curl applied to the right hand's fingers while it's gripping (weight > 0). Fades in/out with the same weight as the hand IK itself, so an empty hand relaxes back to the animated pose.")]
     public FingerGripPose rightGripPose = new FingerGripPose();
-    [Tooltip("Curl applied to the left hand's fingers while it's gripping (weight > 0).")]
-    public FingerGripPose leftGripPose = new FingerGripPose();
+    [Tooltip("Curl applied to the left hand's fingers while it's gripping (weight > 0). Defaults to a mirrored curlAxis (-1,0,0) rather than copying rightGripPose's (1,0,0) - most rigs, Mixamo included, don't mirror bone-local axes between left and right, so the same signed axis curls one hand into a fist and the other backward (looks like the hand itself is reversed). If this rig genuinely does have mirrored bone axes, flip it back to match rightGripPose.")]
+    public FingerGripPose leftGripPose = new FingerGripPose { curlAxis = new Vector3(-1f, 0f, 0f) };
 
     [Header("Weapon Pull-Back (keeps the gun in reach)")]
     [Tooltip("When aiming makes the weapon (parented to the camera) move out beyond the arms' actual reach, the left hand on two-handed weapons usually runs out first, since it travels further from the body. Rather than let the hand visibly stop short of the grip (which the arm reach clamp above would otherwise do), the weapon is pulled back toward whichever shoulder is short by however much - in whatever direction actually closes the gap, not just straight back, so this helps for looking down as well as up. Set to 0 to disable and go back to the hand just clamping short.")]
@@ -89,6 +89,11 @@ public class WeaponHandIK : MonoBehaviour
     public float maxTorsoLean = 8f;
     [Tooltip("How fast the torso lean eases in/out.")]
     public float torsoLeanSpeed = 6f;
+
+    [Header("Debug")]
+    [Tooltip("Logs the left hand's IK state every ~0.25s: its weight, the raw (unclamped) distance from the shoulder to its current target, the measured maxReach, and whether the reach clamp is actively cutting it short. Use this alongside WeaponReloadHandler.debugLogReload - if this says the clamp IS cutting the hand short while standing but NOT while walking, that's the actual cause; if the hand's weight itself isn't ramping to 1, the override isn't even engaging and the cause is upstream of this script entirely.")]
+    public bool debugLogLeftHand = false;
+    int debugLogFrameCounter;
 
     Animator anim;
     Transform rightGrip;
@@ -159,6 +164,18 @@ public class WeaponHandIK : MonoBehaviour
         rightFingerBones = CacheFingerBones(isRight: true);
         leftFingerBones = CacheFingerBones(isRight: false);
 
+        // Finger curl having "no effect" almost always means the rig's Humanoid Avatar
+        // simply has no finger bones mapped - they're optional in Unity's Avatar setup
+        // and Mixamo characters frequently import without them configured, so
+        // CacheFingerBones silently gets back all-null and ApplyFingerGrip has nothing to
+        // rotate. That was a silent no-op before with zero indication why - logging it
+        // once here so it's actually diagnosable instead of looking like a code bug.
+        if (!AnyBoneResolved(rightFingerBones) && !AnyBoneResolved(leftFingerBones))
+            Debug.LogWarning($"{name}: WeaponHandIK found no finger bones on this Avatar - " +
+                "finger curl will have no visible effect. Re-open the character's model import " +
+                "settings, Animation > Configure Avatar, and check the Fingers mapping is filled " +
+                "in (not just the arms/legs/spine) - Mixamo rigs commonly need this done manually.", this);
+
         rightShoulder = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
         rightHandBone = anim.GetBoneTransform(HumanBodyBones.RightHand);
         leftShoulder = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
@@ -227,6 +244,14 @@ public class WeaponHandIK : MonoBehaviour
                 result[f][j] = anim.GetBoneTransform(bones[f, j]); // null if this rig has no finger bones - handled at apply time
         }
         return result;
+    }
+
+    static bool AnyBoneResolved(Transform[][] fingerBones)
+    {
+        foreach (var finger in fingerBones)
+            foreach (var bone in finger)
+                if (bone != null) return true;
+        return false;
     }
 
     /// <summary>The live hand bone (not the weapon grip) - use this to attach props that
@@ -409,6 +434,39 @@ public class WeaponHandIK : MonoBehaviour
         }
     }
 
+    // Flipping leftGripPose.curlAxis's sign didn't fix a still-backward left hand, which
+    // means the true fix isn't just a sign flip on X - it could be a different axis
+    // entirely (Y/Z), or this rig's left hand bones genuinely aren't a mirror of the
+    // right's at all (worth first checking: does the RAW Mixamo clip itself show a
+    // backward left hand with WeaponHandIK disabled entirely? If yes, this is an Avatar/
+    // rig mapping problem, not something this script can fix). Rather than guess a third
+    // value blind, this draws each knuckle's actual curlAxis as a coloured ray in the
+    // Scene view (select this GameObject to see it) - yellow = right hand, cyan = left -
+    // so you can rotate the Scene camera around a knuckle and see by eye which local axis
+    // direction actually points "into a fist" for that specific bone, on each hand, and
+    // read the correct value straight off instead of trial-and-error in Play Mode.
+    void OnDrawGizmosSelected()
+    {
+        DrawCurlAxisGizmos(rightFingerBones, rightGripPose?.curlAxis ?? Vector3.right, Color.yellow);
+        DrawCurlAxisGizmos(leftFingerBones, leftGripPose?.curlAxis ?? Vector3.right, Color.cyan);
+    }
+
+    static void DrawCurlAxisGizmos(Transform[][] fingerBones, Vector3 curlAxis, Color color)
+    {
+        if (fingerBones == null) return;
+        Gizmos.color = color;
+        foreach (var finger in fingerBones)
+        {
+            foreach (var bone in finger)
+            {
+                if (bone == null) continue;
+                Vector3 worldAxis = bone.TransformDirection(curlAxis.normalized);
+                Gizmos.DrawLine(bone.position, bone.position + worldAxis * 0.04f);
+                Gizmos.DrawSphere(bone.position + worldAxis * 0.04f, 0.003f);
+            }
+        }
+    }
+
     // Returns the world-space vector by which the raw (pre-clamp) target exceeded
     // maxReach - i.e. pointing away from the shoulder, with a magnitude equal to how far
     // over the limit it was - or Vector3.zero if it was already in reach / there's
@@ -419,6 +477,10 @@ public class WeaponHandIK : MonoBehaviour
     {
         anim.SetIKPositionWeight(goal, weight);
         anim.SetIKRotationWeight(goal, weight);
+
+        if (debugLogLeftHand && goal == AvatarIKGoal.LeftHand && weight <= 0.05f && (debugLogFrameCounter % 15 == 0))
+            Debug.Log($"{name}: leftHand weight={weight:F2} (near zero - grip={(grip != null ? grip.name : "null")}) - override isn't engaging yet, or at all.", this);
+
         if (weight <= 0f) return Vector3.zero; // grip may already be null while weight fades out
 
         Vector3 excessVector = Vector3.zero;
@@ -448,8 +510,13 @@ public class WeaponHandIK : MonoBehaviour
                 // The hand itself still clamps against the grip's real current position.
                 Vector3 fromShoulder = targetPos - shoulder.position;
                 float dist = fromShoulder.magnitude;
-                if (dist > maxReach)
+                bool clamped = dist > maxReach;
+                if (clamped)
                     targetPos = shoulder.position + (fromShoulder / dist) * maxReach;
+
+                if (debugLogLeftHand && goal == AvatarIKGoal.LeftHand && (debugLogFrameCounter++ % 15 == 0))
+                    Debug.Log($"{name}: leftHand weight={weight:F2} dist={dist:F3} maxReach={maxReach:F3} " +
+                        $"clamped={clamped} appliedPullBack={appliedPullBack}", this);
             }
 
             anim.SetIKPosition(goal, targetPos);

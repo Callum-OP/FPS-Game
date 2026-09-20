@@ -80,6 +80,7 @@ public class PlayerAllySwap : MonoBehaviour
 
         GameObject allyPrefab = allyWeapon.weaponPrefab;
         GameObject playerPrefab = inventory.ActivePrefab;
+        GameObject playerWeaponInstance = inventory.Active; // the live weapon we're about to give away
 
         // The weapon the player started the game already holding was never given a
         // recorded prefab (nothing instantiated it through Store) UNLESS
@@ -110,6 +111,23 @@ public class PlayerAllySwap : MonoBehaviour
         held.SetActive(true);
 
         GameObject displaced = inventory.Store(held, equipImmediately: true, sourcePrefab: allyPrefab);
+
+        // Store() only clears out whatever was already sitting in the INCOMING weapon's
+        // own slot. That's exactly right when the ally hands back the same class of
+        // weapon (rifle for rifle) - it lands in the same slot and naturally displaces
+        // our old one. But when the ally only has, say, a pistol (Secondary) and we gave
+        // away a rifle (Primary), the incoming pistol never touches the Primary slot, so
+        // our outgoing rifle was never removed - just holstered, since it's no longer the
+        // active weapon - and stayed on our back despite having supposedly been handed
+        // over. It really has been given away (the ally's EquipWeapon just spawned a
+        // fresh instance from playerPrefab), so our old copy is now a stale duplicate and
+        // needs to go.
+        if (playerWeaponInstance != null && playerWeaponInstance != displaced && playerWeaponInstance != held)
+        {
+            inventory.Remove(playerWeaponInstance);
+            Destroy(playerWeaponInstance);
+        }
+
         if (displaced != null)
         {
             // The player's OTHER slot (not the one just handed to the ally) still needs

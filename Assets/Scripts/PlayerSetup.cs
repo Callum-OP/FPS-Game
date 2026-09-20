@@ -25,6 +25,9 @@ public class PlayerSetup : MonoBehaviour
     CharacterAnimationDriver characterAnimation;
     WeaponHandIK weaponHandIK;
     WeaponReloadHandler weaponReloadHandler;
+    [Tooltip("Logs the resolved CharacterAttachPoints reference and 'ReloadGrab' lookup result every time a weapon is gathered/wired. Turn on if a specific weapon keeps getting a null ReloadGrab while others don't.")]
+    public bool debugLogAttachPoints = false;
+
     CharacterAttachPoints attachPoints;
 
     void Awake()
@@ -90,6 +93,20 @@ public class PlayerSetup : MonoBehaviour
 
     void GatherWeaponComponents(WeaponController weapon)
     {
+        // Re-resolved here (not just cached from Awake) so a weapon swap can't leave this
+        // pointing at a destroyed reference - it used to only be found once in Awake,
+        // which worked fine for the starting weapon but went silently null (Unity's
+        // fake-null on a destroyed object, caught by `?.` rather than throwing) for every
+        // weapon picked up afterward if CharacterAttachPoints ever ended up parented
+        // under a weapon model instead of the player's own persistent body. It must live
+        // on the body, not any weapon - re-fetching here is a safety net, not a fix for
+        // that placement mistake if it's the actual cause.
+        if (attachPoints == null) attachPoints = GetComponentInChildren<CharacterAttachPoints>();
+
+        if (debugLogAttachPoints)
+            Debug.Log($"GatherWeaponComponents({weapon.name}): attachPoints={(attachPoints != null ? attachPoints.name : "NULL")} " +
+                $"ReloadGrab={(attachPoints != null ? (attachPoints.Get("ReloadGrab") != null ? attachPoints.Get("ReloadGrab").name : "not found in list") : "n/a")}", this);
+
         // All these live in the weapon hierarchy
         weaponCant = weapon.GetComponentInChildren<WeaponCant>(true);
         weaponRecoil = weapon.GetComponentInChildren<WeaponRecoil>(true);
