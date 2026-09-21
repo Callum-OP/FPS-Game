@@ -36,6 +36,7 @@ public class CharacterAnimationDriver : MonoBehaviour
     static readonly int InjuredHash = Animator.StringToHash("Injured");
     static readonly int DeathFromBackHash = Animator.StringToHash("DeathFromBack");
     static readonly int GrenadeHash = Animator.StringToHash("Grenade");
+    static readonly int HitHash = Animator.StringToHash("Hit");
     static readonly int MoveXHash = Animator.StringToHash("MoveX");
     static readonly int MoveYHash = Animator.StringToHash("MoveY");
 
@@ -51,6 +52,8 @@ public class CharacterAnimationDriver : MonoBehaviour
             }
         }
         currentWeaponClass = defaultWeaponClass;
+        if (animator != null)
+            foreach (var p in animator.parameters) if (p.nameHash == HitHash) { hasHitParam = true; break; }
         if (animator != null) animator.SetInteger(WeaponClassHash, (int)currentWeaponClass);
     }
 
@@ -95,6 +98,35 @@ public class CharacterAnimationDriver : MonoBehaviour
     public void PlayMelee() { if (CanAnimate()) animator.SetTrigger(MeleeHash); }
 
     /// <summary>Plays the grenade throw on the masked upper body - legs keep walking.</summary>
+    bool hasHitParam;
+    float lastHitTime = -10f, lastHealthFraction = 1f;
+    [Header("Hit Reaction")]
+    [Tooltip("Minimum seconds between flinches so sustained fire doesn't lock the upper body into one.")]
+    public float hitReactionCooldown = 0.8f;
+
+    void Start()
+    {
+        // Flinch whenever health goes DOWN (player or any Health-based character).
+        var ph = GetComponentInParent<PlayerHealth>();
+        if (ph != null) ph.onHealthChanged += OnHealthFraction;
+        var h = GetComponentInParent<Health>();
+        if (h != null) h.onDamaged.AddListener(OnHealthFraction);
+    }
+
+    void OnHealthFraction(float fraction)
+    {
+        if (fraction < lastHealthFraction - 0.0001f && fraction > 0f) PlayHit();
+        lastHealthFraction = fraction;
+    }
+
+    /// <summary>Short masked upper-body flinch (UB_Hit). Rate limited.</summary>
+    public void PlayHit()
+    {
+        if (!hasHitParam || !CanAnimate() || Time.time - lastHitTime < hitReactionCooldown) return;
+        lastHitTime = Time.time;
+        animator.SetTrigger(HitHash);
+    }
+
     public void PlayGrenade() { if (CanAnimate()) animator.SetTrigger(GrenadeHash); }
 
     public void SetDead(bool dead) { if (CanAnimate()) animator.SetBool(DeadHash, dead); }

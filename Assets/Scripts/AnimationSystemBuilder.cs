@@ -65,10 +65,10 @@ public static class AnimationSystemBuilder
 
         // Pistol - Pistol_Handgun Locomotion Pack
         new ClipDef("pi_idle",       "Pistol_Handgun Locomotion Pack", "pistol idle", true),
-        new ClipDef("pi_walk_fwd",   "Pistol_Handgun Locomotion Pack", "pistol walk arc", true),
-        new ClipDef("pi_run_fwd",    "Pistol_Handgun Locomotion Pack", "pistol run arc", true),
-        new ClipDef("pi_walk_back",  "Pistol_Handgun Locomotion Pack", "pistol walk backward arc", true),
-        new ClipDef("pi_run_back",   "Pistol_Handgun Locomotion Pack", "pistol run backward arc", true),
+        new ClipDef("pi_walk_fwd",   "Pistol_Handgun Locomotion Pack", "pistol walk", true),
+        new ClipDef("pi_run_fwd",    "Pistol_Handgun Locomotion Pack", "pistol run", true),
+        new ClipDef("pi_walk_back",  "Pistol_Handgun Locomotion Pack", "pistol walk backward", true),
+        new ClipDef("pi_run_back",   "Pistol_Handgun Locomotion Pack", "pistol run backward", true),
         new ClipDef("pi_left",       "Pistol_Handgun Locomotion Pack", "pistol strafe", true),
         new ClipDef("pi_right",      "Pistol_Handgun Locomotion Pack", "pistol strafe (2)", true),
         new ClipDef("pi_jump",       "Pistol_Handgun Locomotion Pack", "pistol jump", false),
@@ -117,6 +117,13 @@ public static class AnimationSystemBuilder
         new ClipDef("rc_walk_left",  "Pro Rifle Pack", "walk crouching left", true),
         new ClipDef("rc_walk_right", "Pro Rifle Pack", "walk crouching right", true),
         new ClipDef("rc_idle_plain", "Pro Rifle Pack", "idle crouching", true),
+
+        // Added: unarmed backwards (the Locomotion pack has none), crouch diagonals backwards,
+        // and the sprint that was imported but never used.
+        new ClipDef("un_walk_back",  "Pro Melee Axe Pack", "unarmed walk back", true),
+        new ClipDef("un_run_back",   "Pro Melee Axe Pack", "unarmed run back", true),
+        new ClipDef("rc_walk_back_l","Pro Rifle Pack", "walk crouching backward left", true),
+        new ClipDef("rc_walk_back_r","Pro Rifle Pack", "walk crouching backward right", true),
 
         // Cover - Action Adventure Pack. Enemies (and allies) use these to drop into and
         // rise from cover instead of just crouching where they stand.
@@ -401,6 +408,7 @@ public static class AnimationSystemBuilder
         controller.AddParameter("Reload", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Melee", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Grenade", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Dead", AnimatorControllerParameterType.Bool);
         controller.AddParameter("Injured", AnimatorControllerParameterType.Bool);
         // Which death clip to play - set by CharacterAnimationDriver.SetDead(dead, fromBack).
@@ -427,6 +435,24 @@ public static class AnimationSystemBuilder
     {
         var sm = controller.layers[0].stateMachine;
 
+        // All trees are FreeformDirectional2D: Simple Directional only looks at the ANGLE of the
+        // input and can't hold several clips in one direction (walk + run straight ahead), and the
+        // strafe clips used to sit on diagonals so pure sideways input never reached them.
+        // Freeform blends by direction AND speed with the strafes on the real sideways axis.
+        // CharacterLocomotion feeds: y = forward tier (walk 1, run 2, sprint 3, backwards
+        // negative), x = sideways tier (+-1 at run speed).
+
+        // Pistol AND rifle share this tree: only the arms differ and they are IK'd onto the gun.
+        BlendTree armed = Freeform2D("Armed", new (float x, float y, string key)[]
+        {
+            (0,0,"pi_idle"),
+            (0,1,"pi_walk_fwd"), (0,2,"pi_run_fwd"), (0,3,"ri_sprint_fwd"),
+            (0,-1,"pi_walk_back"), (0,-2,"pi_run_back"),
+            (-0.5f,0,"pi_left"), (-1,0,"pi_left"),
+            (0.5f,0,"pi_right"), (1,0,"pi_right"),
+        });
+        // Unarmed keeps its ORIGINAL Simple Directional tree: the Freeform version made the
+        // forward clips walk slanted to the right (the Pro Melee stance clips don't suit it).
         BlendTree unarmed = Directional2D("Unarmed", new (float x, float y, string key)[]
         {
             (0,0,"un_idle"), (0,1,"un_walk_fwd"), (0,2,"un_run_fwd"),
@@ -434,52 +460,25 @@ public static class AnimationSystemBuilder
             (-1,2,"un_run_left"), (1,2,"un_run_right"),
         });
 
-        BlendTree pistol = Directional2D("Pistol", new (float x, float y, string key)[]
-        {
-            (0,0,"pi_idle"), (0,1,"pi_walk_fwd"), (0,2,"pi_run_fwd"),
-            (0,-1,"pi_walk_back"), (0,-2,"pi_run_back"),
-            (-1,1,"pi_left"), (1,1,"pi_right"),
-            (-1,2,"pi_left"), (1,2,"pi_right"),
-        });
-
-        BlendTree rifle = Directional2D("Rifle", new (float x, float y, string key)[]
-        {
-            (0,0,"ri_idle"),
-            (0,1,"ri_walk_fwd"), (-0.5f,1,"ri_walk_fwd_l"), (0.5f,1,"ri_walk_fwd_r"),
-            (-1,0.5f,"ri_walk_left"), (1,0.5f,"ri_walk_right"),
-            (0,-1,"ri_walk_back"),
-            (0,2,"ri_run_fwd"), (-0.5f,2,"ri_run_fwd_l"), (0.5f,2,"ri_run_fwd_r"),
-            (-1,1.2f,"ri_run_left"), (1,1.2f,"ri_run_right"),
-            (0,-2,"ri_run_back"), (-0.5f,-2,"ri_run_back_l"), (0.5f,-2,"ri_run_back_r"),
-        });
-
-        // Used by EVERY weapon class now, not just the rifle. Only the arms differ
-        // between a rifle and a pistol pose, and the arms are IK'd onto whichever gun is
-        // actually held (plus, for the pistol, overridden by the masked UpperBody pose
-        // added in BuildUpperBodyLayer) - so the legs from the rifle crouch clip read
-        // fine underneath a pistol or empty hands. That's the "lower half of one pose,
-        // upper half of another" combination.
-        BlendTree rifleCrouch = Directional2D("RifleCrouch", new (float x, float y, string key)[]
+        BlendTree rifleCrouch = Freeform2D("RifleCrouch", new (float x, float y, string key)[]
         {
             (0,0,"rc_idle"),
-            (0,1,"rc_walk_fwd"), (-0.5f,1,"rc_walk_fwd_l"), (0.5f,1,"rc_walk_fwd_r"),
-            (-1,0.5f,"rc_walk_left"), (1,0.5f,"rc_walk_right"),
-            (0,-1,"rc_walk_back"),
+            (0,1,"rc_walk_fwd"), (-0.7f,0.7f,"rc_walk_fwd_l"), (0.7f,0.7f,"rc_walk_fwd_r"),
+            (-1,0,"rc_walk_left"), (1,0,"rc_walk_right"),
+            (0,-1,"rc_walk_back"), (-0.7f,-0.7f,"rc_walk_back_l"), (0.7f,-0.7f,"rc_walk_back_r"),
         });
-
-        // Male Injured Pack has no strafe clips, so left/right just reuse forward -
-        // a fine approximation for a temporary low-health overlay.
-        BlendTree injured = Directional2D("Injured", new (float x, float y, string key)[]
+        // Male Injured Pack has no strafe clips - sideways reuses forward.
+        BlendTree injured = Freeform2D("Injured", new (float x, float y, string key)[]
         {
             (0,0,"inj_idle"),
-            (0,1,"inj_walk_fwd"), (-1,1,"inj_walk_fwd"), (1,1,"inj_walk_fwd"),
-            (0,2,"inj_run_fwd"), (-1,2,"inj_run_fwd"), (1,2,"inj_run_fwd"),
+            (0,1,"inj_walk_fwd"), (0,2,"inj_run_fwd"),
             (0,-1,"inj_walk_back"), (0,-2,"inj_run_back"),
+            (-1,0,"inj_walk_fwd"), (1,0,"inj_walk_fwd"),
         });
+        BlendTree pistol = armed, rifle = armed;
 
         AssetDatabase.AddObjectToAsset(unarmed, controller);
-        AssetDatabase.AddObjectToAsset(pistol, controller);
-        AssetDatabase.AddObjectToAsset(rifle, controller);
+        AssetDatabase.AddObjectToAsset(armed, controller);
         AssetDatabase.AddObjectToAsset(rifleCrouch, controller);
         AssetDatabase.AddObjectToAsset(injured, controller);
 
@@ -487,7 +486,12 @@ public static class AnimationSystemBuilder
         AnimatorState sPistol  = AddMotionState(sm, "Pistol", pistol, new Vector3(220, 300, 0));
         AnimatorState sRifle   = AddMotionState(sm, "Rifle", rifle, new Vector3(440, 300, 0));
         AnimatorState sCrouch  = AddMotionState(sm, "RifleCrouch", rifleCrouch, new Vector3(440, 460, 0));
-        AnimatorState sAir     = AddMotionState(sm, "Airborne", C("airborne_idle"), new Vector3(220, 460, 0));
+        // Jump chain: take-off -> loop -> landing (these clips were imported but never used;
+        // it was one falling-idle pose for every jump and fall).
+        AnimatorState sAir     = AddMotionState(sm, "JumpUp", C("ri_jump_up") != null ? C("ri_jump_up") : C("airborne_idle"), new Vector3(220, 460, 0));
+        AnimatorState sAirLoop = AddMotionState(sm, "Airborne", C("ri_jump_loop") != null ? C("ri_jump_loop") : C("airborne_idle"), new Vector3(220, 540, 0));
+        AnimatorState sLand    = AddMotionState(sm, "Land", C("ri_jump_down"), new Vector3(0, 540, 0));
+        AnimatorState sDeadCrouch = AddMotionState(sm, "DeathCrouch", C("ri_death_crouch") != null ? C("ri_death_crouch") : C("ri_death_front"), new Vector3(660, 620, 0));
         AnimatorState sInjured = AddMotionState(sm, "Injured", injured, new Vector3(660, 300, 0));
         AnimatorState sDead     = AddMotionState(sm, "Death", C("ri_death_front"), new Vector3(220, 620, 0));
         AnimatorState sDeadBack = AddMotionState(sm, "DeathBack", C("ri_death_back") != null ? C("ri_death_back") : C("ri_death_front"), new Vector3(440, 620, 0));
@@ -519,15 +523,30 @@ public static class AnimationSystemBuilder
         // Airborne in/out
         foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch })
             AddInstantTransition(s, sAir, AnimatorConditionMode.IfNot, 0, "IsGrounded");
-        AddInstantTransition(sAir, sUnarmed, AnimatorConditionMode.If, 0, "IsGrounded", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
-        AddInstantTransition(sAir, sPistol, AnimatorConditionMode.If, 0, "IsGrounded", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
-        AddInstantTransition(sAir, sRifle, AnimatorConditionMode.If, 0, "IsGrounded", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
+        var toLoop = sAir.AddTransition(sAirLoop);
+        toLoop.hasExitTime = true; toLoop.exitTime = 0.85f; toLoop.duration = 0.15f;
+        AddInstantTransition(sAir, sLand, AnimatorConditionMode.If, 0, "IsGrounded");
+        AddInstantTransition(sAirLoop, sLand, AnimatorConditionMode.If, 0, "IsGrounded");
+        AddInstantTransition(sLand, sAir, AnimatorConditionMode.IfNot, 0, "IsGrounded");
+        // Landing plays out, then returns to whichever pose matches the weapon.
+        for (int wc = 0; wc < 3; wc++)
+        {
+            var back = sLand.AddTransition(wc == 0 ? sUnarmed : (wc == 1 ? sPistol : sRifle));
+            back.hasExitTime = true; back.exitTime = 0.8f; back.duration = 0.15f;
+            back.AddCondition(AnimatorConditionMode.Equals, wc, "WeaponClass");
+        }
 
         // Death from anywhere - added before the Injured wiring below so it's
         // evaluated first: Unity checks a state's transitions in the order
         // they were added, and Dead must win if both are true simultaneously.
-        foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sInjured })
+        foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sAirLoop, sLand, sInjured })
         {
+            if (s == sCrouch)
+            {
+                var tc = s.AddTransition(sDeadCrouch);
+                tc.hasExitTime = false; tc.duration = 0.1f;
+                tc.AddCondition(AnimatorConditionMode.If, 0, "Dead");
+            }
             // Front death first, then back - Unity evaluates a state's transitions in
             // the order they were added, and both carry the same "Dead" condition, so
             // the back one is distinguished by DeathFromBack being true.
@@ -587,6 +606,7 @@ public static class AnimationSystemBuilder
         AnimatorState fire   = AddMotionState(sm, "UB_Fire", C("act_fire_rifle"), new Vector3(220, 140, 0));
         AnimatorState reload = AddMotionState(sm, "UB_Reload", C("act_reload"), new Vector3(0, 280, 0));
         AnimatorState melee  = AddMotionState(sm, "UB_Melee", C("act_melee"), new Vector3(0, 140, 0));
+        AnimatorState hit = AddMotionState(sm, "UB_Hit", C("act_hit"), new Vector3(440, 140, 0));
         AnimatorState grenade = AddMotionState(sm, "UB_Grenade", C("act_grenade"), new Vector3(220, 280, 0));
         // Pistol upper body, masked over whatever the legs are doing. This is what makes
         // the shared (rifle-authored) crouch tree usable for a handgun: the legs crouch,
@@ -627,6 +647,10 @@ public static class AnimationSystemBuilder
             tm.hasExitTime = false; tm.duration = 0.05f;
             tm.AddCondition(AnimatorConditionMode.If, 0, "Melee");
 
+            var th = s.AddTransition(hit);
+            th.hasExitTime = false; th.duration = 0.05f;
+            th.AddCondition(AnimatorConditionMode.If, 0, "Hit");
+
             var tg = s.AddTransition(grenade);
             tg.hasExitTime = false; tg.duration = 0.1f;
             tg.AddCondition(AnimatorConditionMode.If, 0, "Grenade");
@@ -636,6 +660,14 @@ public static class AnimationSystemBuilder
         var backFromFire = fire.AddTransition(aim);
         backFromFire.hasExitTime = true; backFromFire.exitTime = 0.12f; backFromFire.duration = 0.05f;
         backFromFire.hasFixedDuration = true;
+
+        // A flinch is short and never blocks shooting or reloading.
+        var backFromHit = hit.AddTransition(idle);
+        backFromHit.hasExitTime = true; backFromHit.exitTime = 0.55f; backFromHit.duration = 0.15f;
+        var hitToFire = hit.AddTransition(fire);
+        hitToFire.hasExitTime = false; hitToFire.duration = 0.05f; hitToFire.AddCondition(AnimatorConditionMode.If, 0, "Fire");
+        var hitToReload = hit.AddTransition(reload);
+        hitToReload.hasExitTime = false; hitToReload.duration = 0.1f; hitToReload.AddCondition(AnimatorConditionMode.If, 0, "Reload");
 
         var backFromReload = reload.AddTransition(idle);
         backFromReload.hasExitTime = true; backFromReload.exitTime = 0.95f; backFromReload.duration = 0.1f;
@@ -654,6 +686,21 @@ public static class AnimationSystemBuilder
         s.motion = motion;
         s.writeDefaultValues = true;
         return s;
+    }
+
+    static BlendTree Freeform2D(string name, (float x, float y, string key)[] points)
+    {
+        var tree = new BlendTree { name = name, blendType = BlendTreeType.FreeformDirectional2D };
+        tree.blendParameter = "MoveX";
+        tree.blendParameterY = "MoveY";
+        tree.hideFlags = HideFlags.HideInHierarchy;
+        foreach (var p in points)
+        {
+            var clip = C(p.key);
+            if (clip == null) continue;
+            tree.AddChild(clip, new Vector2(p.x, p.y));
+        }
+        return tree;
     }
 
     static BlendTree Directional2D(string name, (float x, float y, string key)[] points)

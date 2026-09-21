@@ -62,6 +62,7 @@ public class PlayerMovement : MonoBehaviour
     private Quaternion cameraRotationOffset = Quaternion.identity; // CameraRecoil
     private float leanTiltZ, leanYawY, leanShiftX;                 // CameraLean
     private Vector3 cameraPositionOffset;                          // CameraBodyFollow
+    private Vector3 cameraTorsoOffset;                             // TorsoPoseDriver
 
     private CharacterController controller;
     private Vector3 velocity;
@@ -152,6 +153,9 @@ public class PlayerMovement : MonoBehaviour
     /// <summary>Extra local-space camera position offset (CameraBodyFollow).</summary>
     public void SetCameraPositionOffset(Vector3 offset) => cameraPositionOffset = offset;
 
+    /// <summary>Camera follow of the procedural torso bend/lean (TorsoPoseDriver), separate from CameraBodyFollow.</summary>
+    public void SetCameraTorsoOffset(Vector3 offset) => cameraTorsoOffset = offset;
+
     void ApplyCameraTransform()
     {
         if (cameraTransform == null) return;
@@ -163,7 +167,7 @@ public class PlayerMovement : MonoBehaviour
 
         cameraTransform.localPosition = standingCameraLocalPos
             + new Vector3(leanShiftX, -currentCrouchDrop, 0f)
-            + cameraPositionOffset;
+            + cameraPositionOffset + cameraTorsoOffset;
     }
 
     void HandleCrouchHeight()

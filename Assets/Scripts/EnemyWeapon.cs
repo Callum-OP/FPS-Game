@@ -132,6 +132,7 @@ public class EnemyWeapon : MonoBehaviour
         friendlyAI = GetComponent<FriendlyAI>(); // may be null on an enemy
         ammo = Mathf.Max(1, magazineSize);
         animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
+        if (animationDriver != null) TorsoPoseDriver.EnsureOn(animationDriver.GetComponent<Animator>());
 
         if (weaponPrefab != null) SpawnWeapon(weaponPrefab);
     }
@@ -418,6 +419,7 @@ public class EnemyWeapon : MonoBehaviour
     /// too is what used to duplicate it.</param>
     public void EquipWeapon(GameObject newHeldWeaponPrefab, bool stashOutgoing = true)
     {
+        if (animationDriver != null) animationDriver.GetComponent<TorsoPoseDriver>()?.PlayWeaponSwitch();
         if (newHeldWeaponPrefab == null) return;
 
         // A reload or weapon swap already under way belongs to the old gun.
@@ -645,6 +647,9 @@ public class EnemyWeapon : MonoBehaviour
     public void SetCombatReady(bool value) => combatReady = value;
 
     public bool IsReloading => reloading;
+    /// <summary>Gun pitch towards the target, degrees, + = down (same convention as the player's camera pitch).</summary>
+    public float EyePitch => eyePitch;
+    public bool IsAimingNow => aiming && !reloading;
     public bool HasAmmo => ammo > 0;
     public int Ammo => ammo;
 

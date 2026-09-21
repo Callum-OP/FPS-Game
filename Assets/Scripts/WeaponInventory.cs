@@ -196,6 +196,7 @@ public class WeaponInventory : MonoBehaviour
     IEnumerator HolsterRoutine()
     {
         busy = true;
+        TorsoPoseDriver.Instance?.PlayWeaponSwitch();
         WeaponController wc = playerSetup.activeWeapon;
         GameObject w = wc.gameObject;
         Slot slot = activeSlot;
@@ -253,6 +254,7 @@ public class WeaponInventory : MonoBehaviour
         if (w == null) { Slot o = activeSlot == Slot.Primary ? Slot.Secondary : Slot.Primary; if (GetSlot(o) != null) { activeSlot = o; w = GetSlot(o); } }
         if (w == null) { holstered = false; yield break; }
         busy = true;
+        TorsoPoseDriver.Instance?.PlayWeaponSwitch();
         Slot slot = activeSlot;
 
         // Rifle: back -> hip first (weapon scripts are still off, so the transform is free).
@@ -396,6 +398,7 @@ public class WeaponInventory : MonoBehaviour
         if (GetSlot(other) == null) return;
         Equip(other);
         StartSwitchCooldown();
+        TorsoPoseDriver.Instance?.PlayWeaponSwitch();
     }
 
     /// <summary>True if the player already carries a weapon made from this prefab (either

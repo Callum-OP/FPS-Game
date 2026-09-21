@@ -52,6 +52,15 @@ public class PlayerSetup : MonoBehaviour
         // just skips whichever part it can't find a point for.
         attachPoints = GetComponentInChildren<CharacterAttachPoints>();
 
+        // Procedural torso (look pitch, reload/switch twist, aim shoulders). Added here so
+        // there is nothing to set up by hand.
+        foreach (var a in GetComponentsInChildren<Animator>(true))
+            if (a.avatar != null && a.avatar.isHuman)
+            {
+                if (a.GetComponent<TorsoPoseDriver>() == null) a.gameObject.AddComponent<TorsoPoseDriver>();
+                break;
+            }
+
         // Only the local player's rigged body should ever hide its head - enemies
         // share the same body prefab and must keep theirs.
         GetComponentInChildren<HeadHider>()?.Activate();

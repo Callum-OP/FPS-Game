@@ -373,6 +373,7 @@ public class Ragdoll : MonoBehaviour
         var agent = GetComponentInParent<NavMeshAgent>(); if (agent != null) agent.enabled = false;
         var loco = GetComponentInChildren<CharacterLocomotion>(); if (loco != null) loco.enabled = false;
         var pose = GetComponentInChildren<UpperBodyPose>(); if (pose != null) pose.enabled = false;
+        var torsoDrv = GetComponentInChildren<TorsoPoseDriver>(); if (torsoDrv != null) torsoDrv.enabled = false;
         // restore the first-person-hidden head — its zero-scale bone breaks ragdoll physics
         var hider = GetComponentInChildren<HeadHider>(); if (hider != null) hider.enabled = false;
 

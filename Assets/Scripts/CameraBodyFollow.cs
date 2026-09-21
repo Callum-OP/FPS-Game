@@ -86,6 +86,10 @@ public class CameraBodyFollow : MonoBehaviour
         restingLocal = Vector3.Lerp(restingLocal, local, restingDrift * Time.deltaTime);
 
         Vector3 deviation = local - restingLocal;
+        // The torso's own sideways sway is cancelled by TorsoPoseDriver; following it here
+        // would swing the camera (and gun) against a torso that is no longer moving.
+        var stab = TorsoPoseDriver.Instance;
+        if (stab != null && stab.stabilizeBody) deviation.x *= 1f - stab.stabilizeSway;
 
         float follow = Mathf.Lerp(normalFollow, injuredFollow, injuredBlend);
         Vector3 world = animRoot.TransformVector(deviation) * follow;
