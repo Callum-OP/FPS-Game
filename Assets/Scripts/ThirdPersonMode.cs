@@ -60,6 +60,17 @@ public class ThirdPersonMode : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Bootstrap()
     {
+        // AfterSceneLoad only fires for the FIRST scene. Restarting reloads the scene, which
+        // made a fresh Player with no ThirdPersonMode - so key 5 died after death + restart.
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        Attach();
+    }
+
+    static void OnSceneLoaded(UnityEngine.SceneManagement.Scene s, UnityEngine.SceneManagement.LoadSceneMode m) => Attach();
+
+    static void Attach()
+    {
         var p = FindFirstObjectByType<PlayerMovement>();
         if (p != null && p.GetComponent<ThirdPersonMode>() == null) p.gameObject.AddComponent<ThirdPersonMode>();
     }

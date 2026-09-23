@@ -403,6 +403,9 @@ public static class AnimationSystemBuilder
         controller.AddParameter("WeaponClass", AnimatorControllerParameterType.Int); // 0 Unarmed 1 Pistol 2 Rifle
         controller.AddParameter("IsCrouching", AnimatorControllerParameterType.Bool);
         controller.AddParameter("IsGrounded", AnimatorControllerParameterType.Bool);
+        // Real ground contact. IsGrounded is switched on early (landing prediction) to start the landing
+        // clip; Land only returns to walking once this is true, so it can't finish mid-air.
+        controller.AddParameter(new AnimatorControllerParameter { name = "TouchingGround", type = AnimatorControllerParameterType.Bool, defaultBool = true });
         controller.AddParameter("Aiming", AnimatorControllerParameterType.Bool);
         controller.AddParameter("Fire", AnimatorControllerParameterType.Trigger);
         controller.AddParameter("Reload", AnimatorControllerParameterType.Trigger);
@@ -451,15 +454,17 @@ public static class AnimationSystemBuilder
             (-0.5f,0,"pi_left"), (-1,0,"pi_left"),
             (0.5f,0,"pi_right"), (1,0,"pi_right"),
         });
-        // Unarmed keeps its ORIGINAL Simple Directional tree: the Freeform version made the
-        // forward clips walk slanted to the right (the Pro Melee stance clips don't suit it).
-        BlendTree unarmed = Directional2D("Unarmed", new (float x, float y, string key)[]
+        // Unarmed: Freeform again, with the backwards clips (the Simple Directional version had
+        // nothing at all for sideways/backwards). The slant it showed earlier was the hips'
+        // travel in the clips, which TorsoPoseDriver's hip lock now removes.
+        BlendTree unarmed = Freeform2D("Unarmed", new (float x, float y, string key)[]
         {
-            (0,0,"un_idle"), (0,1,"un_walk_fwd"), (0,2,"un_run_fwd"),
-            (-1,1,"un_walk_left"), (1,1,"un_walk_right"),
-            (-1,2,"un_run_left"), (1,2,"un_run_right"),
+            (0,0,"un_idle"),
+            (0,1,"un_walk_fwd"), (0,2,"un_run_fwd"),
+            (0,-1,"un_walk_back"), (0,-2,"un_run_back"),
+            (-0.5f,0,"un_walk_left"), (-1,0,"un_run_left"),
+            (0.5f,0,"un_walk_right"), (1,0,"un_run_right"),
         });
-
         BlendTree rifleCrouch = Freeform2D("RifleCrouch", new (float x, float y, string key)[]
         {
             (0,0,"rc_idle"),
@@ -534,6 +539,7 @@ public static class AnimationSystemBuilder
             var back = sLand.AddTransition(wc == 0 ? sUnarmed : (wc == 1 ? sPistol : sRifle));
             back.hasExitTime = true; back.exitTime = 0.8f; back.duration = 0.15f;
             back.AddCondition(AnimatorConditionMode.Equals, wc, "WeaponClass");
+            back.AddCondition(AnimatorConditionMode.If, 0, "TouchingGround");
         }
 
         // Death from anywhere - added before the Injured wiring below so it's

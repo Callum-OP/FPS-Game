@@ -201,7 +201,10 @@ public class WeaponInventory : MonoBehaviour
         GameObject w = wc.gameObject;
         Slot slot = activeSlot;
         var ads = playerSetup.weaponADS;
-        playerSetup.lowerWeapon?.SetLowered(false);
+        // Holstered weapons have no lowered pose: snap it back to rest and stop LowerWeapon
+        // touching the pivot for the rest of the routine (it used to be caught mid-lowered).
+        var lw = playerSetup.lowerWeapon;
+        if (lw != null) { lw.ResetToRest(); lw.enabled = false; }
         wc.enabled = false; // no firing/reloading while it is being put away
 
         Vector3 pos = w.transform.position; Quaternion rot = w.transform.rotation;
@@ -220,6 +223,7 @@ public class WeaponInventory : MonoBehaviour
         wc.enabled = true;
         playerSetup.UnequipWeapon();
         SetWeaponScripts(w, false);
+        lw?.ResetToRest(); // again, in case anything wrote the pivot in between
         w.transform.SetPositionAndRotation(pos, rot);
         Transform point = slot == Slot.Primary ? primaryHolster : secondaryHolster;
         w.transform.SetParent(point, true);
@@ -314,6 +318,7 @@ public class WeaponInventory : MonoBehaviour
     /// PlayerAllySwap) without needing to re-derive a prefab from a live instance.</summary>
     public GameObject Store(GameObject weapon, bool equipImmediately, GameObject sourcePrefab = null)
     {
+        if (weapon != null) weapon.GetComponentInChildren<LowerWeapon>(true)?.CaptureRest();
         Slot slot = SlotFor(weapon);
         GameObject displaced = slot == Slot.Primary ? primary : secondary;
         if (displaced == weapon) displaced = null;
@@ -381,6 +386,14 @@ public class WeaponInventory : MonoBehaviour
     /// <summary>Both weapons on the body - for throwing a grenade, which needs the hands.</summary>
     public void HolsterAll()
     {
+        // The active weapon may be mid-lowered right now (LowerWeapon eases its pivot every
+        // frame) - HolsterAll used to skip straight to Holster() below, which just moves the
+        // GameObject onto the holster point and leaves whatever local pose LowerWeapon had it
+        // at, so a lowered gun ended up holstered part-way through its lower motion. Snap it
+        // back to rest first, exactly like the hold-2 holster path does.
+        var lw = playerSetup != null ? playerSetup.lowerWeapon : null;
+        if (lw != null) { lw.ResetToRest(); lw.enabled = false; }
+        holstered = true;
         Holster(primary, Slot.Primary);
         Holster(secondary, Slot.Secondary);
         playerSetup?.UnequipWeapon();

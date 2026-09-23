@@ -29,7 +29,15 @@ public class TorsoPoseDriver : MonoBehaviour
     public float maxBendDown = 35f;
     public float maxLeanBack = 25f;
     [Tooltip("How much of the head's resulting movement the camera copies.")]
-    [Range(0f, 1.5f)] public float cameraFollow = 0.9f;
+    [Range(0f, 1.5f)] public float cameraFollow = 1.2f;
+    [Tooltip("Extra camera push FORWARD (metres) at full look-down, so the camera travels forward with the bent torso instead of the chest coming up into it. The torso bend itself is unchanged.")]
+    public float lookDownCameraForward = 0.14f;
+    [Tooltip("Slight camera drop (metres) at full look-down.")]
+    public float lookDownCameraDrop = 0.02f;
+    [Tooltip("Camera pitch (degrees) that counts as 'full' look-down for the two values above.")]
+    public float lookDownFullPitch = 75f;
+    [Tooltip("Extra camera push forward (metres) while walking/running forward, so the chest doesn't catch up to a camera that hasn't moved. Separate from the look-down push above - this one is about MOVING forward, not looking down.")]
+    public float walkForwardCameraPush = 0.05f;
 
     [Header("Twist (degrees)")]
     [Tooltip("Left twist while reloading.")]
@@ -53,6 +61,11 @@ public class TorsoPoseDriver : MonoBehaviour
     static readonly int GroundedHash = Animator.StringToHash("IsGrounded");
     float footW;
     Transform hips, lUpperArm, rUpperArm;
+    Vector3 headLocalFwd; bool hasHeadFwd; float headW, walkFwdW;
+    // Calibrated per-instance so we never depend on a bone axis guess or on toe bones being
+    // mapped (both silently broke the previous attempt on some rigs).
+    Vector3 lFootLocalFwd = Vector3.forward, rFootLocalFwd = Vector3.forward; bool hasFootCal;
+    Vector3 lKneeLocalFwd = Vector3.forward, rKneeLocalFwd = Vector3.forward;
     Vector3 modelBaseLocal; bool hasModelBase; Vector2 hipRest;
     float dbgTime; Vector2 dbgMin = new Vector2(99, 99), dbgMax = new Vector2(-99, -99);
     static readonly int MoveXH = Animator.StringToHash("MoveX"), MoveYH = Animator.StringToHash("MoveY");
@@ -66,7 +79,7 @@ public class TorsoPoseDriver : MonoBehaviour
     [Tooltip("How much sideways hip sway to remove (1 = all).")]
     [Range(0f, 1f)] public float stabilizeSway = 1f;
     [Tooltip("How much forward/back hip sway to remove.")]
-    [Range(0f, 1f)] public float stabilizeForward = 0.5f;
+    [Range(0f, 1f)] public float stabilizeForward = 0.3f; // was 0.5 - the residual forward correction here was occasionally over-correcting INTO the fixed camera
     [Tooltip("How much of the hips' yaw wobble to remove.")]
     [Range(0f, 1f)] public float stabilizeYaw = 0.75f;
     [Tooltip("How fast the resting reference follows the hips (per second). Must be slow next to the step cycle - a full stride takes about a second.")]
@@ -111,6 +124,22 @@ public class TorsoPoseDriver : MonoBehaviour
     [Tooltip("Turns planted/swinging feet towards the body's facing by this fraction of their error, so feet stop landing sideways.")]
     [Range(0f, 1f)] public float footYawAlign = 0.6f;
     public float maxFootYawCorrection = 25f;
+    [Tooltip("How fast the feet/knee \"neutral facing\" calibration follows while standing still (per second). This is what the correction below is measured against, so it self-calibrates to THIS rig instead of assuming a bone axis or relying on toe bones (which some Mixamo humanoid rigs never map, silently breaking any fix based on them).")]
+    public float footCalibrationRate = 2f;
+    [Tooltip("Twists the knee back towards forward-facing when it points sideways/inward - the leg equivalent of the elbow fix, and probably the actual fix for \"lower leg looks inward\" (that's very likely calf TWIST, which rotating the foot alone can't touch).")]
+    public bool kneeNeverSideways = true;
+    [Range(0f, 1f)] public float kneeTwistCorrect = 0.85f;
+    public float maxKneeTwistCorrection = 30f;
+
+    [Header("Face Forward While Walking Forward")]
+    [Tooltip("The head turns left/right with the stride while walking forward (looks like bobbing side to side). While moving forward the head yaw is held to the body's facing.")]
+    public bool headFaceForward = true;
+    [Range(0f, 1f)] public float headForwardStrength = 1f;
+    [Tooltip("While moving forward, feet are turned this far towards straight ahead (1 = fully). Fixes the left foot landing turned in.")]
+    [Range(0f, 1f)] public float footForwardWhenWalking = 1f;
+    public float maxFootYawWalking = 50f;
+    [Tooltip("Points the knees straight ahead while walking forward (lower legs drifting inwards, 'limp' look). 0 = off.")]
+    [Range(0f, 1f)] public float kneeForwardStrength = 0.7f;
 
     [Header("Feet While Airborne")]
     [Tooltip("Points the feet along the body's facing (yaw) while jumping/falling/landing, and levels them out this much (0-1).")]
@@ -136,6 +165,9 @@ public class TorsoPoseDriver : MonoBehaviour
         hips = anim.GetBoneTransform(HumanBodyBones.Hips);
         lUpperArm = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
         rUpperArm = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
+        CalibrateLegs(true);
+        // Head-local direction that points forward in the bind pose (rig-independent way to read head yaw).
+        if (head != null) { headLocalFwd = Quaternion.Inverse(head.rotation) * root.forward; hasHeadFwd = true; }
         lShoulder = anim.GetBoneTransform(HumanBodyBones.LeftShoulder);
         rShoulder = anim.GetBoneTransform(HumanBodyBones.RightShoulder);
         if (spine == null && chest == null) enabled = false;
@@ -215,17 +247,90 @@ public class TorsoPoseDriver : MonoBehaviour
 
     float alignW;
     // Hip IK is off: only turn the feet towards the body's facing (rotation only, position left alone).
+    // Learns, per foot/knee bone, which of ITS OWN local directions currently points along
+    // root.forward - the same trick used for the head. This sidesteps two things that broke
+    // the earlier attempt: some Mixamo humanoid avatars never map toe bones at all (silently
+    // falling back to a guessed axis), and a bone's "forward" axis isn't guaranteed to match
+    // any particular local axis across different rigs/packs.
+    void CalibrateLegs(bool force)
+    {
+        var lFoot = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
+        var rFoot = anim.GetBoneTransform(HumanBodyBones.RightFoot);
+        var lKnee = anim.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
+        var rKnee = anim.GetBoneTransform(HumanBodyBones.RightLowerLeg);
+        if (lFoot != null) lFootLocalFwd = Quaternion.Inverse(lFoot.rotation) * root.forward;
+        if (rFoot != null) rFootLocalFwd = Quaternion.Inverse(rFoot.rotation) * root.forward;
+        if (lKnee != null) lKneeLocalFwd = Quaternion.Inverse(lKnee.rotation) * root.forward;
+        if (rKnee != null) rKneeLocalFwd = Quaternion.Inverse(rKnee.rotation) * root.forward;
+        hasFootCal = true;
+    }
+
     void AlignFeet()
     {
-        foreach (var g in new[] { AvatarIKGoal.LeftFoot, AvatarIKGoal.RightFoot })
+        float fwdW = Mathf.Clamp01(anim.GetFloat(MoveYH) / 0.5f);
+        float align = Mathf.Lerp(footYawAlign, footForwardWhenWalking, fwdW);
+        float maxCorr = Mathf.Lerp(maxFootYawCorrection, maxFootYawWalking, fwdW);
+        float kneeW = kneeTwistCorrect * fwdW;
+
+        AlignOneFoot(true, align, maxCorr, kneeW);
+        AlignOneFoot(false, align, maxCorr, kneeW);
+    }
+
+    void AlignOneFoot(bool left, float align, float maxCorr, float kneeW)
+    {
+        var g = left ? AvatarIKGoal.LeftFoot : AvatarIKGoal.RightFoot;
+        var footBone = anim.GetBoneTransform(left ? HumanBodyBones.LeftFoot : HumanBodyBones.RightFoot);
+        var kneeBone = anim.GetBoneTransform(left ? HumanBodyBones.LeftLowerLeg : HumanBodyBones.RightLowerLeg);
+        var hipBone = anim.GetBoneTransform(left ? HumanBodyBones.LeftUpperLeg : HumanBodyBones.RightUpperLeg);
+
+        // --- Foot yaw: using the CALIBRATED axis, not an assumed one and not the toe bones
+        // (some rigs never map LeftToes/RightToes, which silently broke the previous version).
+        Quaternion rot = anim.GetIKRotation(g);
+        if (footBone != null)
         {
-            Quaternion rot = anim.GetIKRotation(g);
-            Vector3 flat = Vector3.ProjectOnPlane(rot * Vector3.forward, Vector3.up);
-            if (flat.sqrMagnitude < 1e-4f) continue;
-            float err = Vector3.SignedAngle(flat, root.forward, Vector3.up);
-            float corr = Mathf.Clamp(err * footYawAlign, -maxFootYawCorrection, maxFootYawCorrection);
-            anim.SetIKRotationWeight(g, alignW);
-            anim.SetIKRotation(g, Quaternion.AngleAxis(corr, Vector3.up) * rot);
+            Vector3 fwd = footBone.rotation * (left ? lFootLocalFwd : rFootLocalFwd);
+            Vector3 flat = Vector3.ProjectOnPlane(fwd, Vector3.up);
+            if (flat.sqrMagnitude > 1e-6f)
+            {
+                float err = Vector3.SignedAngle(flat, root.forward, Vector3.up);
+                float corr = Mathf.Clamp(err * align, -maxCorr, maxCorr);
+                rot = Quaternion.AngleAxis(corr, Vector3.up) * rot;
+            }
+        }
+        anim.SetIKRotationWeight(g, alignW);
+        anim.SetIKRotation(g, rot);
+
+        // --- Knee twist: the "lower leg looks inward" symptom is very likely the CALF bone
+        // twisting around the hip->ankle axis, which rotating only the foot/ankle can never
+        // fix (the calf is animated independently of it). This is the exact same fix as the
+        // elbow-never-inward correction, applied to the leg: measure which way the knee
+        // currently points (calibrated axis again), and if it's twisted off root.forward,
+        // nudge it back via the Animator's knee hint while holding the foot exactly where the
+        // clip put it.
+        if (kneeNeverSideways && kneeW > 0.001f && kneeBone != null && hipBone != null)
+        {
+            Vector3 axis = footBone != null ? (footBone.position - hipBone.position) : Vector3.up;
+            if (axis.sqrMagnitude > 1e-6f)
+            {
+                Vector3 kneeFwd = kneeBone.rotation * (left ? lKneeLocalFwd : rKneeLocalFwd);
+                Vector3 pole = Vector3.ProjectOnPlane(kneeFwd, axis);
+                Vector3 preferred = Vector3.ProjectOnPlane(root.forward, axis);
+                if (pole.sqrMagnitude > 1e-6f && preferred.sqrMagnitude > 1e-6f)
+                {
+                    float twistErr = Vector3.SignedAngle(pole, preferred, axis);
+                    float twistCorr = Mathf.Clamp(twistErr * kneeW, -maxKneeTwistCorrection, maxKneeTwistCorrection);
+                    if (Mathf.Abs(twistCorr) > 0.05f)
+                    {
+                        Vector3 kneePos = kneeBone.position;
+                        Vector3 newKnee = hipBone.position + Quaternion.AngleAxis(twistCorr, axis.normalized) * (kneePos - hipBone.position);
+                        anim.SetIKPositionWeight(g, alignW);
+                        anim.SetIKPosition(g, anim.GetIKPosition(g)); // hold the foot exactly where the clip put it
+                        var hint = left ? AvatarIKHint.LeftKnee : AvatarIKHint.RightKnee;
+                        anim.SetIKHintPositionWeight(hint, alignW);
+                        anim.SetIKHintPosition(hint, newKnee);
+                    }
+                }
+            }
         }
     }
 
@@ -309,11 +414,30 @@ public class TorsoPoseDriver : MonoBehaviour
             if (rShoulder != null) rShoulder.position += up * (aimShoulderRaise * aimK);
         }
 
+        // Head: hold its yaw to the body's facing while walking forward.
+        if (Mathf.Abs(anim.GetFloat(MoveXH)) < 0.05f && Mathf.Abs(anim.GetFloat(MoveYH)) < 0.05f)
+            CalibrateLegs(false);
+
+        walkFwdW = Mathf.MoveTowards(walkFwdW, Mathf.Clamp01(anim.GetFloat(MoveYH) / 0.5f), 6f * dt);
+        if (headFaceForward && hasHeadFwd && head != null && walkFwdW > 0.001f)
+        {
+            Vector3 hf = Vector3.ProjectOnPlane(head.rotation * headLocalFwd, root.up);
+            if (hf.sqrMagnitude > 1e-4f)
+            {
+                float herr = Vector3.SignedAngle(hf, root.forward, root.up);
+                head.rotation = Quaternion.AngleAxis(herr * headForwardStrength * walkFwdW, root.up) * head.rotation;
+            }
+        }
+
         // Camera follows how far the head moved because of all of the above.
         if (head != null && pm != null)
         {
             Vector3 delta = root.InverseTransformPoint(head.position) - headBefore;
-            camOffset = Vector3.SmoothDamp(camOffset, delta * cameraFollow, ref camOffsetVel, 0.06f);
+            float lk = Mathf.Clamp01(Mathf.Max(0f, rawPitch) / Mathf.Max(1f, lookDownFullPitch));
+            lk = lk * lk * (3f - 2f * lk);
+            Vector3 want = delta * cameraFollow + new Vector3(0f, -lookDownCameraDrop * lk, lookDownCameraForward * lk)
+                + Vector3.forward * (walkForwardCameraPush * walkFwdW);
+            camOffset = Vector3.SmoothDamp(camOffset, want, ref camOffsetVel, 0.06f);
             pm.SetCameraTorsoOffset(camOffset);
         }
     }

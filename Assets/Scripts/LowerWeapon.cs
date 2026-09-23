@@ -57,10 +57,21 @@ public class LowerWeapon : MonoBehaviour
         fireAction.Enable();
     }
 
-    void Start()
+    bool restCaptured;
+
+    /// <summary>Records the pivot's authored (un-lowered) pose. Called as early as possible
+    /// (WeaponInventory.Store) so the rest pose can never be captured mid-lowered.</summary>
+    public void CaptureRest()
     {
+        if (restCaptured) return;
         originalPosition = transform.localPosition;
         originalRotation = transform.localRotation;
+        restCaptured = true;
+    }
+
+    void Start()
+    {
+        CaptureRest();
         basePosition = originalPosition;
         baseRotation = originalRotation;
     }
@@ -113,6 +124,20 @@ public class LowerWeapon : MonoBehaviour
     public bool IsLowered() => isLowered;
     public void ToggleLowered() => isLowered = !isLowered;
     public void SetLowered(bool lowered) => isLowered = lowered;
+
+    /// <summary>Snaps the gun pivot back to its normal pose and clears the lowered state. Used
+    /// by holstering, which no longer carries a lowered pose with it.</summary>
+    public void ResetToRest()
+    {
+        CaptureRest();
+        isLowered = false;
+        basePosition = originalPosition;
+        baseRotation = originalRotation;
+        reloadOffsetPos = Vector3.zero;
+        reloadOffsetRot = Quaternion.identity;
+        transform.localPosition = originalPosition;
+        transform.localRotation = originalRotation;
+    }
 
     void OnDestroy()
     {

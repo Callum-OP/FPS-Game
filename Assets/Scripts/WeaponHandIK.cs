@@ -84,6 +84,18 @@ public class WeaponHandIK : MonoBehaviour
     public bool invertLeftCurl = false;
     public bool invertRightCurl = false;
 
+    [Header("Elbow Anatomy")]
+    [Tooltip("The final hand lock keeps the elbow on whatever side the animation had it, so a high-action pose (or a gun held while looking down) could leave the elbow pointing UP - the arm bending the wrong way. With this on the elbow is only allowed to bend outwards or downwards, never upwards.")]
+    public bool elbowNeverUp = true;
+    [Tooltip("How far above 'level' the elbow may point before it is pulled back down (-1 = fully down, 0 = level, 1 = straight up).")]
+    [Range(-1f, 0.5f)] public float elbowMaxUp = -0.15f;
+    [Tooltip("Also never let the elbow point INWARDS (towards the body). It may go straight or outwards.")]
+    public bool elbowNeverIn = true;
+    [Tooltip("Minimum outward lean of the elbow (0 = straight, 1 = fully out).")]
+    [Range(-0.2f, 0.6f)] public float elbowMinOutward = 0.1f;
+    [Tooltip("Where a corrected elbow goes: 0 = straight down, 1 = straight out to the side.")]
+    [Range(0f, 1f)] public float elbowOutward = 0.45f;
+
     [Header("Weapon Pull-Back (keeps the gun in reach)")]
     [Tooltip("When aiming makes the weapon (parented to the camera) move out beyond the arms' actual reach, the left hand on two-handed weapons usually runs out first, since it travels further from the body. Rather than let the hand visibly stop short of the grip (which the arm reach clamp above would otherwise do), the weapon is pulled back toward whichever shoulder is short by however much - in whatever direction actually closes the gap, not just straight back, so this helps for looking down as well as up. Set to 0 to disable and go back to the hand just clamping short.")]
     public float maxPullBack = 0.25f;
@@ -485,8 +497,8 @@ public class WeaponHandIK : MonoBehaviour
             if (reloadAnchorRefresh != null && (reloadRightOverride != null || reloadLeftOverride != null))
                 reloadAnchorRefresh();
 
-            if (lockRightGrip != null) LockHand(rightShoulder, rightLowerArm, rightHandBone, lockRightGrip, rightWeight);
-            if (lockLeftGrip != null) LockHand(leftShoulder, leftLowerArm, leftHandBone, lockLeftGrip, leftWeight);
+            if (lockRightGrip != null) LockHand(rightShoulder, rightLowerArm, rightHandBone, lockRightGrip, rightWeight, true);
+            if (lockLeftGrip != null) LockHand(leftShoulder, leftLowerArm, leftHandBone, lockLeftGrip, leftWeight, false);
         }
         if (overrideRightFingers) ApplyFingerOverride(rightRig, rightFingerBones, rightGripPose, rightWeight);
         if (overrideLeftFingers) ApplyFingerOverride(leftRig, leftFingerBones, leftGripPose, leftWeight);
@@ -496,7 +508,7 @@ public class WeaponHandIK : MonoBehaviour
     // keeping the elbow on whichever side of the shoulder->grip line the animation/IK
     // already had it, so the arm's animated character survives. `weight` fades the lock
     // in and out with the grip blend.
-    void LockHand(Transform upper, Transform lower, Transform hand, Transform grip, float weight)
+    void LockHand(Transform upper, Transform lower, Transform hand, Transform grip, float weight, bool isRight = true)
     {
         if (upper == null || lower == null || hand == null || grip == null || weight <= 0f) return;
 
@@ -518,6 +530,35 @@ public class WeaponHandIK : MonoBehaviour
         if (pole.sqrMagnitude < 1e-8f)
             pole = Vector3.down - dir * Vector3.Dot(Vector3.down, dir);
         pole.Normalize();
+
+        if (elbowNeverUp)
+        {
+            // Preferred bend: down and slightly outward, perpendicular to the shoulder->grip line.
+            Vector3 outward = (isRight ? transform.right : -transform.right);
+            Vector3 preferred = Vector3.ProjectOnPlane(Vector3.down * (1f - elbowOutward) + outward * elbowOutward, dir);
+            if (preferred.sqrMagnitude < 1e-6f) preferred = Vector3.down;
+            preferred.Normalize();
+            if (elbowNeverIn)
+            {
+                Vector3 outN = Vector3.ProjectOnPlane(outward, dir).normalized;
+                float outDot = Vector3.Dot(pole, outN);
+                if (outDot < elbowMinOutward)
+                    pole = (pole + outN * (elbowMinOutward - outDot)).normalized;
+            }
+            float up = Vector3.Dot(pole, Vector3.up);           // + = elbow above the shoulder->grip line
+            if (up > elbowMaxUp)
+            {
+                float t = Mathf.Clamp01(Mathf.InverseLerp(elbowMaxUp, elbowMaxUp + 0.5f, up));
+                t = Mathf.Max(t, 0.35f);                         // always nudge once past the limit
+                pole = Vector3.Slerp(pole, preferred, t).normalized;
+            }
+            if (elbowNeverIn)
+            {
+                Vector3 outN2 = Vector3.ProjectOnPlane(outward, dir).normalized;
+                float od = Vector3.Dot(pole, outN2);
+                if (od < elbowMinOutward) pole = (pole + outN2 * (elbowMinOutward - od)).normalized;
+            }
+        }
 
         float cosA = Mathf.Clamp((a * a + d * d - b * b) / (2f * a * d), -1f, 1f);
         Vector3 newElbow = s + dir * (a * cosA) + pole * (a * Mathf.Sqrt(1f - cosA * cosA));

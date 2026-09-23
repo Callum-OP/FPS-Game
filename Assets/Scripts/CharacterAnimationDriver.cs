@@ -36,6 +36,8 @@ public class CharacterAnimationDriver : MonoBehaviour
     static readonly int InjuredHash = Animator.StringToHash("Injured");
     static readonly int DeathFromBackHash = Animator.StringToHash("DeathFromBack");
     static readonly int GrenadeHash = Animator.StringToHash("Grenade");
+    static readonly int TouchHash = Animator.StringToHash("TouchingGround");
+    bool hasTouchParam;
     static readonly int HitHash = Animator.StringToHash("Hit");
     static readonly int MoveXHash = Animator.StringToHash("MoveX");
     static readonly int MoveYHash = Animator.StringToHash("MoveY");
@@ -53,7 +55,7 @@ public class CharacterAnimationDriver : MonoBehaviour
         }
         currentWeaponClass = defaultWeaponClass;
         if (animator != null)
-            foreach (var p in animator.parameters) if (p.nameHash == HitHash) { hasHitParam = true; break; }
+            foreach (var p in animator.parameters) { if (p.nameHash == HitHash) hasHitParam = true; if (p.nameHash == TouchHash) hasTouchParam = true; }
         if (animator != null) animator.SetInteger(WeaponClassHash, (int)currentWeaponClass);
     }
 
@@ -68,6 +70,12 @@ public class CharacterAnimationDriver : MonoBehaviour
     public void SetGrounded(bool grounded)
     {
         if (CanAnimate()) animator.SetBool(IsGroundedHash, grounded);
+    }
+
+    /// <summary>The REAL ground contact (IsGrounded may be switched on early to start the landing).</summary>
+    public void SetTouchingGround(bool touching)
+    {
+        if (hasTouchParam && CanAnimate()) animator.SetBool(TouchHash, touching);
     }
 
     public void SetCrouching(bool crouching)

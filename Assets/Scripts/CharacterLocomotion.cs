@@ -35,7 +35,11 @@ public class CharacterLocomotion : MonoBehaviour
     [Tooltip("Log raw velocity/move values to the Console twice a second - use this to see exactly what's reaching the Animator.")]
     public bool debugLog = false;
 
+    [Tooltip("Seconds of fall to look ahead when deciding the landing animation should start. The Animator's IsGrounded is switched on this far before actual contact so the landing clip starts on time instead of a beat late. 0 = wait for real contact.")]
+    public float landLookAhead = 0.9f;
+
     Vector3 lastPos;
+    float lastY; bool hasLastY;
     Vector2 moveParam;
     static readonly int DeadHash = Animator.StringToHash("Dead");
 
@@ -55,6 +59,7 @@ public class CharacterLocomotion : MonoBehaviour
     {
         Vector3 worldVelocity;
         bool grounded = true;
+        bool touching = true;
 
         if (playerMovement != null && playerMovement.enabled)
         {
@@ -76,6 +81,20 @@ public class CharacterLocomotion : MonoBehaviour
             worldVelocity = d / Mathf.Max(Time.deltaTime, 1e-4f);
             lastPos = transform.position;
         }
+
+        touching = grounded;
+
+        // Landing prediction (player / controller characters): while falling, say "grounded" to
+        // the Animator slightly before contact so Land starts on time.
+        if (!grounded && landLookAhead > 0f && (playerMovement != null || controller != null))
+        {
+            float vy = hasLastY ? (transform.position.y - lastY) / Mathf.Max(Time.deltaTime, 1e-4f) : 0f;
+            if (vy < -1f && Physics.Raycast(transform.position + Vector3.up * 0.1f, Vector3.down, out RaycastHit gh,
+                    Mathf.Max(groundCheckDistance, -vy * landLookAhead) + 0.1f, ~0, QueryTriggerInteraction.Ignore)
+                && gh.collider.transform.root != transform.root)
+                grounded = true;
+        }
+        lastY = transform.position.y; hasLastY = true;
 
         // World velocity -> this transform's local space so strafing left/right and
         // walking backward map onto the correct blend-tree axes regardless of facing.
@@ -107,6 +126,7 @@ public class CharacterLocomotion : MonoBehaviour
         {
             animationDriver.SetMove(moveParam.x, moveParam.y);
             animationDriver.SetGrounded(grounded);
+            animationDriver.SetTouchingGround(touching);
         }
 
         if (debugLog && Time.frameCount % 30 == 0)
