@@ -146,6 +146,11 @@ public class TorsoPoseDriver : MonoBehaviour
     [Range(0f, 1f)] public float airFootLevel = 0.6f;
     Transform root, spine, chest, upperChest, head, lShoulder, rShoulder;
     float pitch, pitchVel, twist, aimW, switchT = 1f;
+    // Death: every correction below is scaled by `live` (1 alive, 0 dead) so the authored death
+    // animation gets the skeleton to itself. Without this the hip lock pins the body upright over
+    // its feet, the shoulders are squared up to the root and the feet are turned forward, all while
+    // the character is meant to be falling over.
+    bool dead; float deadBlend; float live = 1f; bool ikReleased;
     Vector3 camOffset, camOffsetVel;
 
     void Awake() { if (GetComponentInParent<PlayerMovement>() != null) Instance = this; }
@@ -185,9 +190,27 @@ public class TorsoPoseDriver : MonoBehaviour
     void OnAnimatorIK(int layer)
     {
         if (layer != 0 || anim == null || root == null) return;
+        float dt = Time.deltaTime;
+        if (dead)
+        {
+            // Fade the foot goals out, then release them once so the last (stale) goal can't linger.
+            footW = Mathf.MoveTowards(footW, 0f, dt * 10f);
+            groundW = Mathf.MoveTowards(groundW, 0f, dt * 10f);
+            alignW = Mathf.MoveTowards(alignW, 0f, dt * 10f);
+            if (groundW > 0.001f) StabilizeHipsIK(dt);
+            else if (alignW > 0.001f) AlignFeet();
+            if (footW > 0.001f) { FootFix(AvatarIKGoal.LeftFoot); FootFix(AvatarIKGoal.RightFoot); }
+            if (!ikReleased && groundW <= 0.001f && alignW <= 0.001f && footW <= 0.001f)
+            {
+                ikReleased = true;
+                anim.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 0f); anim.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f);
+                anim.SetIKRotationWeight(AvatarIKGoal.LeftFoot, 0f); anim.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
+                anim.SetIKHintPositionWeight(AvatarIKHint.LeftKnee, 0f); anim.SetIKHintPositionWeight(AvatarIKHint.RightKnee, 0f);
+            }
+            return;
+        }
         var st = anim.GetCurrentAnimatorStateInfo(0);
         bool air = st.IsName("JumpUp") || st.IsName("Airborne") || st.IsName("Land");
-        float dt = Time.deltaTime;
         footW = Mathf.MoveTowards(footW, air ? 1f : 0f, dt * (air ? 10f : 6f));
         groundW = Mathf.MoveTowards(groundW, (!air && stabilizeHips) ? 1f : 0f, dt * 8f);
         alignW = Mathf.MoveTowards(alignW, (!air && !stabilizeHips) ? 1f : 0f, dt * 8f);
@@ -366,6 +389,9 @@ public class TorsoPoseDriver : MonoBehaviour
         anim.SetIKRotation(goal, q);
     }
 
+    /// <summary>Called by Ragdoll when the character dies: fades all procedural corrections out.</summary>
+    public void EnterDeathMode() { dead = true; }
+
     /// <summary>Right-hand reach twist (weapon switch, holster, draw).</summary>
     public void PlayWeaponSwitch() => switchT = 0f;
 
@@ -373,6 +399,17 @@ public class TorsoPoseDriver : MonoBehaviour
     {
         if (anim == null || !anim.enabled) return;
         float dt = Time.deltaTime;
+
+        deadBlend = Mathf.MoveTowards(deadBlend, dead ? 1f : 0f, dt / 0.12f);
+        live = 1f - deadBlend;
+        if (live <= 0.001f)
+        {
+            // Fully dead: nothing of ours is applied any more. Put the model back where the hip
+            // lock had it standing (it has been eased to zero offset by now, this just makes sure).
+            if (hasModelBase && transform.localPosition != modelBaseLocal) transform.localPosition = modelBaseLocal;
+            if (pm != null) pm.SetCameraTorsoOffset(Vector3.zero);
+            return;
+        }
 
         // --- targets ---
         float rawPitch = pm != null ? pm.CameraPitch : (aiWeapon != null ? aiWeapon.EyePitch : 0f);
@@ -392,7 +429,7 @@ public class TorsoPoseDriver : MonoBehaviour
         bool aiming = pm != null ? (setup != null && setup.weaponADS != null && setup.weaponADS.IsAiming())
                                  : (aiWeapon != null && aiWeapon.IsAimingNow);
         aimW = Mathf.MoveTowards(aimW, aiming ? 1f : 0f, aimBlendSpeed * dt);
-        float aimK = Mathf.SmoothStep(0f, 1f, aimW);
+        float aimK = Mathf.SmoothStep(0f, 1f, aimW) * live;
 
         // --- apply (world-space about the body's axes, each bone about its own joint) ---
         if (lockHipsInPlace && hips != null) LockHips(dt);
@@ -425,7 +462,7 @@ public class TorsoPoseDriver : MonoBehaviour
             if (hf.sqrMagnitude > 1e-4f)
             {
                 float herr = Vector3.SignedAngle(hf, root.forward, root.up);
-                head.rotation = Quaternion.AngleAxis(herr * headForwardStrength * walkFwdW, root.up) * head.rotation;
+                head.rotation = Quaternion.AngleAxis(herr * headForwardStrength * walkFwdW * live, root.up) * head.rotation;
             }
         }
 
@@ -437,7 +474,7 @@ public class TorsoPoseDriver : MonoBehaviour
             lk = lk * lk * (3f - 2f * lk);
             Vector3 want = delta * cameraFollow + new Vector3(0f, -lookDownCameraDrop * lk, lookDownCameraForward * lk)
                 + Vector3.forward * (walkForwardCameraPush * walkFwdW);
-            camOffset = Vector3.SmoothDamp(camOffset, want, ref camOffsetVel, 0.06f);
+            camOffset = Vector3.SmoothDamp(camOffset, want * live, ref camOffsetVel, 0.06f);
             pm.SetCameraTorsoOffset(camOffset);
         }
     }
@@ -461,10 +498,10 @@ public class TorsoPoseDriver : MonoBehaviour
 
         Vector3 dev = local - restLocal;
         Vector3 shiftLocal = new Vector3(-dev.x * stabilizeSway, 0f, -dev.z * stabilizeForward);
-        shiftLocal = Vector3.ClampMagnitude(shiftLocal, maxShift);
+        shiftLocal = Vector3.ClampMagnitude(shiftLocal, maxShift) * live;
         shiftBone.position += root.TransformVector(shiftLocal);
 
-        float yawFix = Mathf.Clamp(-Mathf.DeltaAngle(restYaw, yaw) * stabilizeYaw, -maxYawCorrection, maxYawCorrection);
+        float yawFix = Mathf.Clamp(-Mathf.DeltaAngle(restYaw, yaw) * stabilizeYaw, -maxYawCorrection, maxYawCorrection) * live;
         if (Mathf.Abs(yawFix) > 0.01f)
         {
             // About the hips' position so the spine pivots where it joins the pelvis.
@@ -489,7 +526,7 @@ public class TorsoPoseDriver : MonoBehaviour
         if (Mathf.Abs(anim.GetFloat(MoveXH)) < 0.05f && Mathf.Abs(anim.GetFloat(MoveYH)) < 0.05f)
             hipRest = Vector2.Lerp(hipRest, rel, 1f - Mathf.Exp(-4f * dt));
 
-        Vector2 off = -(rel - hipRest) * hipLockStrength;
+        Vector2 off = -(rel - hipRest) * hipLockStrength * live;
         if (off.magnitude > maxHipLockOffset) off = off.normalized * maxHipLockOffset;
         Vector3 lp = modelBaseLocal;
         lp.x += off.x; lp.z += off.y;
@@ -531,8 +568,8 @@ public class TorsoPoseDriver : MonoBehaviour
         shRestRoll = Mathf.Lerp(shRestRoll, roll, k);
 
         // Yaw: wobble AND constant off-facing. Roll: wobble only (keeps a deliberate lean).
-        float yawFix = Mathf.Clamp(-yaw * Mathf.Max(shoulderYawRemove, shoulderSquareUp), -maxShoulderYaw, maxShoulderYaw);
-        float rollFix = Mathf.Clamp(-(roll - shRestRoll) * shoulderRollRemove, -maxShoulderRoll, maxShoulderRoll);
+        float yawFix = Mathf.Clamp(-yaw * Mathf.Max(shoulderYawRemove, shoulderSquareUp), -maxShoulderYaw, maxShoulderYaw) * live;
+        float rollFix = Mathf.Clamp(-(roll - shRestRoll) * shoulderRollRemove, -maxShoulderRoll, maxShoulderRoll) * live;
 
         Quaternion q = Quaternion.AngleAxis(yawFix, root.up) * Quaternion.AngleAxis(rollFix, root.forward);
         Vector3 pivot = bone.position;
@@ -542,14 +579,14 @@ public class TorsoPoseDriver : MonoBehaviour
         Vector3 c2 = pivot + q * (c - pivot);
         Vector3 cl2 = root.InverseTransformPoint(c2);
         Vector3 shift = new Vector3(-(cl2.x - shRest.x) * shoulderSlideRemove, 0f, -(cl2.z - shRest.y) * stabilizeForward);
-        bone.position += root.TransformVector(Vector3.ClampMagnitude(shift, maxShift));
+        bone.position += root.TransformVector(Vector3.ClampMagnitude(shift, maxShift) * live);
     }
 
     void Bend(Transform bone, float share)
     {
         if (bone == null || share <= 0f) return;
         // + pitch about the body's right axis tips the torso forward; + twist about up turns right.
-        Quaternion q = Quaternion.AngleAxis(twist * share, root.up) * Quaternion.AngleAxis(pitch * share, root.right);
+        Quaternion q = Quaternion.AngleAxis(twist * share * live, root.up) * Quaternion.AngleAxis(pitch * share * live, root.right);
         bone.rotation = q * bone.rotation;
     }
 

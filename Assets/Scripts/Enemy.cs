@@ -157,6 +157,7 @@ public class EnemyAI : MonoBehaviour
         playerInSight = CanSeePlayer();
         ChooseFireTarget();
         enemyWeapon?.SetAimPoint(fireTarget != null, fireTarget != null ? fireTarget.position + Vector3.up * 1.1f : Vector3.zero);
+        UpdateLookTarget();
 
         // Always update last known position when player is visible
         if (playerInSight)
@@ -185,6 +186,17 @@ public class EnemyAI : MonoBehaviour
             enemyWeapon.UpdateScavenge(scavengeWeapons && canShoot
                 && (currentState == State.Patrol || currentState == State.Idle) && !playerInSight,
                 scavengeRadius, scavengeDelay, 1.4f, scavengeMinPickupAge, agent, walkSpeed * 1.4f);
+    }
+
+    // Head follows whoever it's shooting at, or the last place the player was seen while searching;
+    // otherwise the polish layer lets it glance around while idle.
+    void UpdateLookTarget()
+    {
+        if (characterAnimation == null) return;
+        if (fireTarget != null) characterAnimation.SetLookTarget(fireTarget, 1.4f);
+        else if (currentState == State.Investigate || currentState == State.Chase)
+            characterAnimation.SetLookPoint(lastKnownPlayerPos + Vector3.up * 1.4f);
+        else characterAnimation.ClearLook();
     }
 
     // State handlers
@@ -427,6 +439,11 @@ public class EnemyAI : MonoBehaviour
         if (attackTimer <= 0f)
         {
             attackTimer = attackCooldown;
+            // UpperBodyPose stands down whenever the Animator system is present, so its swing never
+            // played. Unarmed brawlers use the real melee clip; armed enemies keep their hands on the
+            // gun and just lunge with the torso.
+            if (canShoot) characterAnimation?.PlayLunge();
+            else characterAnimation?.PlayMelee();
             if (bodyPose != null) bodyPose.TriggerMelee();
             playerHealth.TakeDamage(attackDamage);
             Debug.Log($"{name} attacked player for {attackDamage} damage");

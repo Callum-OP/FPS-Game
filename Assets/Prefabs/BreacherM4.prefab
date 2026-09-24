@@ -39492,7 +39492,7 @@ Transform:
   m_GameObject: {fileID: 5187670953487107366}
   serializedVersion: 2
   m_LocalRotation: {x: 0.93862283, y: -0.2287371, z: 0.064882085, w: 0.24991368}
-  m_LocalPosition: {x: -0.039, y: -0.143, z: 0.431}
+  m_LocalPosition: {x: -0.158, y: -0.071, z: 0.632}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -39608,8 +39608,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   animationDriver: {fileID: 0}
-  hipPosition: {x: 0, y: -0.2, z: 0.28}
-  adsPosition: {x: 0, y: -0.09, z: 0.5}
+  hipPosition: {x: 0, y: -0.17, z: 0.28}
+  adsPosition: {x: 0, y: -0.06, z: 0.5}
   hipRotation: {x: -1, y: 1.2, z: 35}
   adsRotation: {x: 0, y: 0, z: 0}
   adsSpeed: 10
@@ -39713,6 +39713,9 @@ MonoBehaviour:
   handGrabTime: 0.2
   handReloadTime: 0.55
   handReturnTime: 0.9
+  seatHoldSeconds: 0.35
+  gripSettleSeconds: 0.1
+  minReturnSeconds: 0.6
   weaponReloadPivot: {fileID: 867525230156697492}
   centerCarriedMagOnHand: 1
   carriedMagNudge: {x: 0, y: 0, z: 0}
@@ -39745,13 +39748,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7943068405551898249}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.69553447, y: 0.33306563, z: 0.6364872, w: -0.0135382}
-  m_LocalPosition: {x: -0.194, y: 0.029999994, z: 1.047}
+  m_LocalRotation: {x: 0.68593925, y: 0.42325747, z: 0.5804324, w: -0.115925945}
+  m_LocalPosition: {x: -0.149, y: 0.12, z: 1.08}
   m_LocalScale: {x: 2.08, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7530102725102030228}
-  m_LocalEulerAnglesHint: {x: 206.284, y: 282.195, z: 330.164}
+  m_LocalEulerAnglesHint: {x: 220.57, y: 293.206, z: 324.038}
 --- !u!1 &9129799328890459208
 GameObject:
   m_ObjectHideFlags: 0

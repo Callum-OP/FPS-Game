@@ -26,8 +26,10 @@ public class CharacterLocomotion : MonoBehaviour
     public float runSpeed = 5.5f;
     [Tooltip("Planar forward speed (m/s) that maps to a full sprint (blend value 3). Anything between runSpeed and this blends run -> sprint. Only forward movement sprints.")]
     public float sprintSpeed = 6.5f;
-    [Tooltip("Smoothing time for the Move parameters.")]
+    [Tooltip("Smoothing time for the Move parameters while speeding up (a start).")]
     public float damping = 0.12f;
+    [Tooltip("Smoothing time while slowing down (a stop). Shorter than a start so the feet plant crisply instead of gliding - CharacterMotionPolish adds the rock-back on top.")]
+    public float stopDamping = 0.09f;
     [Tooltip("How far below the feet to ray-check for ground (player only - NavMeshAgent enemies are always \"grounded\").")]
     public float groundCheckDistance = 0.3f;
     [Tooltip("Planar speed (m/s) below which we snap straight to idle instead of blending, so CharacterController/NavMeshAgent velocity noise can't keep the walk cycle alive while stationary.")]
@@ -119,7 +121,8 @@ public class CharacterLocomotion : MonoBehaviour
             target = new Vector2(Mathf.Clamp(lateralTier, -2f, 2f), Mathf.Clamp(speedTier, -2f, 3f));
         }
 
-        moveParam = Vector2.Lerp(moveParam, target, Time.deltaTime / Mathf.Max(damping, 0.01f));
+        float smooth = target.magnitude >= moveParam.magnitude ? damping : stopDamping;
+        moveParam = Vector2.Lerp(moveParam, target, 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(smooth, 0.01f)));
         if (target == Vector2.zero && moveParam.magnitude < 0.03f) moveParam = Vector2.zero; // kill the last sliver
 
         if (animationDriver != null)

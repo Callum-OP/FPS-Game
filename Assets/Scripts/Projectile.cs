@@ -49,7 +49,7 @@ public class Projectile : MonoBehaviour
         var contact = collision.contacts[0];
         ImpactEffects.SpawnImpact(contact.point, contact.normal, collision.collider.transform);
 
-        ApplyDamage(collision.collider, currentDamage, rb.linearVelocity.normalized);
+        ApplyDamage(collision.collider, currentDamage, rb.linearVelocity.normalized, contact.point);
         Destroy(gameObject);
     }   
 
@@ -68,7 +68,7 @@ public class Projectile : MonoBehaviour
         Vector3 point = other.ClosestPoint(transform.position);
         ImpactEffects.SpawnImpact(point, (transform.position - point).normalized, other.transform);
 
-        ApplyDamage(other, CalculateFalloff(), transform.forward);
+        ApplyDamage(other, CalculateFalloff(), transform.forward, point);
         Destroy(gameObject);
     }
 
@@ -94,9 +94,13 @@ public class Projectile : MonoBehaviour
         return health != null;
     }
 
-    void ApplyDamage(Collider col, float amount, Vector3 travelDirection)
+    void ApplyDamage(Collider col, float amount, Vector3 travelDirection, Vector3 hitPoint)
     {
         if (!CanDamage(col)) return;
+
+        // Tell the body which bone was hit and from where BEFORE the damage lands: if this is the
+        // killing blow, that decides the death animation (headshot, side) and where the impulse goes.
+        col.GetComponentInParent<Ragdoll>()?.RegisterHit(col, hitPoint, travelDirection);
 
         var pHealth = col.GetComponentInParent<PlayerHealth>();
         if (pHealth != null) { pHealth.TakeDamage(amount, travelDirection, knockbackForce); return; }

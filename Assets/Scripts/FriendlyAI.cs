@@ -134,6 +134,14 @@ public class FriendlyAI : MonoBehaviour
         target = FindNearestVisibleEnemy();
         allyWeapon?.SetAimPoint(target != null, target != null ? target.position + Vector3.up * 1.1f : Vector3.zero);
 
+        // Look at the enemy being engaged, or glance at the player when close; otherwise let go.
+        if (characterAnimation != null)
+        {
+            if (target != null) characterAnimation.SetLookTarget(target, 1.4f);
+            else if (Vector3.Distance(transform.position, player.position) < 8f) characterAnimation.SetLookTarget(player, 1.5f);
+            else characterAnimation.ClearLook();
+        }
+
         switch (currentState)
         {
             case State.Follow: HandleFollow(); break;

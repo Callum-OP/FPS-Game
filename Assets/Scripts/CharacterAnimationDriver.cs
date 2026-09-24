@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public enum CharacterWeaponClass
@@ -7,15 +8,35 @@ public enum CharacterWeaponClass
     Rifle = 2
 }
 
+/// <summary>What Ragdoll asks the driver for when a character dies.</summary>
+public struct DeathRequest
+{
+    /// <summary>Horizontal, character-local (x right, z forward): the way the body should fall.</summary>
+    public Vector3 fallDirLocal;
+    public bool headshot;
+    public bool crouching;
+    public bool allowMirrored;
+    /// <summary>The "death from right" clip is assumed to fall towards the character's LEFT. Flip if it looks backwards.</summary>
+    public bool rightDeathFallsLeft;
+}
+
+public struct DeathChoice
+{
+    public string stateName;
+    public int stateHash;
+    public Vector3 fallDirLocal;
+}
+
 /// <summary>
 /// Talks to the Animator built by AnimationSystemBuilder (Assets/Animations/CharacterAnimator.controller).
 /// Base layer picks the right full-body directional blend tree for the current weapon;
 /// UpperBody layer (masked to arms/spine/head) handles Aim/Fire/Reload/Melee without
 /// ever interrupting the legs. Put this next to the Animator, same as before.
 ///
-/// Public API is intentionally unchanged from the old version (SetWeaponFrom, PlayShoot,
-/// PlayReload) so WeaponController/PlayerSetup keep working with no edits; PlayMelee/
-/// SetAiming/SetCrouching are new hooks used by PlayerMelee/WeaponADS/PlayerMovement.
+/// Public API is unchanged (SetWeaponFrom, PlayShoot, PlayReload...). New: the death
+/// variant picker (TryChooseDeath / PlayDeath, used by Ragdoll), directional hit notification,
+/// and look-target pass-through to CharacterMotionPolish, which this adds to the humanoid
+/// Animator automatically.
 /// </summary>
 [RequireComponent(typeof(Animator))]
 public class CharacterAnimationDriver : MonoBehaviour
@@ -24,6 +45,9 @@ public class CharacterAnimationDriver : MonoBehaviour
 
     Animator animator;
     CharacterWeaponClass currentWeaponClass;
+    CharacterMotionPolish polish;
+    Ragdoll ragdollOwner;
+    int upperBodyLayer = -1;
 
     static readonly int WeaponClassHash = Animator.StringToHash("WeaponClass");
     static readonly int IsCrouchingHash = Animator.StringToHash("IsCrouching");
@@ -42,6 +66,40 @@ public class CharacterAnimationDriver : MonoBehaviour
     static readonly int MoveXHash = Animator.StringToHash("MoveX");
     static readonly int MoveYHash = Animator.StringToHash("MoveY");
 
+    // ---- death variants ---------------------------------------------------
+    // State names as built by AnimationSystemBuilder. Fall direction is character-local
+    // (x right, z forward): a death "from the front" falls backwards (-z). Variants whose
+    // state is missing from the controller are skipped, so an old controller (Death,
+    // DeathBack, DeathCrouch only) still works until the builder is re-run.
+    struct DeathDef
+    {
+        public string state; public float fallX, fallZ; public bool head, crouch, mirrored, side;
+        public DeathDef(string s, float x, float z, bool head, bool crouch, bool mirrored, bool side = false)
+        { state = s; fallX = x; fallZ = z; this.head = head; this.crouch = crouch; this.mirrored = mirrored; this.side = side; }
+    }
+
+    static readonly DeathDef[] DeathTable =
+    {
+        new DeathDef("Death",             0f, -1f, false, false, false),
+        new DeathDef("Death_FrontM",      0f, -1f, false, false, true),
+        new DeathDef("DeathBack",         0f,  1f, false, false, false),
+        new DeathDef("Death_BackM",       0f,  1f, false, false, true),
+        new DeathDef("Death_HeadFront",   0f, -1f, true,  false, false),
+        new DeathDef("Death_HeadFrontM",  0f, -1f, true,  false, true),
+        new DeathDef("Death_HeadBack",    0f,  1f, true,  false, false),
+        new DeathDef("Death_HeadBackM",   0f,  1f, true,  false, true),
+        new DeathDef("Death_Right",      -1f,  0f, false, false, false, true),
+        new DeathDef("Death_Left",        1f,  0f, false, false, true,  true),
+        new DeathDef("DeathCrouch",       0f, -1f, true,  true,  false),
+        new DeathDef("Death_CrouchBack",  0f,  1f, true,  true,  false),
+    };
+
+    bool[] deathStateExists;
+
+    public bool IsCrouching { get; private set; }
+    public Animator BodyAnimator => animator;
+    public CharacterMotionPolish Polish => polish;
+
     void Awake()
     {
         var animators = GetComponentsInChildren<Animator>(true);
@@ -54,9 +112,23 @@ public class CharacterAnimationDriver : MonoBehaviour
             }
         }
         currentWeaponClass = defaultWeaponClass;
+        ragdollOwner = GetComponentInParent<Ragdoll>();
+        if (ragdollOwner == null) ragdollOwner = GetComponentInChildren<Ragdoll>();
+
         if (animator != null)
+        {
             foreach (var p in animator.parameters) { if (p.nameHash == HitHash) hasHitParam = true; if (p.nameHash == TouchHash) hasTouchParam = true; }
-        if (animator != null) animator.SetInteger(WeaponClassHash, (int)currentWeaponClass);
+            animator.SetInteger(WeaponClassHash, (int)currentWeaponClass);
+            upperBodyLayer = animator.GetLayerIndex("UpperBody");
+
+            // Procedural secondary motion lives on the humanoid body, added here so there is
+            // nothing to set up on the prefabs.
+            if (animator.avatar != null && animator.avatar.isHuman)
+            {
+                polish = animator.GetComponent<CharacterMotionPolish>();
+                if (polish == null) polish = animator.gameObject.AddComponent<CharacterMotionPolish>();
+            }
+        }
     }
 
     /// <summary>Straight from CharacterLocomotion each frame - local-space move direction.</summary>
@@ -80,6 +152,7 @@ public class CharacterAnimationDriver : MonoBehaviour
 
     public void SetCrouching(bool crouching)
     {
+        IsCrouching = crouching;
         if (CanAnimate()) animator.SetBool(IsCrouchingHash, crouching);
     }
 
@@ -101,9 +174,22 @@ public class CharacterAnimationDriver : MonoBehaviour
         SetWeaponClass(weapon.isAutomatic || weapon.isShotgun ? CharacterWeaponClass.Rifle : CharacterWeaponClass.Pistol);
     }
 
-    public void PlayShoot() { if (CanAnimate()) animator.SetTrigger(FireHash); }
+    public void PlayShoot()
+    {
+        if (!CanAnimate()) return;
+        animator.SetTrigger(FireHash);
+        polish?.Kick(1f);
+    }
     public void PlayReload() { if (CanAnimate()) animator.SetTrigger(ReloadHash); }
-    public void PlayMelee() { if (CanAnimate()) animator.SetTrigger(MeleeHash); }
+    public void PlayMelee()
+    {
+        if (!CanAnimate()) return;
+        animator.SetTrigger(MeleeHash);
+        polish?.Lunge();
+    }
+
+    /// <summary>Torso lunge only, no arm clip - for armed characters whose hands are locked to the gun.</summary>
+    public void PlayLunge() { polish?.Lunge(); }
 
     /// <summary>Plays the grenade throw on the masked upper body - legs keep walking.</summary>
     bool hasHitParam;
@@ -135,23 +221,144 @@ public class CharacterAnimationDriver : MonoBehaviour
         animator.SetTrigger(HitHash);
     }
 
+    /// <summary>Directional flinch, called by Ragdoll for every hit that carries a direction. Not rate limited:
+    /// it's a spring, so stacked hits just add up.</summary>
+    public void NotifyHit(Vector3 worldTravelDirection, float force)
+    {
+        polish?.Flinch(worldTravelDirection, force);
+    }
+
     public void PlayGrenade() { if (CanAnimate()) animator.SetTrigger(GrenadeHash); }
 
-    public void SetDead(bool dead) { if (CanAnimate()) animator.SetBool(DeadHash, dead); }
+    // ---- look ----
+    public void SetLookTarget(Transform target, float heightOffset = 1.4f) { polish?.SetLookTarget(target, heightOffset); }
+    public void SetLookPoint(Vector3 worldPoint) { polish?.SetLookPoint(worldPoint); }
+    public void ClearLook() { polish?.ClearLook(); }
 
-    /// <summary>Death with a direction - picks the shot-from-behind clip when fromBack is
-    /// true. Set the direction BEFORE the Dead bool so the transition sees it in the same
-    /// frame it's evaluated.</summary>
+    // ---- death -------------------------------------------------------------
+
+    /// <summary>Legacy entry point. When a Ragdoll is present it owns the death (it picks the variant
+    /// and hands over to physics), so this does nothing - PlayerSetup still calls it on player death.</summary>
+    public void SetDead(bool dead)
+    {
+        if (ragdollOwner != null) return;
+        if (CanAnimate()) animator.SetBool(DeadHash, dead);
+    }
+
+    /// <summary>Legacy directional entry point; same rule as SetDead(bool).</summary>
     public void SetDead(bool dead, bool fromBack)
     {
-        if (!CanAnimate()) return;
+        if (ragdollOwner != null || !CanAnimate()) return;
         animator.SetBool(DeathFromBackHash, fromBack);
         animator.SetBool(DeadHash, dead);
     }
 
-    /// <summary>Length of the death clip currently playing on the base layer, so a
-    /// ragdoll can be timed to take over partway through it. Returns 0 if nothing
-    /// useful is playing.</summary>
+    bool HasState(string name)
+    {
+        return animator.HasState(0, Animator.StringToHash(name))
+            || animator.HasState(0, Animator.StringToHash("Base Layer." + name));
+    }
+
+    /// <summary>Picks the death clip that best matches the request from the variants the controller
+    /// actually contains. False if it has none at all (then the body goes straight to physics).</summary>
+    public bool TryChooseDeath(DeathRequest req, out DeathChoice choice)
+    {
+        choice = default;
+        if (!CanAnimate()) return false;
+
+        if (deathStateExists == null)
+        {
+            deathStateExists = new bool[DeathTable.Length];
+            for (int i = 0; i < DeathTable.Length; i++) deathStateExists[i] = HasState(DeathTable[i].state);
+        }
+
+        Vector3 fall = new Vector3(req.fallDirLocal.x, 0f, req.fallDirLocal.z);
+        fall = fall.sqrMagnitude > 1e-4f ? fall.normalized : new Vector3(0f, 0f, -1f);
+
+        // Crouch variants only exist for a crouching body; if the controller has none, stand up
+        // and use the normal ones rather than skipping the animation.
+        bool anyCrouch = false;
+        for (int i = 0; i < DeathTable.Length; i++)
+            if (deathStateExists[i] && DeathTable[i].crouch) anyCrouch = true;
+        bool useCrouch = req.crouching && anyCrouch;
+
+        int best = -1; float bestScore = float.NegativeInfinity;
+        for (int i = 0; i < DeathTable.Length; i++)
+        {
+            if (!deathStateExists[i]) continue;
+            var d = DeathTable[i];
+            if (d.crouch != useCrouch) continue;
+            if (d.mirrored && !req.allowMirrored) continue;
+
+            float fx = d.fallX;
+            if (d.side && !req.rightDeathFallsLeft) fx = -fx;
+
+            float dir = fx * fall.x + d.fallZ * fall.z;
+            float headBonus = d.head == req.headshot ? 1f : -0.6f;
+            if (useCrouch) headBonus = 0f;
+            float score = dir * 2f + headBonus + Random.value * 0.35f;
+            if (score > bestScore) { bestScore = score; best = i; }
+        }
+
+        if (best < 0) return false;
+
+        var def = DeathTable[best];
+        float outX = def.fallX;
+        if (def.side && !req.rightDeathFallsLeft) outX = -outX;
+        choice = new DeathChoice
+        {
+            stateName = def.state,
+            stateHash = Animator.StringToHash(def.state),
+            fallDirLocal = new Vector3(outX, 0f, def.fallZ)
+        };
+        return true;
+    }
+
+    /// <summary>Crossfades the base layer into the chosen death state and clears the upper-body layer
+    /// so the arms fall with the rest of the body instead of holding the aim pose.</summary>
+    public void PlayDeath(DeathChoice choice, float crossfade, float speed)
+    {
+        if (!CanAnimate()) return;
+        polish?.EnterDeathMode();
+        BlendOutUpperBody(0.1f);
+        animator.speed = Mathf.Max(0.1f, speed);
+        animator.CrossFadeInFixedTime(choice.stateHash, Mathf.Max(0.01f, crossfade), 0);
+    }
+
+    /// <summary>Fades the masked UpperBody layer to zero over the given time.</summary>
+    public void BlendOutUpperBody(float duration)
+    {
+        if (upperBodyLayer < 0 || !CanAnimate()) return;
+        StartCoroutine(FadeLayer(upperBodyLayer, duration));
+    }
+
+    IEnumerator FadeLayer(int layer, float duration)
+    {
+        float start = animator.GetLayerWeight(layer);
+        float t = 0f;
+        while (t < duration && animator != null && animator.enabled)
+        {
+            t += Time.deltaTime;
+            animator.SetLayerWeight(layer, Mathf.Lerp(start, 0f, Mathf.Clamp01(t / Mathf.Max(0.01f, duration))));
+            yield return null;
+        }
+        if (animator != null) animator.SetLayerWeight(layer, 0f);
+    }
+
+    /// <summary>Length in seconds of the state that is (or is about to be) playing on the base layer with
+    /// the given hash, or 0 if it isn't there yet. Looks at both the current and the incoming state, since
+    /// during a crossfade the destination is the "next" one.</summary>
+    public float GetStateLength(int stateHash)
+    {
+        if (!CanAnimate()) return 0f;
+        var next = animator.GetNextAnimatorStateInfo(0);
+        if (animator.IsInTransition(0) && next.shortNameHash == stateHash) return next.length;
+        var cur = animator.GetCurrentAnimatorStateInfo(0);
+        if (cur.shortNameHash == stateHash) return cur.length;
+        return 0f;
+    }
+
+    /// <summary>Length of the death clip currently playing on the base layer.</summary>
     public float GetCurrentBaseStateLength()
     {
         if (!CanAnimate()) return 0f;

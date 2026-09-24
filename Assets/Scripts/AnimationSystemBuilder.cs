@@ -46,8 +46,9 @@ public static class AnimationSystemBuilder
         public string file;     // fbx file name (no extension)
         public bool loop;
         public bool rootMotion; // bake XZ root motion out (we always drive movement via code)
-        public ClipDef(string key, string pack, string file, bool loop)
-        { this.key = key; this.pack = pack; this.file = file; this.loop = loop; this.rootMotion = false; }
+        public bool optional;   // missing file is logged quietly, not as a warning
+        public ClipDef(string key, string pack, string file, bool loop, bool optional = false)
+        { this.key = key; this.pack = pack; this.file = file; this.loop = loop; this.rootMotion = false; this.optional = optional; }
     }
 
     // Every clip the animator system references. Edit this table to swap packs/clips.
@@ -102,6 +103,8 @@ public static class AnimationSystemBuilder
         new ClipDef("ri_death_head_f",   "Pro Rifle Pack", "death from front headshot", false),
         new ClipDef("ri_death_head_b",   "Pro Rifle Pack", "death from back headshot", false),
         new ClipDef("ri_death_crouch",   "Pro Rifle Pack", "death crouching headshot front", false),
+        // Optional: only used if the pack ships it (crouching, shot from behind).
+        new ClipDef("ri_death_crouch_b", "Pro Rifle Pack", "death crouching headshot back", false, optional: true),
         // Sprint set - the pack has proper sprint clips, so running flat out no longer
         // has to reuse the run cycle played faster.
         new ClipDef("ri_sprint_fwd",     "Pro Rifle Pack", "sprint forward", true),
@@ -277,7 +280,8 @@ public static class AnimationSystemBuilder
         var importer = AssetImporter.GetAtPath(fbxPath) as ModelImporter;
         if (importer == null)
         {
-            Debug.LogWarning($"[AnimationSystemBuilder] Missing FBX: {fbxPath}");
+            if (def.optional) Debug.Log($"[AnimationSystemBuilder] Optional clip not present, skipped: {fbxPath}");
+            else Debug.LogWarning($"[AnimationSystemBuilder] Missing FBX: {fbxPath}");
             return null;
         }
 
@@ -350,7 +354,7 @@ public static class AnimationSystemBuilder
     static AnimationClip C(string key)
     {
         _clipLookup.TryGetValue(key, out var c);
-        if (c == null) Debug.LogWarning($"[AnimationSystemBuilder] Clip '{key}' unavailable - a blend tree node will be empty.");
+        if (c == null && !key.EndsWith("crouch_b")) Debug.LogWarning($"[AnimationSystemBuilder] Clip '{key}' unavailable - a blend tree node will be empty.");
         return c;
     }
 
@@ -502,13 +506,29 @@ public static class AnimationSystemBuilder
         AnimatorState sDeadBack = AddMotionState(sm, "DeathBack", C("ri_death_back") != null ? C("ri_death_back") : C("ri_death_front"), new Vector3(440, 620, 0));
         sm.defaultState = sUnarmed;
 
+        // ---- death variants ----
+        // No transitions lead INTO these: Ragdoll picks one (from the direction of the killing shot, headshot,
+        // stance and momentum - see CharacterAnimationDriver.TryChooseDeath) and crossfades to it by name. The
+        // names must match that table. "M" states play the same clip mirrored, which doubles the variety for
+        // free. Any variant whose clip isn't in the packs is simply not created and never chosen.
+        float dy = 700f;
+        AddDeathVariant(sm, "Death_FrontM",     C("ri_death_front"),  true,  new Vector3(0,   dy, 0));
+        AddDeathVariant(sm, "Death_BackM",      C("ri_death_back"),   true,  new Vector3(220, dy, 0));
+        AddDeathVariant(sm, "Death_HeadFront",  C("ri_death_head_f"), false, new Vector3(440, dy, 0));
+        AddDeathVariant(sm, "Death_HeadFrontM", C("ri_death_head_f"), true,  new Vector3(660, dy, 0));
+        AddDeathVariant(sm, "Death_HeadBack",   C("ri_death_head_b"), false, new Vector3(0,   dy + 80, 0));
+        AddDeathVariant(sm, "Death_HeadBackM",  C("ri_death_head_b"), true,  new Vector3(220, dy + 80, 0));
+        AddDeathVariant(sm, "Death_Right",      C("ri_death_right"),  false, new Vector3(440, dy + 80, 0));
+        AddDeathVariant(sm, "Death_Left",       C("ri_death_right"),  true,  new Vector3(660, dy + 80, 0));
+        AddDeathVariant(sm, "Death_CrouchBack", C("ri_death_crouch_b"), false, new Vector3(880, dy, 0));
+
         var weaponStates = new[] { sUnarmed, sPistol, sRifle };
         for (int i = 0; i < weaponStates.Length; i++)
         for (int j = 0; j < weaponStates.Length; j++)
         {
             if (i == j) continue;
             var t = weaponStates[i].AddTransition(weaponStates[j]);
-            t.hasExitTime = false; t.duration = 0.15f;
+            t.hasExitTime = false; t.duration = 0.2f;
             t.AddCondition(AnimatorConditionMode.Equals, j, "WeaponClass");
         }
 
@@ -576,11 +596,21 @@ public static class AnimationSystemBuilder
         AddInstantTransition(sInjured, sRifle, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
     }
 
+    // A death state that is only ever entered by CrossFade. Skipped when its clip wasn't imported.
+    static void AddDeathVariant(AnimatorStateMachine sm, string name, AnimationClip clip, bool mirror, Vector3 pos)
+    {
+        if (clip == null) return;
+        var s = AddMotionState(sm, name, clip, pos);
+        s.mirror = mirror;
+    }
+
     static void AddInstantTransition(AnimatorState from, AnimatorState to, AnimatorConditionMode mode, float threshold, string param, System.Action<AnimatorStateTransition> extra = null)
     {
         var t = from.AddTransition(to);
         t.hasExitTime = false;
-        t.duration = 0.15f;
+        // Crouch and injured changes are whole-body pose swaps, so they get a longer, softer blend than
+        // the quick triggers on the upper-body layer.
+        t.duration = (param == "IsCrouching" || param == "Injured") ? 0.25f : 0.15f;
         t.AddCondition(mode, threshold, param);
         extra?.Invoke(t);
     }
