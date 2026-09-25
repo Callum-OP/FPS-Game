@@ -6,7 +6,7 @@ using UnityEngine.AI;
 /// character - a NavMeshAgent (enemies) or a CharacterController (player). Falls
 /// back to measuring transform movement if neither is present.
 ///
-/// Feeds CharacterAnimationDriver's MoveX/MoveY (local-space, -1..1 strafe / -2..2
+/// Feeds CharacterAnimationDriver's MoveX/MoveY (local velocity in m/s with a rebuilt controller; the old -1..1 strafe / -2..2
 /// forward-back-ish where run clips live) so the per-weapon 2D directional blend
 /// trees built by AnimationSystemBuilder pick the right clip. Put this on the rigged
 /// body that has the Animator, same as before.
@@ -111,8 +111,17 @@ public class CharacterLocomotion : MonoBehaviour
             target = Vector2.zero; // snap to true idle - residual CharacterController/NavMeshAgent
                                     // velocity noise should never keep the walk cycle alive
         }
+        else if (animationDriver != null && animationDriver.UsesVelocityBlend)
+        {
+            // Velocity space: the blend trees have every clip placed at the speed it was authored at
+            // (see AnimationSystemBuilder), so the feed is simply the local velocity in m/s and the tree
+            // works out the walk/run/sprint mix that matches the ground speed - no foot skating.
+            target = new Vector2(lateral, forward);
+            if (target.magnitude > 8f) target = target.normalized * 8f;
+        }
         else
         {
+            // Controller not rebuilt yet: the old 0-3 tier layout.
             float speedTier = forward >= 0f
                 ? Mathf.InverseLerp(0f, Mathf.Max(runSpeed, 0.01f), Mathf.Abs(forward)) * 2f
                   + Mathf.InverseLerp(runSpeed, Mathf.Max(sprintSpeed, runSpeed + 0.01f), forward)

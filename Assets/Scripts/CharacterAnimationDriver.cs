@@ -16,8 +16,12 @@ public struct DeathRequest
     public bool headshot;
     public bool crouching;
     public bool allowMirrored;
-    /// <summary>The "death from right" clip is assumed to fall towards the character's LEFT. Flip if it looks backwards.</summary>
+    /// <summary>The "death from right" clip falls towards the character's LEFT (measured). Flip only if your clip differs.</summary>
     public bool rightDeathFallsLeft;
+    /// <summary>Horizontal speed at the moment of death, m/s.</summary>
+    public float planarSpeed;
+    /// <summary>A knockback-sized hit (shotgun blast at close range): only the fast "as if shotgunned" clips qualify.</summary>
+    public bool heavy;
 }
 
 public struct DeathChoice
@@ -25,6 +29,9 @@ public struct DeathChoice
     public string stateName;
     public int stateHash;
     public Vector3 fallDirLocal;
+    /// <summary>How far through THIS clip the ragdoll should take over (fraction, at the default 0.33 setting). Measured
+    /// per clip so the handoff happens as the body commits to falling but before it reaches the floor.</summary>
+    public float handoffPoint;
 }
 
 /// <summary>
@@ -62,36 +69,73 @@ public class CharacterAnimationDriver : MonoBehaviour
     static readonly int GrenadeHash = Animator.StringToHash("Grenade");
     static readonly int TouchHash = Animator.StringToHash("TouchingGround");
     bool hasTouchParam;
+    static readonly int MeleeIndexHash = Animator.StringToHash("MeleeIndex");
+    static readonly int ShoveHash = Animator.StringToHash("Shove");
+    bool hasMeleeIndexParam, hasShoveParam;
+    int meleeVariants = 1;
+
+    /// <summary>Seconds from the shove trigger to the moment the kick connects (measured from the
+    /// clip: peak foot speed at 0.60s into the raw 1.40s clip, played at 1.3x - see
+    /// AnimationSystemBuilder's Shove state).</summary>
+    public const float ShoveStrikeDelay = 0.46f;
+
+    /// <summary>True when the controller was built with the velocity-space (m/s) blend trees. False for a controller
+    /// that hasn't been rebuilt yet, which still expects the old 0-3 tier values.</summary>
+    public bool UsesVelocityBlend { get; private set; }
+
+    /// <summary>Seconds from the melee trigger to the moment the swing actually connects (measured from the clips,
+    /// after the builder's speed-up and start offset). Anything that deals melee damage should wait this long.</summary>
+    public const float MeleeStrikeDelay = 0.36f;
     static readonly int HitHash = Animator.StringToHash("Hit");
     static readonly int MoveXHash = Animator.StringToHash("MoveX");
     static readonly int MoveYHash = Animator.StringToHash("MoveY");
 
     // ---- death variants ---------------------------------------------------
-    // State names as built by AnimationSystemBuilder. Fall direction is character-local
-    // (x right, z forward): a death "from the front" falls backwards (-z). Variants whose
-    // state is missing from the controller are skipped, so an old controller (Death,
-    // DeathBack, DeathCrouch only) still works until the builder is re-run.
+    // State names as built by AnimationSystemBuilder. Everything numeric here was MEASURED from the FBX
+    // animation data (forward kinematics of the skeleton, not guessed from the file names):
+    //   fall  - which way the body ends up lying, character-local (x right, z forward), from head-vs-feet
+    //           at the end of the clip. NB several names are misleading: "death from the front" actually
+    //           falls FORWARD, and "death from the back" falls forward-and-left.
+    //   handoff - fraction of the clip at which to hand over to the ragdoll: about a third, brought earlier
+    //           for the fast clips that are already on the floor by then (measured time to hips < 40 cm).
+    // Variants whose state is missing from the controller are skipped, so an old controller still works
+    // until the builder is re-run (then only Death, DeathBack and DeathCrouch exist).
     struct DeathDef
     {
-        public string state; public float fallX, fallZ; public bool head, crouch, mirrored, side;
-        public DeathDef(string s, float x, float z, bool head, bool crouch, bool mirrored, bool side = false)
-        { state = s; fallX = x; fallZ = z; this.head = head; this.crouch = crouch; this.mirrored = mirrored; this.side = side; }
+        public string state; public float fallX, fallZ, handoff; public bool head, crouch, mirrored, side, moving, heavy;
+        public DeathDef(string s, float x, float z, float handoff, bool head = false, bool crouch = false, bool mirrored = false,
+                        bool side = false, bool moving = false, bool heavy = false)
+        { state = s; fallX = x; fallZ = z; this.handoff = handoff; this.head = head; this.crouch = crouch; this.mirrored = mirrored; this.side = side; this.moving = moving; this.heavy = heavy; }
     }
 
     static readonly DeathDef[] DeathTable =
     {
-        new DeathDef("Death",             0f, -1f, false, false, false),
-        new DeathDef("Death_FrontM",      0f, -1f, false, false, true),
-        new DeathDef("DeathBack",         0f,  1f, false, false, false),
-        new DeathDef("Death_BackM",       0f,  1f, false, false, true),
-        new DeathDef("Death_HeadFront",   0f, -1f, true,  false, false),
-        new DeathDef("Death_HeadFrontM",  0f, -1f, true,  false, true),
-        new DeathDef("Death_HeadBack",    0f,  1f, true,  false, false),
-        new DeathDef("Death_HeadBackM",   0f,  1f, true,  false, true),
-        new DeathDef("Death_Right",      -1f,  0f, false, false, false, true),
-        new DeathDef("Death_Left",        1f,  0f, false, false, true,  true),
-        new DeathDef("DeathCrouch",       0f, -1f, true,  true,  false),
-        new DeathDef("Death_CrouchBack",  0f,  1f, true,  true,  false),
+        // ---- falls forward ----
+        new DeathDef("Death",            0.04f,  1.00f, 0.33f),
+        new DeathDef("Death_FrontM",    -0.04f,  1.00f, 0.33f, mirrored: true),
+        new DeathDef("DeathBack",       -0.57f,  0.82f, 0.30f),
+        new DeathDef("Death_BackM",      0.57f,  0.82f, 0.30f, mirrored: true),
+        new DeathDef("Death_HeadBack",  -0.05f,  1.00f, 0.33f, head: true),
+        new DeathDef("Death_HeadBackM",  0.05f,  1.00f, 0.33f, head: true, mirrored: true),
+        new DeathDef("Death_Moving",    -0.12f,  0.99f, 0.33f, moving: true),
+        new DeathDef("Death_MovingM",    0.12f,  0.99f, 0.33f, moving: true, mirrored: true),
+        // ---- falls backward ----
+        new DeathDef("Death_HeadFront",  0.38f, -0.92f, 0.30f, head: true),
+        new DeathDef("Death_HeadFrontM",-0.38f, -0.92f, 0.30f, head: true, mirrored: true),
+        new DeathDef("Death_Stumble",    0.16f, -0.99f, 0.18f),
+        new DeathDef("Death_StumbleM",  -0.16f, -0.99f, 0.18f, mirrored: true),
+        new DeathDef("Death_FallOver",   0.22f, -0.97f, 0.24f),
+        new DeathDef("Death_FallOverM", -0.22f, -0.97f, 0.24f, mirrored: true),
+        // ---- falls to the side (the clip falls to the character's left) ----
+        new DeathDef("Death_Right",     -0.96f, -0.27f, 0.28f, side: true),
+        new DeathDef("Death_Left",       0.96f, -0.27f, 0.28f, side: true, mirrored: true),
+        // ---- crouching ----
+        new DeathDef("DeathCrouch",      0.02f,  1.00f, 0.33f, head: true, crouch: true),
+        // ---- heavy hits (shotgun blast): fast, already airborne / down by a third, so an early handoff ----
+        new DeathDef("Death_ShotFront",  0.02f, -1.00f, 0.25f, heavy: true),
+        new DeathDef("Death_ShotFrontM",-0.02f, -1.00f, 0.25f, mirrored: true, heavy: true),
+        new DeathDef("Death_ShotBack",  -0.01f,  1.00f, 0.16f, heavy: true),
+        new DeathDef("Death_ShotBackM",  0.01f,  1.00f, 0.16f, mirrored: true, heavy: true),
     };
 
     bool[] deathStateExists;
@@ -102,13 +146,26 @@ public class CharacterAnimationDriver : MonoBehaviour
 
     void Awake()
     {
+        // Prefer a HUMANOID animator with a controller assigned. Enemy/ally prefabs have two
+        // Animator components: a non-humanoid one on the root (left over from an earlier setup,
+        // avatar unset) and the real one on the nested model, which is the one every bone lookup,
+        // IK pass and TorsoPoseDriver/WeaponHandIK actually needs. Falling back to "last one with a
+        // controller" (previous behaviour) only if nothing humanoid turns up, so this never regresses
+        // a prefab that has just the one Animator.
         var animators = GetComponentsInChildren<Animator>(true);
         for (int i = animators.Length - 1; i >= 0; i--)
         {
-            if (animators[i].runtimeAnimatorController != null)
+            if (animators[i].runtimeAnimatorController != null && animators[i].avatar != null && animators[i].avatar.isHuman)
             {
                 animator = animators[i];
                 break;
+            }
+        }
+        if (animator == null)
+        {
+            for (int i = animators.Length - 1; i >= 0; i--)
+            {
+                if (animators[i].runtimeAnimatorController != null) { animator = animators[i]; break; }
             }
         }
         currentWeaponClass = defaultWeaponClass;
@@ -117,9 +174,22 @@ public class CharacterAnimationDriver : MonoBehaviour
 
         if (animator != null)
         {
-            foreach (var p in animator.parameters) { if (p.nameHash == HitHash) hasHitParam = true; if (p.nameHash == TouchHash) hasTouchParam = true; }
+            foreach (var p in animator.parameters)
+            {
+                if (p.nameHash == HitHash) hasHitParam = true;
+                if (p.nameHash == TouchHash) hasTouchParam = true;
+                if (p.nameHash == MeleeIndexHash) hasMeleeIndexParam = true;
+                if (p.nameHash == ShoveHash) hasShoveParam = true;
+                if (p.name == "MoveInMetres") UsesVelocityBlend = true;
+            }
             animator.SetInteger(WeaponClassHash, (int)currentWeaponClass);
             upperBodyLayer = animator.GetLayerIndex("UpperBody");
+            if (hasMeleeIndexParam && upperBodyLayer >= 0)
+            {
+                meleeVariants = 1;
+                if (animator.HasState(upperBodyLayer, Animator.StringToHash("UB_Melee2"))) meleeVariants = 2;
+                if (meleeVariants == 2 && animator.HasState(upperBodyLayer, Animator.StringToHash("UB_Melee3"))) meleeVariants = 3;
+            }
 
             // Procedural secondary motion lives on the humanoid body, added here so there is
             // nothing to set up on the prefabs.
@@ -170,7 +240,7 @@ public class CharacterAnimationDriver : MonoBehaviour
     /// <summary>Convenience used by PlayerSetup/WeaponController - infers weapon class from the gun.</summary>
     public void SetWeaponFrom(WeaponController weapon)
     {
-        if (weapon == null) { SetWeaponClass(CharacterWeaponClass.Unarmed); return; }
+        if (weapon == null || weapon.isMeleeWeapon) { SetWeaponClass(CharacterWeaponClass.Unarmed); return; }
         SetWeaponClass(weapon.isAutomatic || weapon.isShotgun ? CharacterWeaponClass.Rifle : CharacterWeaponClass.Pistol);
     }
 
@@ -184,8 +254,43 @@ public class CharacterAnimationDriver : MonoBehaviour
     public void PlayMelee()
     {
         if (!CanAnimate()) return;
+        if (hasMeleeIndexParam) animator.SetInteger(MeleeIndexHash, meleeVariants > 1 ? Random.Range(0, meleeVariants) : 0);
         animator.SetTrigger(MeleeHash);
-        polish?.Lunge();
+        // The lunge goes in with the swing, not at the key press.
+        if (polish != null) StartCoroutine(LungeAfter(MeleeStrikeDelay * 0.5f));
+    }
+
+    IEnumerator LungeAfter(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (polish != null) polish.Lunge();
+    }
+
+    /// <summary>Right-click shove/kick: a full-body base-layer state (see AnimationSystemBuilder),
+    /// so - unlike the melee swings - the masked UpperBody layer is faded to 0 for the duration
+    /// instead of just left running: it would otherwise sit on top of the kick and lock the arms
+    /// into whatever aim/idle pose they were in, which looks wrong for a full-body move.</summary>
+    public void PlayShove()
+    {
+        if (!hasShoveParam || !CanAnimate()) return;
+        animator.SetTrigger(ShoveHash);
+        BlendOutUpperBody(0.08f);
+        StartCoroutine(RestoreUpperBodyAfter(ShoveStrikeDelay + 0.35f));
+        if (polish != null) StartCoroutine(LungeAfter(ShoveStrikeDelay * 0.6f));
+    }
+
+    IEnumerator RestoreUpperBodyAfter(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        RestoreUpperBody(0.15f);
+    }
+
+    /// <summary>Fades the masked UpperBody layer back up to full weight - the counterpart to
+    /// BlendOutUpperBody, used once a Shove's full-body clip has finished.</summary>
+    public void RestoreUpperBody(float duration)
+    {
+        if (upperBodyLayer < 0 || !CanAnimate()) return;
+        StartCoroutine(FadeLayerTo(upperBodyLayer, 1f, duration));
     }
 
     /// <summary>Torso lunge only, no arm clip - for armed characters whose hands are locked to the gun.</summary>
@@ -287,16 +392,18 @@ public class CharacterAnimationDriver : MonoBehaviour
         {
             if (!deathStateExists[i]) continue;
             var d = DeathTable[i];
+            if (d.heavy != req.heavy) continue;          // blasts use the shotgun clips, everything else never does
             if (d.crouch != useCrouch) continue;
             if (d.mirrored && !req.allowMirrored) continue;
+            if (d.moving && req.planarSpeed < 1f) continue; // "walking to dying" only for a body that was moving
 
             float fx = d.fallX;
             if (d.side && !req.rightDeathFallsLeft) fx = -fx;
 
             float dir = fx * fall.x + d.fallZ * fall.z;
-            float headBonus = d.head == req.headshot ? 1f : -0.6f;
-            if (useCrouch) headBonus = 0f;
-            float score = dir * 2f + headBonus + Random.value * 0.35f;
+            float headBonus = req.heavy || useCrouch ? 0f : (d.head == req.headshot ? 1f : -0.6f);
+            float movingBonus = d.moving && dir > 0.5f ? 1.5f : 0f;
+            float score = dir * 2f + headBonus + movingBonus + Random.value * 0.35f;
             if (score > bestScore) { bestScore = score; best = i; }
         }
 
@@ -309,7 +416,8 @@ public class CharacterAnimationDriver : MonoBehaviour
         {
             stateName = def.state,
             stateHash = Animator.StringToHash(def.state),
-            fallDirLocal = new Vector3(outX, 0f, def.fallZ)
+            fallDirLocal = new Vector3(outX, 0f, def.fallZ),
+            handoffPoint = def.handoff
         };
         return true;
     }
@@ -332,17 +440,19 @@ public class CharacterAnimationDriver : MonoBehaviour
         StartCoroutine(FadeLayer(upperBodyLayer, duration));
     }
 
-    IEnumerator FadeLayer(int layer, float duration)
+    IEnumerator FadeLayer(int layer, float duration) => FadeLayerTo(layer, 0f, duration);
+
+    IEnumerator FadeLayerTo(int layer, float target, float duration)
     {
         float start = animator.GetLayerWeight(layer);
         float t = 0f;
         while (t < duration && animator != null && animator.enabled)
         {
             t += Time.deltaTime;
-            animator.SetLayerWeight(layer, Mathf.Lerp(start, 0f, Mathf.Clamp01(t / Mathf.Max(0.01f, duration))));
+            animator.SetLayerWeight(layer, Mathf.Lerp(start, target, Mathf.Clamp01(t / Mathf.Max(0.01f, duration))));
             yield return null;
         }
-        if (animator != null) animator.SetLayerWeight(layer, 0f);
+        if (animator != null) animator.SetLayerWeight(layer, target);
     }
 
     /// <summary>Length in seconds of the state that is (or is about to be) playing on the base layer with

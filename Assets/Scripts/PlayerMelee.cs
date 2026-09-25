@@ -37,13 +37,28 @@ public class PlayerMelee : MonoBehaviour
 
         if (animationDriver == null) animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
         if (animationDriver != null)
+        {
             animationDriver.PlayMelee();
+            // The damage lands when the swing actually connects, not the instant the key is pressed -
+            // the clips take a beat to wind up (see CharacterAnimationDriver.MeleeStrikeDelay).
+            StartCoroutine(DealDamageAfter(CharacterAnimationDriver.MeleeStrikeDelay));
+        }
         else
         {
             if (legacyBodyPose == null) legacyBodyPose = GetComponentInChildren<UpperBodyPose>();
             legacyBodyPose?.TriggerMelee();
+            DealDamage();
         }
+    }
 
+    System.Collections.IEnumerator DealDamageAfter(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        DealDamage();
+    }
+
+    void DealDamage()
+    {
         Transform eye = ThirdPersonMode.Active && ThirdPersonMode.Eye != null ? ThirdPersonMode.Eye : (cam != null ? cam.transform : null);
         Vector3 origin = eye != null ? eye.position : transform.position + Vector3.up * 1.5f;
         Vector3 dir = eye != null ? eye.forward : transform.forward;

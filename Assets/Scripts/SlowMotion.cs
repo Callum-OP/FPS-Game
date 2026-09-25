@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>Bullet-time. Was bound to right mouse; that's now PlayerShove, so this moved to
+/// PlayerInputMap.SlowMo (C) - see PlayerInputMap for the full current key layout.</summary>
 public class SlowMotion : MonoBehaviour
 {
     [Header("Settings")]
@@ -14,7 +16,7 @@ public class SlowMotion : MonoBehaviour
 
     void Awake()
     {
-        slowMoAction = new InputAction("SlowMo", binding: "<Mouse>/rightButton");
+        slowMoAction = new InputAction("SlowMo", binding: PlayerInputMap.SlowMo);
         slowMoAction.Enable();
     }
 

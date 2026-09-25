@@ -62,7 +62,7 @@ Transform:
   m_GameObject: {fileID: 3971073849451909769}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.68, z: 0.013}
+  m_LocalPosition: {x: 0, y: 0.644, z: 0.013}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -260,6 +260,7 @@ GameObject:
   - component: {fileID: 3579103132014354902}
   - component: {fileID: 3272267351875027821}
   - component: {fileID: 7850456022116762550}
+  - component: {fileID: 8037241872667057805}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -506,16 +507,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ragdoll
   animator: {fileID: 4783233763987129048}
-  deathAnimationChance: 0.5
-  ragdollTakeoverPoint: 0.45
-  maxDeathAnimationTime: 1.2
+  useDeathAnimations: 1
+  ragdollHandoffPoint: 0.33
+  handoffJitter: 0.04
+  minAnimationTime: 0.25
+  deathAnimationTimeCap: 2
+  deathCrossfade: 0.1
+  deathSpeedRange: {x: 0.95, y: 1.1}
+  mirrorVariants: 1
+  rightDeathFallsLeft: 1
+  momentumCarry: 0.6
+  slideDamping: 3.5
+  momentumSteering: 0.35
   velocityInheritance: 1
+  angularInheritance: 1
+  maxHandoffSpeed: 7
+  maxHandoffAngularSpeed: 18
+  hitImpulse: 3
+  headImpulseScale: 1.5
+  looseSwingLimit: 70
+  looseTwistLimit: 45
+  jointRelaxTime: 0.6
   groundClamp: 1
   groundLayers:
     serializedVersion: 2
     m_Bits: 4294967295
   groundClampDuration: 4
   groundClampTolerance: 0.35
+  freezeWhenSettled: 1
+  settleSpeed: 0.2
+  settleTime: 0.6
+  maxSettleTime: 8
   explosionRagdollForce: 9
   knockbackSkipAnimationThreshold: 16
   knockbackImpulseScale: 5
@@ -572,6 +594,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterAnimationDriver
   defaultWeaponClass: 1
+  hitReactionCooldown: 0.8
 --- !u!114 &2851115830741363710
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -591,10 +614,13 @@ MonoBehaviour:
   animationDriver: {fileID: 8719003296114661464}
   walkSpeed: 2.5
   runSpeed: 5.5
+  sprintSpeed: 6.5
   damping: 0.12
+  stopDamping: 0.09
   groundCheckDistance: 0.3
   idleDeadzone: 0.15
   debugLog: 1
+  landLookAhead: 0.9
 --- !u!114 &8784270823998979221
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -620,12 +646,22 @@ MonoBehaviour:
     pinkyCurl: 50
   leftGripPose:
     curlAxis: {x: -1, y: 0, z: 0}
-    thumbCurl: 10
-    indexCurl: 11.4
-    middleCurl: 11.4
-    ringCurl: 8.7
-    pinkyCurl: 8.7
-  mirrorLeftCurlFromRight: 1
+    thumbCurl: 0
+    indexCurl: 50
+    middleCurl: 50
+    ringCurl: 50
+    pinkyCurl: 50
+  strictHandLock: 1
+  lockMaxStretch: 0.05
+  overrideLeftFingers: 1
+  overrideRightFingers: 0
+  invertLeftCurl: 0
+  invertRightCurl: 0
+  elbowNeverUp: 1
+  elbowMaxUp: -0.15
+  elbowNeverIn: 1
+  elbowMinOutward: 0.1
+  elbowOutward: 0.45
   maxPullBack: 0.35
   pullBackSpeed: 10
   pullBackDeadzone: 0.04
@@ -678,6 +714,11 @@ MonoBehaviour:
   hipHolsterRotation: {x: 0, y: 90, z: 0}
   startingWeaponPrefab: {fileID: 6466554159311269021}
   switchCooldown: 0.5
+  holsterHoldTime: 0.6
+  holsterCarrySeconds: 0.45
+  holsterSlingSeconds: 0.25
+  drawSeconds: 0.35
+  holsterSpeedMultiplier: 1.15
 --- !u!114 &7850456022116762550
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -693,6 +734,24 @@ MonoBehaviour:
   swapRange: 2.5
   inventory: {fileID: 3272267351875027821}
   playerSetup: {fileID: 8380861452952741765}
+--- !u!114 &8037241872667057805
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c77487d0109a2b24b991ffd6a15b705e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerShove
+  range: 2
+  damage: 5
+  pushDistance: 2.5
+  staggerDuration: 0.7
+  cooldown: 1
+  animationDriver: {fileID: 8719003296114661464}
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0

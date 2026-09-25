@@ -132,7 +132,12 @@ public class EnemyWeapon : MonoBehaviour
         friendlyAI = GetComponent<FriendlyAI>(); // may be null on an enemy
         ammo = Mathf.Max(1, magazineSize);
         animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
-        if (animationDriver != null) TorsoPoseDriver.EnsureOn(animationDriver.GetComponent<Animator>());
+        // BodyAnimator, not GetComponent<Animator>() on this GameObject: enemy/ally prefabs carry a
+        // second, non-humanoid Animator on their root (see CharacterAnimationDriver.Awake), and handing
+        // THAT to EnsureOn silently does nothing (it requires avatar.isHuman) - which is why enemies and
+        // allies never actually got a TorsoPoseDriver (aim pitch, hip stabilising, foot alignment - the
+        // whole system the player's body runs) despite this call looking like it should add one.
+        if (animationDriver != null) TorsoPoseDriver.EnsureOn(animationDriver.BodyAnimator);
 
         if (weaponPrefab != null) SpawnWeapon(weaponPrefab);
     }
@@ -160,7 +165,15 @@ public class EnemyWeapon : MonoBehaviour
 
     bool EnsureAnchorAndHandIK()
     {
-        Animator anim = GetComponentInChildren<Animator>();
+        // Same fix as above: GetComponentInChildren<Animator>() (first match, depth-first) returns
+        // the root's non-humanoid Animator, not the humanoid one on the nested model. WeaponHandIK was
+        // then being added to - and doing every bone/IK lookup against - an Animator with no avatar,
+        // which silently no-ops every GetBoneTransform/SetIKPosition call: the hands never actually
+        // moved to the grip, they just stayed wherever the raw (untargeted) clip left them. That's the
+        // "hands don't reach correct positions on gun" bug.
+        Animator anim = animationDriver != null && animationDriver.BodyAnimator != null
+            ? animationDriver.BodyAnimator
+            : GetComponentInChildren<Animator>();
         if (anim == null)
         {
             Debug.LogWarning($"EnemyWeapon on '{name}': no Animator found - can't attach the weapon.", this);

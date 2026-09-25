@@ -236,6 +236,7 @@ public class Ragdoll : MonoBehaviour
         explosionDismembers = dismember;
     }
 
+    bool usedClip;
     bool killedByExplosion;
     Vector3 explosionCentre;
     float explosionForceReceived;
@@ -297,9 +298,11 @@ public class Ragdoll : MonoBehaviour
         knockedBack = !killedByExplosion && pendingHitForceSum >= knockbackSkipAnimationThreshold;
 
         bool airborne = IsAirborne();
+        // A knockback-sized hit used to skip the animation. It now plays the fast "as if shotgunned" clip
+        // (if the controller has one) and the shove is applied on top at the handoff.
         bool animate = useDeathAnimations && animator != null && animator.enabled
             && animator.runtimeAnimatorController != null && driver != null
-            && !killedByExplosion && !knockedBack && !airborne;
+            && !killedByExplosion && !airborne;
 
         DeathChoice choice = default;
         if (animate) animate = driver.TryChooseDeath(BuildDeathRequest(), out choice);
@@ -307,7 +310,10 @@ public class Ragdoll : MonoBehaviour
         BeginDeathPose();
 
         float speed = Random.Range(Mathf.Min(deathSpeedRange.x, deathSpeedRange.y), Mathf.Max(deathSpeedRange.x, deathSpeedRange.y));
-        float point = Mathf.Clamp(ragdollHandoffPoint + Random.Range(-handoffJitter, handoffJitter), 0.1f, 0.95f);
+        // Per-clip handoff (measured), scaled by the Inspector value relative to its 0.33 default.
+        float clipPoint = animate && choice.handoffPoint > 0f ? choice.handoffPoint : 0.33f;
+        float point = Mathf.Clamp(clipPoint * (ragdollHandoffPoint / 0.33f) + Random.Range(-handoffJitter, handoffJitter), 0.08f, 0.95f);
+        usedClip = animate;
         if (animate) driver.PlayDeath(choice, deathCrossfade, speed);
         else if (driver != null && driver.Polish != null) driver.Polish.EnterDeathMode();
 
@@ -385,7 +391,9 @@ public class Ragdoll : MonoBehaviour
             headshot = hasHitInfo && lastHitWasHead,
             crouching = driver != null && driver.IsCrouching,
             allowMirrored = mirrorVariants,
-            rightDeathFallsLeft = rightDeathFallsLeft
+            rightDeathFallsLeft = rightDeathFallsLeft,
+            planarSpeed = vel.magnitude,
+            heavy = knockedBack
         };
     }
 
@@ -567,7 +575,8 @@ public class Ragdoll : MonoBehaviour
             // A directional shove on every bone, like the whole body being punched backward.
             Vector3 direction = pendingHitDirectionSum.sqrMagnitude > 0.0001f
                 ? pendingHitDirectionSum.normalized : transform.forward;
-            float impulse = pendingHitForceSum * knockbackImpulseScale;
+            // The shotgun clip already carries most of the motion; the shove adds to it rather than replaces it.
+            float impulse = pendingHitForceSum * knockbackImpulseScale * (usedClip ? 0.5f : 1f);
 
             foreach (var rb in bones)
             {

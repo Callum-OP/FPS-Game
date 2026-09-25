@@ -12,10 +12,14 @@ using UnityEngine.InputSystem;
 ///   R  reload                  F  drop
 ///   Ctrl crouch                Shift aim                    Space jump
 ///   Q/E cant                   V melee                      Left click fire
+///   Right click shove/kick      C slow-mo (moved off right click - see below)
 ///
 /// There is no dedicated sprint any more - lowering the gun (2) already gives a speed
 /// boost via LowerWeapon.fastWalkMultiplier, which does the job a sprint key would have
 /// and is what "sprint" now means in this game.
+///
+/// Right-click used to be SlowMotion's own hardcoded binding; it's now Shove, and
+/// SlowMotion moved to C - see SlowMotion.cs.
 /// </summary>
 public static class PlayerInputMap
 {
@@ -31,6 +35,8 @@ public static class PlayerInputMap
     public const string Reload       = "<Keyboard>/r";
     public const string Drop         = "<Keyboard>/f";
     public const string Melee        = "<Keyboard>/v";
+    public const string Shove        = "<Mouse>/rightButton";
+    public const string SlowMo       = "<Keyboard>/c";
     public const string CantLeft     = "<Keyboard>/q";
     public const string CantRight    = "<Keyboard>/e";
     public const string Fire         = "<Mouse>/leftButton";

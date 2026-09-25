@@ -21,6 +21,8 @@ public class WeaponController : MonoBehaviour
     [Tooltip("How many times to repeat the reload sequence, e.g. a shotgun loading one shell at a time instead of a single mag swap. Each cycle refills an equal share of the missing ammo and plays the full reload visuals/animation again - set to 1 for a normal single-mag reload.")]
     public int reloadCycles = 1;
     public bool isAutomatic = false;
+    [Tooltip("A held prop, not a firearm: Update() does nothing (no fire/reload/ammo), and CharacterAnimationDriver treats it as unarmed for locomotion. The actual attack is the existing melee (V) / shove (right-click) system, which already works with anything equipped.")]
+    public bool isMeleeWeapon = false;
 
     [Header("Shotgun")]
     public bool isShotgun = false;
@@ -124,6 +126,7 @@ public class WeaponController : MonoBehaviour
     void Update()
     {
         if (isReloading) return;
+        if (isMeleeWeapon) return; // no ammo, no fire/reload - just a held prop
 
         // R is reload only now - pickup moved to its own key (1).
         if (reloadAction.WasPressedThisFrame() && currentAmmo < maxAmmo)

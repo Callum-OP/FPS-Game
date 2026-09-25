@@ -441,13 +441,38 @@ public class EnemyAI : MonoBehaviour
             attackTimer = attackCooldown;
             // UpperBodyPose stands down whenever the Animator system is present, so its swing never
             // played. Unarmed brawlers use the real melee clip; armed enemies keep their hands on the
-            // gun and just lunge with the torso.
-            if (canShoot) characterAnimation?.PlayLunge();
-            else characterAnimation?.PlayMelee();
-            if (bodyPose != null) bodyPose.TriggerMelee();
-            playerHealth.TakeDamage(attackDamage);
-            Debug.Log($"{name} attacked player for {attackDamage} damage");
+            // gun and just lunge with the torso. Damage lands with the swing, not the button press.
+            if (canShoot)
+            {
+                characterAnimation?.PlayLunge();
+                StartCoroutine(DealMeleeDamageAfter(0.2f));
+            }
+            else if (characterAnimation != null)
+            {
+                characterAnimation.PlayMelee();
+                StartCoroutine(DealMeleeDamageAfter(CharacterAnimationDriver.MeleeStrikeDelay));
+            }
+            else
+            {
+                if (bodyPose != null) bodyPose.TriggerMelee();
+                DealMeleeDamageNow();
+            }
         }
+    }
+
+    IEnumerator DealMeleeDamageAfter(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        DealMeleeDamageNow();
+    }
+
+    void DealMeleeDamageNow()
+    {
+        if (playerHealth == null) return;
+        float dist = Vector3.Distance(transform.position, player.position);
+        if (dist > attackRange * 1.6f) return; // player stepped out of range during the wind-up
+        playerHealth.TakeDamage(attackDamage);
+        Debug.Log($"{name} attacked player for {attackDamage} damage");
     }
 
     // States

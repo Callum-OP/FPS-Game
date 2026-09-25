@@ -65,6 +65,15 @@ public class TorsoPoseDriver : MonoBehaviour
     // Calibrated per-instance so we never depend on a bone axis guess or on toe bones being
     // mapped (both silently broke the previous attempt on some rigs).
     Vector3 lFootLocalFwd = Vector3.forward, rFootLocalFwd = Vector3.forward; bool hasFootCal;
+    // Per-frame low-pass on the yaw/twist corrections below, and how much to trust each one this
+    // frame (see AlignOneFoot) - both exist to stop the walking-forward foot/leg glitch: mid-stride
+    // the foot pitches up for toe-off and down for heel-strike, and at those moments the calibrated
+    // "which way is this foot facing" reading swings toward vertical, where a yaw reading is
+    // inherently noisy (a nearly-vertical vector's horizontal component flips around for tiny
+    // real rotations). Blindly applying that noisy reading at up to 50 degrees of correction (the
+    // walking-forward strength) is what produced the slanted, twisted-looking-sideways foot and the
+    // bouncy, rag-doll-ish leg.
+    float lFootYawSmooth, rFootYawSmooth, lKneeTwistSmooth, rKneeTwistSmooth;
     Vector3 lKneeLocalFwd = Vector3.forward, rKneeLocalFwd = Vector3.forward;
     Vector3 modelBaseLocal; bool hasModelBase; Vector2 hipRest;
     float dbgTime; Vector2 dbgMin = new Vector2(99, 99), dbgMax = new Vector2(-99, -99);
@@ -136,8 +145,9 @@ public class TorsoPoseDriver : MonoBehaviour
     public bool headFaceForward = true;
     [Range(0f, 1f)] public float headForwardStrength = 1f;
     [Tooltip("While moving forward, feet are turned this far towards straight ahead (1 = fully). Fixes the left foot landing turned in.")]
-    [Range(0f, 1f)] public float footForwardWhenWalking = 1f;
-    public float maxFootYawWalking = 50f;
+    [Range(0f, 1f)] public float footForwardWhenWalking = 0.6f;
+    public float maxFootYawWalking = 28f;
+    [Range(0f, 1f)] public float footCorrectionSmoothing = 0.35f;
     [Tooltip("Points the knees straight ahead while walking forward (lower legs drifting inwards, 'limp' look). 0 = off.")]
     [Range(0f, 1f)] public float kneeForwardStrength = 0.7f;
 
@@ -151,6 +161,8 @@ public class TorsoPoseDriver : MonoBehaviour
     // its feet, the shoulders are squared up to the root and the feet are turned forward, all while
     // the character is meant to be falling over.
     bool dead; float deadBlend; float live = 1f; bool ikReleased;
+    // MoveY is 0.5 at half-walk with the old tier feed, and a speed in m/s with the rebuilt controller (0.5 tier ~ 1.4 m/s).
+    float fwdMoveScale = 0.5f;
     Vector3 camOffset, camOffsetVel;
 
     void Awake() { if (GetComponentInParent<PlayerMovement>() != null) Instance = this; }
@@ -162,6 +174,7 @@ public class TorsoPoseDriver : MonoBehaviour
         pm = GetComponentInParent<PlayerMovement>();
         aiWeapon = GetComponentInParent<EnemyWeapon>();
         if (anim == null || !anim.isHuman || (pm == null && aiWeapon == null)) { enabled = false; return; }
+        foreach (var prm in anim.parameters) if (prm.name == "MoveInMetres") fwdMoveScale = 1.4f;
         root = pm != null ? pm.transform : (aiWeapon != null ? aiWeapon.transform : transform);
         spine = anim.GetBoneTransform(HumanBodyBones.Spine);
         chest = anim.GetBoneTransform(HumanBodyBones.Chest);
@@ -290,7 +303,7 @@ public class TorsoPoseDriver : MonoBehaviour
 
     void AlignFeet()
     {
-        float fwdW = Mathf.Clamp01(anim.GetFloat(MoveYH) / 0.5f);
+        float fwdW = Mathf.Clamp01(anim.GetFloat(MoveYH) / fwdMoveScale);
         float align = Mathf.Lerp(footYawAlign, footForwardWhenWalking, fwdW);
         float maxCorr = Mathf.Lerp(maxFootYawCorrection, maxFootYawWalking, fwdW);
         float kneeW = kneeTwistCorrect * fwdW;
@@ -313,12 +326,29 @@ public class TorsoPoseDriver : MonoBehaviour
         {
             Vector3 fwd = footBone.rotation * (left ? lFootLocalFwd : rFootLocalFwd);
             Vector3 flat = Vector3.ProjectOnPlane(fwd, Vector3.up);
-            if (flat.sqrMagnitude > 1e-6f)
+            // fwd is a rotated unit vector, so flat's length IS how horizontal it currently is:
+            // 1 when the foot's calibrated-forward is level, 0 when it's pointing straight up/down.
+            // Below ~25 degrees off vertical the yaw reading is more noise than signal - fade the
+            // correction out well before then rather than trusting it at full strength right up to
+            // the last moment.
+            float confidence = Mathf.Clamp01((flat.magnitude - 0.15f) / 0.35f);
+            confidence *= confidence;
+            float corr = 0f;
+            if (flat.sqrMagnitude > 1e-6f && confidence > 0f)
             {
                 float err = Vector3.SignedAngle(flat, root.forward, Vector3.up);
-                float corr = Mathf.Clamp(err * align, -maxCorr, maxCorr);
-                rot = Quaternion.AngleAxis(corr, Vector3.up) * rot;
+                corr = Mathf.Clamp(err * align, -maxCorr, maxCorr) * confidence;
             }
+            // Low-pass the applied correction itself: even a genuine, confident reading changes
+            // fast through a stride, and re-deriving it from scratch each frame (nothing here
+            // accumulates onto last frame's result - it's always measured fresh off the current
+            // animated pose) still means back-to-back frames can land on quite different corr
+            // values. Smoothing removes the frame-to-frame snapping without lagging behind a real,
+            // sustained turn.
+            float smoothed = left
+                ? (lFootYawSmooth = Mathf.Lerp(lFootYawSmooth, corr, footCorrectionSmoothing))
+                : (rFootYawSmooth = Mathf.Lerp(rFootYawSmooth, corr, footCorrectionSmoothing));
+            rot = Quaternion.AngleAxis(smoothed, Vector3.up) * rot;
         }
         anim.SetIKRotationWeight(g, alignW);
         anim.SetIKRotation(g, rot);
@@ -338,10 +368,23 @@ public class TorsoPoseDriver : MonoBehaviour
                 Vector3 kneeFwd = kneeBone.rotation * (left ? lKneeLocalFwd : rKneeLocalFwd);
                 Vector3 pole = Vector3.ProjectOnPlane(kneeFwd, axis);
                 Vector3 preferred = Vector3.ProjectOnPlane(root.forward, axis);
-                if (pole.sqrMagnitude > 1e-6f && preferred.sqrMagnitude > 1e-6f)
+                // Same confidence + smoothing as the foot yaw above, and for the same reason: kneeFwd
+                // swings close to parallel with the hip->ankle axis at points in the stride, where the
+                // "how twisted is this knee" reading gets just as noisy.
+                // pole is ProjectOnPlane of a UNIT vector (kneeFwd, from calibration), so its magnitude
+                // is already sin(angle-from-axis) in 0..1 - no need to divide by axis's own length.
+                float poleConf = Mathf.Clamp01((pole.magnitude - 0.15f) / 0.35f);
+                poleConf *= poleConf;
+                float twistCorr = 0f;
+                if (pole.sqrMagnitude > 1e-6f && preferred.sqrMagnitude > 1e-6f && poleConf > 0f)
                 {
                     float twistErr = Vector3.SignedAngle(pole, preferred, axis);
-                    float twistCorr = Mathf.Clamp(twistErr * kneeW, -maxKneeTwistCorrection, maxKneeTwistCorrection);
+                    twistCorr = Mathf.Clamp(twistErr * kneeW, -maxKneeTwistCorrection, maxKneeTwistCorrection) * poleConf;
+                }
+                {
+                    twistCorr = left
+                        ? (lKneeTwistSmooth = Mathf.Lerp(lKneeTwistSmooth, twistCorr, footCorrectionSmoothing))
+                        : (rKneeTwistSmooth = Mathf.Lerp(rKneeTwistSmooth, twistCorr, footCorrectionSmoothing));
                     if (Mathf.Abs(twistCorr) > 0.05f)
                     {
                         Vector3 kneePos = kneeBone.position;
@@ -455,7 +498,7 @@ public class TorsoPoseDriver : MonoBehaviour
         if (Mathf.Abs(anim.GetFloat(MoveXH)) < 0.05f && Mathf.Abs(anim.GetFloat(MoveYH)) < 0.05f)
             CalibrateLegs(false);
 
-        walkFwdW = Mathf.MoveTowards(walkFwdW, Mathf.Clamp01(anim.GetFloat(MoveYH) / 0.5f), 6f * dt);
+        walkFwdW = Mathf.MoveTowards(walkFwdW, Mathf.Clamp01(anim.GetFloat(MoveYH) / fwdMoveScale), 6f * dt);
         if (headFaceForward && hasHeadFwd && head != null && walkFwdW > 0.001f)
         {
             Vector3 hf = Vector3.ProjectOnPlane(head.rotation * headLocalFwd, root.up);
