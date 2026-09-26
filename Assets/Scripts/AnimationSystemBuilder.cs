@@ -39,6 +39,7 @@ public static class AnimationSystemBuilder
     const string OutDir = "Assets/Animations";
     const string ControllerPath = OutDir + "/CharacterAnimator.controller";
     const string MaskPath = OutDir + "/UpperBodyMask.mask";
+    const string LowerMaskPath = OutDir + "/LowerBodyMask.mask";
 
     // ---- clip descriptor -------------------------------------------------
     struct ClipDef
@@ -124,6 +125,12 @@ public static class AnimationSystemBuilder
         new ClipDef("ri_walk_back_l",    "Pro Rifle Pack", "walk backward left", true),
         new ClipDef("ri_walk_back_r",    "Pro Rifle Pack", "walk backward right", true),
 
+        // Turn-in-place (see BuildTurnLayer): a standing pivot, not a walk cycle, but marked
+        // loop=true so holding a turn direction repeats the step instead of freezing on the
+        // last frame - the same reason every locomotion clip above loops.
+        new ClipDef("ri_turn_l",         "Pro Rifle Pack", "turn 90 left", true),
+        new ClipDef("ri_turn_r",         "Pro Rifle Pack", "turn 90 right", true),
+
         // Rifle crouch - Pro Rifle Pack
         new ClipDef("rc_idle",       "Pro Rifle Pack", "idle crouching aiming", true),
         new ClipDef("rc_walk_fwd",   "Pro Rifle Pack", "walk crouching forward", true),
@@ -133,11 +140,18 @@ public static class AnimationSystemBuilder
         new ClipDef("rc_walk_left",  "Pro Rifle Pack", "walk crouching left", true),
         new ClipDef("rc_walk_right", "Pro Rifle Pack", "walk crouching right", true),
         new ClipDef("rc_idle_plain", "Pro Rifle Pack", "idle crouching", true),
+        new ClipDef("rc_turn_l",     "Pro Rifle Pack", "crouching turn 90 left", true),
+        new ClipDef("rc_turn_r",     "Pro Rifle Pack", "crouching turn 90 right", true),
 
         // Added: unarmed backwards (the Locomotion pack has none), crouch diagonals backwards,
         // and the sprint that was imported but never used.
         new ClipDef("un_walk_back",  "Pro Melee Axe Pack", "unarmed walk back", true),
         new ClipDef("un_run_back",   "Pro Melee Axe Pack", "unarmed run back", true),
+        // Turn-in-place, unarmed. Also stands in for Pistol below - the Pistol_Handgun pack
+        // doesn't ship a turn clip of its own, and this reads closer than the rifle turn does
+        // for a one-handed weapon. Swap in a real pistol turn clip here if you source one.
+        new ClipDef("un_turn_l",     "Pro Melee Axe Pack", "unarmed turn left 90", true),
+        new ClipDef("un_turn_r",     "Pro Melee Axe Pack", "unarmed turn right 90", true),
         new ClipDef("rc_walk_back_l","Pro Rifle Pack", "walk crouching backward left", true),
         new ClipDef("rc_walk_back_r","Pro Rifle Pack", "walk crouching backward right", true),
 
@@ -407,6 +421,34 @@ public static class AnimationSystemBuilder
         return mask;
     }
 
+    // The exact inverse of BuildUpperBodyMask: only legs/feet move, nothing else. Used by the
+    // turn-in-place layer (BuildTurnLayer) so it can only ever affect footwork - it runs
+    // alongside WeaponHandIK and TorsoPoseDriver (which own the arms/spine/head) and must
+    // never fight either of those for the same bones, the single most common bug class in
+    // this project's animation system (see AnatomicalConstraints.cs for the same principle
+    // applied to the runtime joint-limit pass).
+    static AvatarMask BuildLowerBodyMask()
+    {
+        var mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(LowerMaskPath) ?? new AvatarMask();
+        for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
+        {
+            var part = (AvatarMaskBodyPart)i;
+            bool active = part == AvatarMaskBodyPart.LeftLeg ||
+                          part == AvatarMaskBodyPart.RightLeg ||
+                          part == AvatarMaskBodyPart.LeftFootIK ||
+                          part == AvatarMaskBodyPart.RightFootIK ||
+                          part == AvatarMaskBodyPart.Root;
+            mask.SetHumanoidBodyPartActive(part, active);
+        }
+
+        if (AssetDatabase.LoadAssetAtPath<AvatarMask>(LowerMaskPath) == null)
+            AssetDatabase.CreateAsset(mask, LowerMaskPath);
+        else
+            EditorUtility.SetDirty(mask);
+
+        return mask;
+    }
+
     // ---- controller -----------------------------------------------------
     static AnimatorController BuildController(AvatarMask upperBodyMask)
     {
@@ -447,9 +489,14 @@ public static class AnimationSystemBuilder
         controller.AddParameter("Injured", AnimatorControllerParameterType.Bool);
         // Which death clip to play - set by CharacterAnimationDriver.SetDead(dead, fromBack).
         controller.AddParameter("DeathFromBack", AnimatorControllerParameterType.Bool);
+        // Signed turn rate in deg/s, fed by TurnInPlace.cs (negative = turning left). Only the
+        // SIGN really matters to the blend tree below; TurnInPlace also drives this layer's
+        // weight directly at runtime, so the exact magnitude scale here isn't load-bearing.
+        controller.AddParameter("TurnSpeed", AnimatorControllerParameterType.Float);
 
         BuildBaseLayer(controller);
         BuildUpperBodyLayer(controller, upperBodyMask);
+        BuildTurnLayer(controller, BuildLowerBodyMask());
 
         // Turn on the IK pass so OnAnimatorIK() actually gets called - WeaponHandIK
         // uses it to snap the hand bones onto the weapon's grip points every frame,
@@ -844,6 +891,72 @@ public static class AnimationSystemBuilder
         }
     }
 
+    // -- turn-in-place (masked to legs only) layer --
+    //
+    // Real footwork for turning on the spot (a pivot step), instead of the whole body just
+    // silently rotating under a locomotion tree that has no idea a turn is happening. This
+    // layer never decides WHETHER or how fast to turn - Enemy.cs/FriendlyAI.cs/PlayerMovement
+    // keep doing exactly what they already do to actually rotate the transform. TurnInPlace.cs
+    // (runtime) just WATCHES that rotation, feeds its rate into TurnSpeed, and fades this
+    // layer's weight up while idle-turning and down the instant real movement starts (the
+    // directional locomotion trees already cover turning while walking/strafing - this layer
+    // is only for turning from a standstill). Layer weight starts at 0 for exactly that reason:
+    // until TurnInPlace.cs raises it, this layer is fully transparent and the base layer's own
+    // legs show through untouched.
+    static void BuildTurnLayer(AnimatorController controller, AvatarMask lowerBodyMask)
+    {
+        var layer = new AnimatorControllerLayer
+        {
+            name = "TurnInPlace",
+            defaultWeight = 0f,
+            avatarMask = lowerBodyMask,
+            blendingMode = AnimatorLayerBlendingMode.Override,
+            stateMachine = new AnimatorStateMachine { name = "TurnInPlace", hideFlags = HideFlags.HideInHierarchy }
+        };
+        AssetDatabase.AddObjectToAsset(layer.stateMachine, controller);
+        controller.AddLayer(layer);
+        var sm = layer.stateMachine;
+
+        // Each is a 3-point Simple1D blend on TurnSpeed: full left clip at -90, the matching
+        // idle pose (reused, not a real "hold" - see Turn1D) at 0, full right clip at +90. The
+        // idle midpoint keeps the pose sane at low |TurnSpeed| while this layer's weight is
+        // still ramping in/out, rather than a raw 50/50 blend of the two turn clips.
+        BlendTree unarmedTree = Turn1D("TL_Unarmed", "un_turn_l", "un_idle", "un_turn_r");
+        BlendTree pistolTree  = Turn1D("TL_Pistol", "un_turn_l", "pi_idle", "un_turn_r"); // no pistol-specific turn clip yet, see the un_turn_l/r ClipDefs
+        BlendTree rifleTree   = Turn1D("TL_Rifle", "ri_turn_l", "ri_idle", "ri_turn_r");
+        BlendTree crouchTree  = Turn1D("TL_Crouch", "rc_turn_l", "rc_idle", "rc_turn_r");
+        AssetDatabase.AddObjectToAsset(unarmedTree, controller);
+        AssetDatabase.AddObjectToAsset(pistolTree, controller);
+        AssetDatabase.AddObjectToAsset(rifleTree, controller);
+        AssetDatabase.AddObjectToAsset(crouchTree, controller);
+
+        AnimatorState tUnarmed = AddMotionState(sm, "TL_Unarmed", unarmedTree, new Vector3(0, 0, 0));
+        AnimatorState tPistol  = AddMotionState(sm, "TL_Pistol", pistolTree, new Vector3(220, 0, 0));
+        AnimatorState tRifle   = AddMotionState(sm, "TL_Rifle", rifleTree, new Vector3(440, 0, 0));
+        AnimatorState tCrouch  = AddMotionState(sm, "TL_Crouch", crouchTree, new Vector3(440, 140, 0));
+        sm.defaultState = tUnarmed;
+
+        // Same weapon-swap wiring as the base layer (see BuildBaseLayer) - kept identical on
+        // purpose so this layer never disagrees with the base layer about which weapon's legs
+        // should be showing.
+        var weaponStates = new[] { tUnarmed, tPistol, tRifle };
+        for (int i = 0; i < weaponStates.Length; i++)
+        for (int j = 0; j < weaponStates.Length; j++)
+        {
+            if (i == j) continue;
+            var t = weaponStates[i].AddTransition(weaponStates[j]);
+            t.hasExitTime = false; t.duration = 0.2f;
+            t.AddCondition(AnimatorConditionMode.Equals, j, "WeaponClass");
+        }
+
+        AddInstantTransition(tRifle, tCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
+        AddInstantTransition(tPistol, tCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
+        AddInstantTransition(tUnarmed, tCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
+        AddInstantTransition(tCrouch, tRifle, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
+        AddInstantTransition(tCrouch, tPistol, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
+        AddInstantTransition(tCrouch, tUnarmed, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
+    }
+
     // ---- helpers ----------------------------------------------------------
     static AnimatorState AddMotionState(AnimatorStateMachine sm, string name, Motion motion, Vector3 pos)
     {
@@ -872,6 +985,25 @@ public static class AnimationSystemBuilder
         for (int k = 0; k < children.Length && k < found.Count; k++)
             children[k].timeScale = found[k].ts;
         tree.children = children;
+        return tree;
+    }
+
+    // 3-point Simple1D blend for the turn-in-place layer: left clip at -90, idle at 0, right
+    // clip at +90. Threshold values only need the right SIGN to pick a side - TurnInPlace.cs
+    // owns the actual deg/s -> weight mapping via this layer's runtime weight, not this tree.
+    static BlendTree Turn1D(string name, string leftKey, string idleKey, string rightKey)
+    {
+        var tree = new BlendTree { name = name, blendType = BlendTreeType.Simple1D };
+        tree.blendParameter = "TurnSpeed";
+        tree.useAutomaticThresholds = false;
+        tree.hideFlags = HideFlags.HideInHierarchy;
+
+        var left = C(leftKey);
+        var idle = C(idleKey);
+        var right = C(rightKey);
+        if (left != null) tree.AddChild(left, -90f);
+        if (idle != null) tree.AddChild(idle, 0f);
+        if (right != null) tree.AddChild(right, 90f);
         return tree;
     }
 

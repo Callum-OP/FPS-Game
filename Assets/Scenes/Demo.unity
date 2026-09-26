@@ -12352,7 +12352,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 910542812212260045, guid: c8215dbac326f8e4895fdcf861a33bd9, type: 3}
+      insertIndex: 8
+      addedObject: {fileID: 603555670}
   m_SourcePrefab: {fileID: 100100000, guid: c8215dbac326f8e4895fdcf861a33bd9, type: 3}
 --- !u!1001 &343048798
 PrefabInstance:
@@ -21814,6 +21817,49 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8125521008550867370, guid: 38fcb473a8f39364e919afa6fc18e6d7, type: 3}
   m_PrefabInstance: {fileID: 600876380}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &603555657 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 910542812212260045, guid: c8215dbac326f8e4895fdcf861a33bd9, type: 3}
+  m_PrefabInstance: {fileID: 342522368}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &603555661 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3211400689782095061, guid: c8215dbac326f8e4895fdcf861a33bd9, type: 3}
+  m_PrefabInstance: {fileID: 342522368}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 603555657}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eaa447621804f544c81010d753fa8aa5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterLocomotion
+--- !u!95 &603555663 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 4799998883464736613, guid: c8215dbac326f8e4895fdcf861a33bd9, type: 3}
+  m_PrefabInstance: {fileID: 342522368}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &603555670
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 603555657}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dfbc942a6724bb4aa484e1e3c0dd0c3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TurnInPlace
+  animator: {fileID: 603555663}
+  locomotion: {fileID: 603555661}
+  minTurnRate: 12
+  fullTurnRate: 140
+  maxTurnSpeedParam: 200
+  weightSmoothing: 0.08
+  sampleWindow: 0.1
+  debugResolvedAnimator: {fileID: 0}
+  debugTurnRate: 0
+  debugLayerWeight: 0
 --- !u!1001 &604658307
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -29489,7 +29535,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+      insertIndex: 14
+      addedObject: {fileID: 1221179402}
+    - targetCorrespondingSourceObject: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1221179403}
   m_SourcePrefab: {fileID: 100100000, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
 --- !u!1001 &819586449
 PrefabInstance:
@@ -43669,6 +43721,116 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5412017221204367677, guid: abe3d47b915ca924a9e06dd6d3321396, type: 3}
   m_PrefabInstance: {fileID: 1220930167}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1221179380 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+  m_PrefabInstance: {fileID: 819495767}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1221179387 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2851115830741363710, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+  m_PrefabInstance: {fileID: 819495767}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1221179380}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eaa447621804f544c81010d753fa8aa5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterLocomotion
+--- !u!95 &1221179389 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 2714943959344486485, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+  m_PrefabInstance: {fileID: 819495767}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1221179402
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1221179380}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dfbc942a6724bb4aa484e1e3c0dd0c3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TurnInPlace
+  animator: {fileID: 1221179389}
+  locomotion: {fileID: 1221179387}
+  minTurnRate: 12
+  fullTurnRate: 140
+  maxTurnSpeedParam: 200
+  weightSmoothing: 0.08
+  sampleWindow: 0.1
+  debugResolvedAnimator: {fileID: 1221179389}
+  debugTurnRate: 0
+  debugLayerWeight: 0
+--- !u!114 &1221179403
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1221179380}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0247c20d95e712a4eacdcf1f088048e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AnatomicalConstraints
+  limits:
+  - bone: 7
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 35
+    lateralLimit: 20
+  - bone: 8
+    twistMin: -15
+    twistMax: 15
+    bendMin: -20
+    bendMax: 25
+    lateralLimit: 15
+  - bone: 10
+    twistMin: -70
+    twistMax: 70
+    bendMin: -45
+    bendMax: 40
+    lateralLimit: 20
+  - bone: 1
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 110
+    lateralLimit: 35
+  - bone: 2
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 110
+    lateralLimit: 35
+  - bone: 3
+    twistMin: -6
+    twistMax: 6
+    bendMin: 0
+    bendMax: 140
+    lateralLimit: 8
+  - bone: 4
+    twistMin: -6
+    twistMax: 6
+    bendMin: 0
+    bendMax: 140
+    lateralLimit: 8
+  - bone: 5
+    twistMin: -15
+    twistMax: 15
+    bendMin: -30
+    bendMax: 45
+    lateralLimit: 15
+  - bone: 6
+    twistMin: -15
+    twistMax: 15
+    bendMin: -30
+    bendMax: 45
+    lateralLimit: 15
 --- !u!1001 &1221871205
 PrefabInstance:
   m_ObjectHideFlags: 0

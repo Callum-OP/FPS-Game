@@ -15,8 +15,9 @@ using UnityEngine;
 /// (RagdollBuilder), since that only ever runs after death, once the Animator/WeaponHandIK
 /// have both stopped touching the rig.
 ///
-/// Attach to the same object as the Animator - generic, works on Player and on enemies/
-/// allies exactly like WeaponHandIK (just needs a Humanoid Animator).
+/// Attach to the same object as the Animator (works on Player and on enemies/allies -
+/// generic, only needs a Humanoid Animator, same pattern as WeaponHandIK/TorsoPoseDriver/
+/// TorsoMotionDampener - put it right next to those, not on an outer parent object).
 ///
 /// HOW THE CLAMP WORKS: each bone's rotation is measured relative to its own REST local
 /// rotation (captured once in Awake, i.e. the bind pose). That relative rotation is
@@ -57,6 +58,9 @@ public class AnatomicalConstraints : MonoBehaviour
     [Tooltip("Per-bone limits in degrees. Arms/hands deliberately excluded - see class comment.")]
     public JointLimit[] limits = Defaults();
 
+    [Tooltip("Manual override: if this project's rig has more than one Animator component and auto-detection isn't working, optional.")]
+    public Animator animatorOverride;
+
     static JointLimit[] Defaults() => new JointLimit[]
     {
         // Torso: kept fairly free since TorsoPoseDriver already relies on some give here for
@@ -83,10 +87,26 @@ public class AnatomicalConstraints : MonoBehaviour
     Quaternion[] restLocal;
     bool[] valid;
 
-    void Awake()
+    void Start() => TryInit();
+
+    void TryInit()
     {
-        anim = GetComponentInChildren<Animator>();
-        if (anim == null || anim.avatar == null || !anim.avatar.isHuman)
+        // Ask CharacterAnimationDriver for the Animator it already correctly resolved, rather
+        // than re-deriving this here.
+        anim = animatorOverride; // manual override wins outright - see its tooltip
+        if (anim == null)
+        {
+            var driver = GetComponentInChildren<CharacterAnimationDriver>();
+            if (driver != null) anim = driver.BodyAnimator;
+        }
+        if (anim == null)
+        {
+            foreach (var candidate in GetComponentsInChildren<Animator>(true))
+            {
+                if (candidate.runtimeAnimatorController != null && candidate.avatar != null && candidate.avatar.isHuman) { anim = candidate; break; }
+            }
+        }
+        if (anim == null)
         {
             enabled = false;
             return;
@@ -107,6 +127,7 @@ public class AnatomicalConstraints : MonoBehaviour
 
     void LateUpdate()
     {
+        if (bones == null) return; // not initialized - see TryInit
         for (int i = 0; i < limits.Length; i++)
         {
             if (valid[i]) Clamp(bones[i], restLocal[i], limits[i]);

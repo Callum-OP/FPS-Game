@@ -367,6 +367,13 @@ public class Ragdoll : MonoBehaviour
         foreach (var d in GetComponentsInChildren<TorsoMotionDampener>(true)) d.enabled = false;
         foreach (var t in GetComponentsInChildren<TorsoPoseDriver>(true)) t.EnterDeathMode();
         foreach (var w in GetComponentsInChildren<WeaponHandIK>(true)) w.SetGripTargets(null, null);
+        // AnatomicalConstraints clamps bone LOCAL ROTATIONS every LateUpdate with no death check
+        // of its own - left running, it fights the ragdoll's physics-driven bone rotations every
+        // frame after handoff, forcing them back within animation limits and making the corpse
+        // look stiff/resistant instead of loose. TurnInPlace only touches Animator parameters, not
+        // bones, but the Animator is about to be disabled anyway, so disabling it too is free.
+        foreach (var a in GetComponentsInChildren<AnatomicalConstraints>(true)) a.enabled = false;
+        foreach (var tp in GetComponentsInChildren<TurnInPlace>(true)) tp.enabled = false;
     }
 
     Vector3 FallbackHitDirection()
@@ -691,7 +698,7 @@ public class Ragdoll : MonoBehaviour
     }
 
     // ------------------------------------------------------------------
-    // Safety nets
+    // Safety nets (unchanged behaviour)
     // ------------------------------------------------------------------
 
     // A settling ragdoll never legitimately needs to move faster than this - if a bone is, it's almost
