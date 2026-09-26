@@ -53,8 +53,10 @@ Maybe unlockable skills too?
     Instant takedown? (if they get close)
 
 # Issues
-If you drop gun while canted, you stay canted
+Stepping on a newly formed ragdoll from recent AI death it causes ragdoll body to teleport up and fall back down.
 
-Some sounds are louder and quieter than they should be, add a way to change the volume
+If you holster gun with it is lowered it can appear weird in holster. This is when holstering, switching to weapon or switching to grenade.
+
+Some sounds are louder and quieter than they should be, add a way to change the volume. Not too bad at the moment.
 
 It would probably make more sense if leaning disabled the fast walk
