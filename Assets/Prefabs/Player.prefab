@@ -255,12 +255,12 @@ GameObject:
   - component: {fileID: 7219984608590271071}
   - component: {fileID: 2714943959344486485}
   - component: {fileID: 8719003296114661464}
+  - component: {fileID: 6731215967728792995}
   - component: {fileID: 2851115830741363710}
   - component: {fileID: 8784270823998979221}
   - component: {fileID: 3579103132014354902}
   - component: {fileID: 3272267351875027821}
   - component: {fileID: 7850456022116762550}
-  - component: {fileID: 8037241872667057805}
   - component: {fileID: 2565851839017307113}
   m_Layer: 0
   m_Name: Player
@@ -535,6 +535,8 @@ MonoBehaviour:
     m_Bits: 4294967295
   groundClampDuration: 4
   groundClampTolerance: 0.35
+  clampLaunchDuringRelax: 1
+  maxUpwardSpeedDuringRelax: 2
   freezeWhenSettled: 1
   settleSpeed: 0.2
   settleTime: 0.6
@@ -596,6 +598,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CharacterAnimationDriver
   defaultWeaponClass: 1
   hitReactionCooldown: 0.8
+--- !u!114 &6731215967728792995
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dfbc942a6724bb4aa484e1e3c0dd0c3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TurnInPlace
+  animator: {fileID: 4783233763987129048}
+  locomotion: {fileID: 2851115830741363710}
+  minTurnRate: 1
+  fullTurnRate: 140
+  maxTurnSpeedParam: 200
+  weightSmoothing: 0.08
+  sampleWindow: 0.1
+  debugResolvedAnimator: {fileID: 4783233763987129048}
+  debugTurnRate: 0
+  debugLayerWeight: 0
 --- !u!114 &2851115830741363710
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -735,24 +759,6 @@ MonoBehaviour:
   swapRange: 2.5
   inventory: {fileID: 3272267351875027821}
   playerSetup: {fileID: 8380861452952741765}
---- !u!114 &8037241872667057805
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8403096973582887497}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c77487d0109a2b24b991ffd6a15b705e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerShove
-  range: 2
-  damage: 5
-  pushDistance: 2.5
-  staggerDuration: 0.7
-  cooldown: 1
-  animationDriver: {fileID: 8719003296114661464}
 --- !u!114 &2565851839017307113
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -762,7 +768,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 8403096973582887497}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bff050179b1bbb944b20edc22e239b32, type: 3}
+  m_Script: {fileID: 11500000, guid: 0247c20d95e712a4eacdcf1f088048e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AnatomicalConstraints
   limits:
@@ -820,6 +826,7 @@ MonoBehaviour:
     bendMin: -30
     bendMax: 45
     lateralLimit: 15
+  animatorOverride: {fileID: 4783233763987129048}
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0

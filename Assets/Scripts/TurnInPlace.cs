@@ -33,13 +33,16 @@ public class TurnInPlace : MonoBehaviour
     public float maxTurnSpeedParam = 200f;
     [Tooltip("How quickly the layer weight itself follows the target above (seconds, smoothing time).")]
     public float weightSmoothing = 0.08f;
-    [Tooltip("Yaw rate is measured over this many seconds, not one raw frame delta - a single-frame reading is too noisy (camera mouse-look jitter, physics sub-stepping) to drive a layer weight cleanly.")]
+    [Tooltip("Time constant (seconds) for smoothing the measured yaw rate. Replaces the old fixed sample window - this is now a continuous exponential average, not a periodic reset, so it can't create rhythmic zero-dips while turning.")]
     public float sampleWindow = 0.1f;
+    [Tooltip("How quickly the TurnSpeed parameter itself is allowed to change (deg/s per second). Keeps a single noisy frame of the smoothed rate from snapping the blend tree.")]
+    public float paramSmoothing = 600f;
 
     int layerIndex = -1;
     float layerWeight;
-    float sampleYaw;      // yaw at the start of the current sample window
-    float sampleElapsed;
+    float prevYaw;
+    float smoothedRate;   // continuous EMA of yaw rate, deg/s
+    float paramValue;     // what's actually sent to the Animator, further damped
     static readonly int TurnSpeedHash = Animator.StringToHash("TurnSpeed");
 
     [Header("Debug (read-only, watch these in Play Mode)")]
@@ -87,7 +90,7 @@ public class TurnInPlace : MonoBehaviour
             return;
         }
 
-        sampleYaw = transform.eulerAngles.y;
+        prevYaw = transform.eulerAngles.y;
         animator.SetLayerWeight(layerIndex, 0f);
         debugResolvedAnimator = animator;
     }
@@ -96,17 +99,22 @@ public class TurnInPlace : MonoBehaviour
     {
         float yaw = transform.eulerAngles.y;
 
-        sampleElapsed += Time.deltaTime;
-        float delta = Mathf.DeltaAngle(sampleYaw, yaw);
-        float rate = sampleElapsed > 0.001f ? delta / sampleElapsed : 0f;
-        if (sampleElapsed >= sampleWindow)
-        {
-            sampleYaw = yaw;
-            sampleElapsed = 0f;
-        }
+        // Instantaneous rate this frame, then folded into a continuous exponential moving
+        // average using sampleWindow as the time constant. This replaces the old "reset the
+        // baseline every sampleWindow seconds" approach: that reset made the very next frame's
+        // reading effectively a single-frame instantaneous sample again, and if that one frame
+        // happened to land between rotation updates (mouse-look ticks, AI Slerp steps) the
+        // reading came back as 0 - rhythmically, once per window, even during a continuous
+        // turn. That periodic zero is what was snapping the blend tree back toward the idle
+        // pose and made a turn look like it kept resetting. An EMA has no reset point, so it
+        // can't produce that artifact - it just smoothly tracks the true rate.
+        float instRate = Time.deltaTime > 1e-5f ? Mathf.DeltaAngle(prevYaw, yaw) / Time.deltaTime : 0f;
+        prevYaw = yaw;
+        float rateSmoothing = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(sampleWindow, 0.01f));
+        smoothedRate = Mathf.Lerp(smoothedRate, instRate, rateSmoothing);
 
         bool idle = locomotion == null || locomotion.IsIdle;
-        float absRate = Mathf.Abs(rate);
+        float absRate = Mathf.Abs(smoothedRate);
         float target = (idle && absRate > minTurnRate)
             ? Mathf.InverseLerp(minTurnRate, fullTurnRate, absRate)
             : 0f;
@@ -114,10 +122,15 @@ public class TurnInPlace : MonoBehaviour
         layerWeight = Mathf.MoveTowards(layerWeight, target, Time.deltaTime / Mathf.Max(weightSmoothing, 0.01f));
         animator.SetLayerWeight(layerIndex, layerWeight);
 
-        float param = Mathf.Clamp(rate, -maxTurnSpeedParam, maxTurnSpeedParam);
-        animator.SetFloat(TurnSpeedHash, param);
+        // Second layer of smoothing on the value actually sent to the Animator - belt and
+        // braces against any single-frame blip in smoothedRate still visibly twitching the
+        // blend tree, without adding noticeable lag (paramSmoothing is a deg/s-per-second rate,
+        // not a time constant, so it only caps how fast the param can change).
+        float targetParam = Mathf.Clamp(smoothedRate, -maxTurnSpeedParam, maxTurnSpeedParam);
+        paramValue = Mathf.MoveTowards(paramValue, targetParam, paramSmoothing * Time.deltaTime);
+        animator.SetFloat(TurnSpeedHash, paramValue);
 
-        debugTurnRate = rate;
+        debugTurnRate = smoothedRate;
         debugLayerWeight = layerWeight;
     }
 }

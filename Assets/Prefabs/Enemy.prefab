@@ -233,6 +233,8 @@ MonoBehaviour:
     m_Bits: 4294967295
   groundClampDuration: 4
   groundClampTolerance: 0.35
+  clampLaunchDuringRelax: 1
+  maxUpwardSpeedDuringRelax: 2
   freezeWhenSettled: 1
   settleSpeed: 0.2
   settleTime: 0.6
@@ -368,7 +370,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 910542812212260045}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bff050179b1bbb944b20edc22e239b32, type: 3}
+  m_Script: {fileID: 11500000, guid: 0247c20d95e712a4eacdcf1f088048e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AnatomicalConstraints
   limits:
@@ -426,6 +428,7 @@ MonoBehaviour:
     bendMin: -30
     bendMax: 45
     lateralLimit: 15
+  animatorOverride: {fileID: 3378653021993452407}
 --- !u!1 &3014967846191164479
 GameObject:
   m_ObjectHideFlags: 0
