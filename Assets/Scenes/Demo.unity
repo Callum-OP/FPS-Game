@@ -29486,26 +29486,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.ringCurl
-      value: 50
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.indexCurl
-      value: 50
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.pinkyCurl
-      value: 50
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.thumbCurl
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8784270823998979221, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      propertyPath: leftGripPose.middleCurl
-      value: 50
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

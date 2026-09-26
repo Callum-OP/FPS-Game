@@ -25,6 +25,18 @@ using System.Collections.Generic;
 /// Note: run this on a PREFAB INSTANCE IN A SCENE (or opened in Prefab Mode), not on the
 /// raw FBX/model asset - Rigidbody/Collider/CharacterJoint can't be added to an imported
 /// model file directly.
+///
+/// JOINT LIMITS (anatomical pass): most joints use axis=local X (the bone-to-child chain
+/// axis, as before) with a twist limit for the bone's own internal rotation and swing1/2
+/// for its main bend + sideways give. Knees and elbows are the exception - a real knee/
+/// elbow only bends one direction (0 degrees to ~140 degrees), which CharacterJoint's
+/// swing limits can't express (swing1Limit/swing2Limit are always symmetric +/-limit).
+/// So for those two bones only, 'axis' is pointed down the BEND direction (local Z)
+/// instead of the chain direction, and the (asymmetric) twist limit is used to enforce
+/// "0 to ~140, forward only" - swing1/2 then cover the two directions that should barely
+/// move at all (no sideways knee wobble, no internal shin twist). Values are a reasonable
+/// starting point, not measured against this project's actual rig - tune by eye in Play
+/// Mode with a ragdoll death, like everything else placement/feel-related here.
 /// </summary>
 public static class RagdollBuilder
 {
@@ -33,31 +45,50 @@ public static class RagdollBuilder
         public HumanBodyBones bone;
         public HumanBodyBones? parent; // null = ragdoll root (Hips) - no CharacterJoint
         public float radiusRatio;      // capsule radius as a fraction of this bone's own measured length
-        public BoneSpec(HumanBodyBones b, HumanBodyBones? p, float radiusRatio)
-        { bone = b; parent = p; this.radiusRatio = radiusRatio; }
+        public Vector3 axis;           // CharacterJoint twist axis, LOCAL space
+        public Vector3 swingAxis;      // CharacterJoint swing axis, LOCAL space (must be roughly perpendicular to axis)
+        public float lowTwist, highTwist; // degrees - the asymmetric limit, used as the hinge bend for knee/elbow
+        public float swing1, swing2;      // degrees - symmetric
+
+        public BoneSpec(HumanBodyBones b, HumanBodyBones? p, float radiusRatio, Vector3 axis, Vector3 swingAxis,
+                         float lowTwist, float highTwist, float swing1, float swing2)
+        {
+            bone = b; parent = p; this.radiusRatio = radiusRatio;
+            this.axis = axis; this.swingAxis = swingAxis;
+            this.lowTwist = lowTwist; this.highTwist = highTwist;
+            this.swing1 = swing1; this.swing2 = swing2;
+        }
     }
 
-    // Rough humanoid limb-thickness-to-length ratios. Mass is no longer listed here -
-    // it's now computed from each built capsule's actual volume (see BoneDensity below)
-    // instead of a fixed number, for the same reason radius is now a ratio: a value
-    // tuned for one specific model's scale doesn't generalize to a very differently
-    // scaled/proportioned one (see the comment on BoneDensity for what this fixed).
+    static readonly Vector3 X = Vector3.right;
+    static readonly Vector3 Y = Vector3.up;
+    static readonly Vector3 Z = Vector3.forward;
+
+    // Rough humanoid limb-thickness-to-length ratios plus anatomical joint limits.
+    // Mass is computed from each built capsule's actual volume (see BoneDensity) rather
+    // than a fixed number, same reasoning as before: a value tuned for one model's scale
+    // doesn't generalise to a differently-scaled/proportioned one.
     static readonly BoneSpec[] Bones =
     {
-        new BoneSpec(HumanBodyBones.Hips,          null,                          0.30f),
-        new BoneSpec(HumanBodyBones.Spine,         HumanBodyBones.Hips,           0.45f),
-        new BoneSpec(HumanBodyBones.Chest,         HumanBodyBones.Spine,          0.50f),
-        new BoneSpec(HumanBodyBones.Head,          HumanBodyBones.Chest,          0.45f),
+        new BoneSpec(HumanBodyBones.Hips,    null,                    0.30f, X, Y,  0f,  0f,  0f,  0f), // root - no joint
+        new BoneSpec(HumanBodyBones.Spine,   HumanBodyBones.Hips,     0.45f, X, Y, -20f, 20f, 30f, 20f),
+        new BoneSpec(HumanBodyBones.Chest,   HumanBodyBones.Spine,    0.50f, X, Y, -15f, 15f, 25f, 15f),
+        new BoneSpec(HumanBodyBones.Head,    HumanBodyBones.Chest,    0.45f, X, Y, -70f, 70f, 40f, 20f),
 
-        new BoneSpec(HumanBodyBones.LeftUpperArm,  HumanBodyBones.Chest,          0.18f),
-        new BoneSpec(HumanBodyBones.LeftLowerArm,  HumanBodyBones.LeftUpperArm,   0.16f),
-        new BoneSpec(HumanBodyBones.RightUpperArm, HumanBodyBones.Chest,          0.18f),
-        new BoneSpec(HumanBodyBones.RightLowerArm, HumanBodyBones.RightUpperArm,  0.16f),
+        // Shoulders: most freedom of any joint (raising/reaching/aiming), chain-axis twist.
+        new BoneSpec(HumanBodyBones.LeftUpperArm,  HumanBodyBones.Chest,         0.18f, X, Y, -60f, 60f, 100f, 80f),
+        new BoneSpec(HumanBodyBones.RightUpperArm, HumanBodyBones.Chest,         0.18f, X, Y, -60f, 60f, 100f, 80f),
+        // Elbows: hinge - axis pointed down the BEND direction (Z) so the asymmetric twist
+        // limit gives "0 to 145, forward only"; swing1/2 (old chain-axis + lateral) locked tight.
+        new BoneSpec(HumanBodyBones.LeftLowerArm,  HumanBodyBones.LeftUpperArm,  0.16f, Z, Y,   0f, 145f,  8f, 8f),
+        new BoneSpec(HumanBodyBones.RightLowerArm, HumanBodyBones.RightUpperArm, 0.16f, Z, Y,   0f, 145f,  8f, 8f),
 
-        new BoneSpec(HumanBodyBones.LeftUpperLeg,  HumanBodyBones.Hips,           0.22f),
-        new BoneSpec(HumanBodyBones.LeftLowerLeg,  HumanBodyBones.LeftUpperLeg,   0.18f),
-        new BoneSpec(HumanBodyBones.RightUpperLeg, HumanBodyBones.Hips,           0.22f),
-        new BoneSpec(HumanBodyBones.RightLowerLeg, HumanBodyBones.RightUpperLeg,  0.18f),
+        // Hips: generous forward/back swing, tighter ab/adduction, modest internal rotation.
+        new BoneSpec(HumanBodyBones.LeftUpperLeg,  HumanBodyBones.Hips,          0.22f, X, Y, -20f, 20f, 110f, 35f),
+        new BoneSpec(HumanBodyBones.RightUpperLeg, HumanBodyBones.Hips,          0.22f, X, Y, -20f, 20f, 110f, 35f),
+        // Knees: same hinge treatment as elbows - "0 to 140, forward only", everything else tight.
+        new BoneSpec(HumanBodyBones.LeftLowerLeg,  HumanBodyBones.LeftUpperLeg,  0.18f, Z, Y,   0f, 140f,  6f, 6f),
+        new BoneSpec(HumanBodyBones.RightLowerLeg, HumanBodyBones.RightUpperLeg, 0.18f, Z, Y,   0f, 140f,  6f, 6f),
     };
 
     // kg per cubic metre of capsule volume. Not meant to be biologically accurate -
@@ -155,12 +186,12 @@ public static class RagdollBuilder
 
             CharacterJoint joint = Undo.AddComponent<CharacterJoint>(t.gameObject);
             joint.connectedBody = parentRb;
-            joint.axis = new Vector3(1f, 0f, 0f);
-            joint.swingAxis = new Vector3(0f, 1f, 0f);
-            joint.lowTwistLimit = new SoftJointLimit { limit = -20f };
-            joint.highTwistLimit = new SoftJointLimit { limit = 20f };
-            joint.swing1Limit = new SoftJointLimit { limit = 40f };
-            joint.swing2Limit = new SoftJointLimit { limit = 40f };
+            joint.axis = spec.axis;
+            joint.swingAxis = spec.swingAxis;
+            joint.lowTwistLimit = new SoftJointLimit { limit = spec.lowTwist };
+            joint.highTwistLimit = new SoftJointLimit { limit = spec.highTwist };
+            joint.swing1Limit = new SoftJointLimit { limit = spec.swing1 };
+            joint.swing2Limit = new SoftJointLimit { limit = spec.swing2 };
             // Projection was previously enabled here to keep joints from stretching
             // under extreme force, but projection is a direct position SNAP applied
             // outside the normal physics step - it completely bypasses collision

@@ -58,7 +58,6 @@
     <Compile Include="Assets\Scripts\WeaponCant.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\EnvMapAnimator.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\ShiftableObject.cs" />
-    <Compile Include="Assets\Scripts\TestMeleeWeaponBuilder.cs" />
     <Compile Include="Assets\Scripts\RagdollBuilder.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextSelector_A.cs" />
     <Compile Include="Assets\Scripts\LowerWeapon.cs" />
@@ -129,6 +128,7 @@
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_FrameRateCounter.cs" />
     <Compile Include="Assets\TutorialInfo\Scripts\Readme.cs" />
     <Compile Include="Assets\Scripts\FriendlyAI.cs" />
+    <Compile Include="Assets\Scripts\AnatomicalConstaints.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\Benchmark01.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TextMeshSpawner.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\ArrayArrangement.cs" />
@@ -139,7 +139,6 @@
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Rotatable.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\Benchmark03.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Easy FPS\Scripts\BulletScript.cs" />
-    <Compile Include="Assets\Scripts\CharacterModelSelector.cs" />
     <Compile Include="Assets\Scripts\PlayerShove.cs" />
     <Compile Include="Assets\Scripts\PlayerMovement.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Inspector\MaterialHider.cs" />

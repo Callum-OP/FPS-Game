@@ -87,6 +87,12 @@ public class Ragdoll : MonoBehaviour
     [Tooltip("How far below the ground the hips have to be before the body is lifted.")]
     public float groundClampTolerance = 0.35f;
 
+    [Header("Early Impact Safety")]
+    [Tooltip("Right after handoff the joints are deliberately opened wide (see Joint Relax Time) so the animated pose doesn't snap. In that same window the chain has very little rotational resistance, so a player/AI walking onto a limb can whip the whole loosely-jointed body upward far harder than the contact itself warrants - looks like the corpse teleporting into the air then dropping. This clamps just the UPWARD speed of every bone, only while the joints are still loose, which kills that launch without touching the normal falling/sliding motion (which is never upward). Left off for explosion deaths, which are meant to toss the body.")]
+    public bool clampLaunchDuringRelax = true;
+    [Tooltip("Upward speed cap (m/s) applied during the joint-relax window above.")]
+    public float maxUpwardSpeedDuringRelax = 2f;
+
     [Header("Settling")]
     [Tooltip("Once the corpse has stopped moving its bones are frozen (kinematic), so later gunfire, grenades or pushes can't drive it through the floor.")]
     public bool freezeWhenSettled = true;
@@ -124,6 +130,7 @@ public class Ragdoll : MonoBehaviour
     Quaternion[] jointRest;     // relative rotation of each joint's bodies at rest (where the limits are centred)
     bool dead, handedOff;
     bool liveHitboxes;
+    float handoffTime; // Time.time when Handoff() ran - used to know when the joint-relax window has ended
     Transform hipsBone;
     Rigidbody headBody;
     CharacterAnimationDriver driver;
@@ -504,6 +511,7 @@ public class Ragdoll : MonoBehaviour
     void Handoff()
     {
         handedOff = true;
+        handoffTime = Time.time;
 
         // Measure before anything moves.
         bool haveMotion = MeasureMotion(out Vector3[] lin, out Vector3[] ang);
@@ -683,7 +691,7 @@ public class Ragdoll : MonoBehaviour
     }
 
     // ------------------------------------------------------------------
-    // Safety nets (unchanged behaviour)
+    // Safety nets
     // ------------------------------------------------------------------
 
     // A settling ragdoll never legitimately needs to move faster than this - if a bone is, it's almost
@@ -697,9 +705,21 @@ public class Ragdoll : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float fastest = 0f;
+            bool inRelaxWindow = clampLaunchDuringRelax && !killedByExplosion
+                && (Time.time - handoffTime) < (jointRelaxTime + 0.15f);
             foreach (var rb in bones)
             {
                 if (rb == null || rb.isKinematic) continue;
+
+                // Kill only an anomalous UPWARD spike (a step-on whip) while joints are still loose -
+                // legitimate falling/sliding motion is never upward, so this never touches it.
+                if (inRelaxWindow && rb.linearVelocity.y > maxUpwardSpeedDuringRelax)
+                {
+                    Vector3 v = rb.linearVelocity;
+                    v.y = maxUpwardSpeedDuringRelax;
+                    rb.linearVelocity = v;
+                }
+
                 float sp = rb.linearVelocity.magnitude;
                 if (sp > MaxSafeSpeed) rb.linearVelocity = rb.linearVelocity.normalized * MaxSafeSpeed;
                 fastest = Mathf.Max(fastest, sp);

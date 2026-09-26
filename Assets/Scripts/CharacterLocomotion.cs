@@ -45,6 +45,12 @@ public class CharacterLocomotion : MonoBehaviour
     Vector2 moveParam;
     static readonly int DeadHash = Animator.StringToHash("Dead");
 
+    /// <summary>True once moveParam has settled to (near) zero - i.e. the base layer is
+    /// actually showing an idle pose, not just slow. TurnInPlace only turns the legs on
+    /// while this is true; the directional locomotion trees already handle turning while
+    /// walking/strafing themselves.</summary>
+    public bool IsIdle => moveParam.magnitude < 0.05f;
+
     void Reset() { animator = GetComponent<Animator>(); }
 
     void Awake()

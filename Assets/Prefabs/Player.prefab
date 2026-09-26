@@ -261,6 +261,7 @@ GameObject:
   - component: {fileID: 3272267351875027821}
   - component: {fileID: 7850456022116762550}
   - component: {fileID: 8037241872667057805}
+  - component: {fileID: 2565851839017307113}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -752,6 +753,73 @@ MonoBehaviour:
   staggerDuration: 0.7
   cooldown: 1
   animationDriver: {fileID: 8719003296114661464}
+--- !u!114 &2565851839017307113
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bff050179b1bbb944b20edc22e239b32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AnatomicalConstraints
+  limits:
+  - bone: 7
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 35
+    lateralLimit: 20
+  - bone: 8
+    twistMin: -15
+    twistMax: 15
+    bendMin: -20
+    bendMax: 25
+    lateralLimit: 15
+  - bone: 10
+    twistMin: -70
+    twistMax: 70
+    bendMin: -45
+    bendMax: 40
+    lateralLimit: 20
+  - bone: 1
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 110
+    lateralLimit: 35
+  - bone: 2
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 110
+    lateralLimit: 35
+  - bone: 3
+    twistMin: -6
+    twistMax: 6
+    bendMin: 0
+    bendMax: 140
+    lateralLimit: 8
+  - bone: 4
+    twistMin: -6
+    twistMax: 6
+    bendMin: 0
+    bendMax: 140
+    lateralLimit: 8
+  - bone: 5
+    twistMin: -15
+    twistMax: 15
+    bendMin: -30
+    bendMax: 45
+    lateralLimit: 15
+  - bone: 6
+    twistMin: -15
+    twistMax: 15
+    bendMin: -30
+    bendMax: 45
+    lateralLimit: 15
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0

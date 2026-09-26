@@ -50,6 +50,7 @@ GameObject:
   - component: {fileID: 7738536188537177383}
   - component: {fileID: 4092626673707240009}
   - component: {fileID: -8467075519014609456}
+  - component: {fileID: 4186290501909926101}
   m_Layer: 0
   m_Name: Teammate
   m_TagString: Enemy
@@ -152,16 +153,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ragdoll
   animator: {fileID: 3378653021993452407}
-  deathAnimationChance: 0.5
-  ragdollTakeoverPoint: 0.45
-  maxDeathAnimationTime: 1.2
+  useDeathAnimations: 1
+  ragdollHandoffPoint: 0.33
+  handoffJitter: 0.04
+  minAnimationTime: 0.25
+  deathAnimationTimeCap: 2
+  deathCrossfade: 0.1
+  deathSpeedRange: {x: 0.95, y: 1.1}
+  mirrorVariants: 1
+  rightDeathFallsLeft: 1
+  momentumCarry: 0.6
+  slideDamping: 3.5
+  momentumSteering: 0.35
   velocityInheritance: 1
+  angularInheritance: 1
+  maxHandoffSpeed: 7
+  maxHandoffAngularSpeed: 18
+  hitImpulse: 3
+  headImpulseScale: 1.5
+  looseSwingLimit: 70
+  looseTwistLimit: 45
+  jointRelaxTime: 0.6
   groundClamp: 1
   groundLayers:
     serializedVersion: 2
     m_Bits: 4294967295
   groundClampDuration: 4
   groundClampTolerance: 0.35
+  freezeWhenSettled: 1
+  settleSpeed: 0.2
+  settleTime: 0.6
+  maxSettleTime: 8
   explosionRagdollForce: 9
   knockbackSkipAnimationThreshold: 16
   knockbackImpulseScale: 5
@@ -200,6 +222,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterAnimationDriver
   defaultWeaponClass: 1
+  hitReactionCooldown: 0.8
 --- !u!114 &3211400689782095061
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -219,10 +242,13 @@ MonoBehaviour:
   animationDriver: {fileID: 7892662152946834436}
   walkSpeed: 2.5
   runSpeed: 5.5
+  sprintSpeed: 6.5
   damping: 0.12
+  stopDamping: 0.09
   groundCheckDistance: 0.3
   idleDeadzone: 0.15
   debugLog: 1
+  landLookAhead: 0.9
 --- !u!114 &7738536188537177383
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -251,7 +277,14 @@ MonoBehaviour:
   handGrabTime: 0.25
   handSeatTime: 0.6
   worldPickupPrefab: {fileID: 1118620770691677480, guid: 94da89d0446a7d548a00ad91176e4cdd, type: 3}
+  primaryHolsterPoint: {fileID: 0}
   secondaryHolsterPoint: {fileID: 5257276938015235413}
+  useEyeRigHold: 1
+  maxAimPitch: 40
+  aimPitchSpeed: 240
+  switchInsteadOfReload: 1
+  switchTime: 0.7
+  returnToPrimaryDelay: 1.5
   secondaryWeaponPrefab: {fileID: 0}
 --- !u!114 &4092626673707240009
 MonoBehaviour:
@@ -314,7 +347,78 @@ MonoBehaviour:
   autoUpgradeWeapon: 1
   weaponDetectRadius: 3
   autoPickupDelay: 4
+  scavengeRadius: 8
+  scavengeDelay: 0.8
+  scavengeReach: 1.4
+  scavengeMinPickupAge: 1
   onlyUpgradeOutOfCombat: 1
+--- !u!114 &4186290501909926101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910542812212260045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bff050179b1bbb944b20edc22e239b32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AnatomicalConstraints
+  limits:
+  - bone: 7
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 35
+    lateralLimit: 20
+  - bone: 8
+    twistMin: -15
+    twistMax: 15
+    bendMin: -20
+    bendMax: 25
+    lateralLimit: 15
+  - bone: 10
+    twistMin: -70
+    twistMax: 70
+    bendMin: -45
+    bendMax: 40
+    lateralLimit: 20
+  - bone: 1
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 110
+    lateralLimit: 35
+  - bone: 2
+    twistMin: -20
+    twistMax: 20
+    bendMin: -25
+    bendMax: 110
+    lateralLimit: 35
+  - bone: 3
+    twistMin: -6
+    twistMax: 6
+    bendMin: 0
+    bendMax: 140
+    lateralLimit: 8
+  - bone: 4
+    twistMin: -6
+    twistMax: 6
+    bendMin: 0
+    bendMax: 140
+    lateralLimit: 8
+  - bone: 5
+    twistMin: -15
+    twistMax: 15
+    bendMin: -30
+    bendMax: 45
+    lateralLimit: 15
+  - bone: 6
+    twistMin: -15
+    twistMax: 15
+    bendMin: -30
+    bendMax: 45
+    lateralLimit: 15
 --- !u!1 &3014967846191164479
 GameObject:
   m_ObjectHideFlags: 0
