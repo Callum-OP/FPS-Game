@@ -20,6 +20,11 @@ public struct DeathRequest
     public bool rightDeathFallsLeft;
     /// <summary>Horizontal speed at the moment of death, m/s.</summary>
     public float planarSpeed;
+    /// <summary>True if the character had been moving continuously above Ragdoll.movingSpeedThreshold
+    /// for at least Ragdoll.requiredMovingDuration - what the "moving"-flagged variants below actually
+    /// gate on now, instead of the old instant planarSpeed check (a single fast frame could trigger a
+    /// full stumble before).</summary>
+    public bool sustainedMovement;
     /// <summary>A knockback-sized hit (shotgun blast at close range): only the fast "as if shotgunned" clips qualify.</summary>
     public bool heavy;
 }
@@ -122,10 +127,10 @@ public class CharacterAnimationDriver : MonoBehaviour
         // ---- falls backward ----
         new DeathDef("Death_HeadFront",  0.38f, -0.92f, 0.30f, head: true),
         new DeathDef("Death_HeadFrontM",-0.38f, -0.92f, 0.30f, head: true, mirrored: true),
-        new DeathDef("Death_Stumble",    0.16f, -0.99f, 0.18f),
-        new DeathDef("Death_StumbleM",  -0.16f, -0.99f, 0.18f, mirrored: true),
-        new DeathDef("Death_FallOver",   0.22f, -0.97f, 0.24f),
-        new DeathDef("Death_FallOverM", -0.22f, -0.97f, 0.24f, mirrored: true),
+        new DeathDef("Death_Stumble",    0.16f, -0.99f, 0.18f, moving: true),
+        new DeathDef("Death_StumbleM",  -0.16f, -0.99f, 0.18f, mirrored: true, moving: true),
+        new DeathDef("Death_FallOver",   0.22f, -0.97f, 0.24f, moving: true),
+        new DeathDef("Death_FallOverM", -0.22f, -0.97f, 0.24f, mirrored: true, moving: true),
         // ---- falls to the side (the clip falls to the character's left) ----
         new DeathDef("Death_Right",     -0.96f, -0.27f, 0.28f, side: true),
         new DeathDef("Death_Left",       0.96f, -0.27f, 0.28f, side: true, mirrored: true),
@@ -395,7 +400,7 @@ public class CharacterAnimationDriver : MonoBehaviour
             if (d.heavy != req.heavy) continue;          // blasts use the shotgun clips, everything else never does
             if (d.crouch != useCrouch) continue;
             if (d.mirrored && !req.allowMirrored) continue;
-            if (d.moving && req.planarSpeed < 1f) continue; // "walking to dying" only for a body that was moving
+            if (d.moving && !req.sustainedMovement) continue; // "walking to dying" only after real sustained movement, not a single fast frame
 
             float fx = d.fallX;
             if (d.side && !req.rightDeathFallsLeft) fx = -fx;

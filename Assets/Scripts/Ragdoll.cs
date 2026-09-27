@@ -18,7 +18,11 @@ using UnityEngine.AI;
 ///     copies of each).
 ///  2. The clip plays for ragdollHandoffPoint of its length (about a third), with the upper-body
 ///     layer, hand IK and every procedural pose writer faded out so the whole body falls. If the
-///     body was moving it keeps sliding forward with its momentum (momentumCarry).
+///     body had been moving CONTINUOUSLY for at least requiredMovingDuration (not just fast on the
+///     exact frame it died) it keeps sliding forward with its momentum (momentumCarry, scaled by
+///     the actual speed it died at) - both this slide and the Death_Moving/Death_Stumble/
+///     Death_FallOver clip variants share that same sustained-movement gate, so a body barely
+///     moving for an instant doesn't get either any more.
 ///  3. Handoff, at the END of a rendered frame so the pose on screen is the pose physics starts
 ///     from: the bones are seeded with the linear AND angular velocity the animation was moving
 ///     them with (measured over the last few frames, at each bone's centre of mass), the joints are
@@ -58,6 +62,10 @@ public class Ragdoll : MonoBehaviour
     public float slideDamping = 3.5f;
     [Tooltip("How strongly the body's speed steers which clip is chosen, per m/s. A runner moving forward at 5 m/s outweighs the direction of the shot.")]
     public float momentumSteering = 0.35f;
+    [Tooltip("Planar speed (m/s) that counts as 'moving' for the sustained-movement timer below.")]
+    public float movingSpeedThreshold = 1f;
+    [Tooltip("Seconds of CONTINUOUS movement above movingSpeedThreshold required before the momentum slide above, or a moving-flagged death clip (Death_Moving, Death_Stumble, Death_FallOver and mirrors), is allowed to trigger. Previously there was no duration check - a single fast frame right before death was enough to get a full stumble.")]
+    public float requiredMovingDuration = 2f;
 
     [Header("Handoff To Physics")]
     [Tooltip("How much of the clip's own bone velocity is handed to the ragdoll. 1 = it carries on falling exactly the way the clip was moving it, which is what makes the handover invisible.")]
@@ -137,6 +145,8 @@ public class Ragdoll : MonoBehaviour
     NavMeshAgent agent;
     CharacterController cc;
     Vector3 rootVelocity;       // planar + vertical, captured the instant of death
+    float movingDuration;       // seconds of continuous movement above movingSpeedThreshold, tracked every frame while alive
+    bool sustainedMovement;     // snapshot of (movingDuration >= requiredMovingDuration), taken in Die() at the same instant as rootVelocity
 
     // motion history recorded (only) while dying, newest last
     const int HistoryLen = 6;
@@ -196,6 +206,17 @@ public class Ragdoll : MonoBehaviour
         if (h != null) h.onDeath.AddListener(Die);
         var ph = GetComponentInParent<PlayerHealth>();
         if (ph != null) ph.onDeath += Die;
+    }
+
+    void Update()
+    {
+        if (dead) return; // handedOff isn't set yet at the moment of death - dead covers it earlier and for the rest of this object's life
+
+        Vector3 v = Vector3.zero;
+        if (agent != null && agent.enabled) v = agent.velocity;
+        else if (cc != null && cc.enabled) v = cc.velocity;
+        float speed = new Vector3(v.x, 0f, v.z).magnitude;
+        movingDuration = speed >= movingSpeedThreshold ? movingDuration + Time.deltaTime : 0f;
     }
 
     void SetPhysics(bool on)
@@ -292,6 +313,7 @@ public class Ragdoll : MonoBehaviour
         rootVelocity = Vector3.zero;
         if (agent != null && agent.enabled) rootVelocity = agent.velocity;
         else if (cc != null && cc.enabled) rootVelocity = cc.velocity;
+        sustainedMovement = movingDuration >= requiredMovingDuration;
 
         StartCoroutine(DeathSequence());
     }
@@ -325,7 +347,7 @@ public class Ragdoll : MonoBehaviour
         else if (driver != null && driver.Polish != null) driver.Polish.EnterDeathMode();
 
         Vector3 planar = new Vector3(rootVelocity.x, 0f, rootVelocity.z);
-        if (momentumCarry > 0f && planar.sqrMagnitude > 0.25f)
+        if (momentumCarry > 0f && sustainedMovement && planar.sqrMagnitude > 0.25f)
             StartCoroutine(SlideRoutine(planar * momentumCarry));
 
         histCount = 0;
@@ -407,6 +429,7 @@ public class Ragdoll : MonoBehaviour
             allowMirrored = mirrorVariants,
             rightDeathFallsLeft = rightDeathFallsLeft,
             planarSpeed = vel.magnitude,
+            sustainedMovement = sustainedMovement,
             heavy = knockedBack
         };
     }
