@@ -385,6 +385,15 @@ public class WeaponHandIK : MonoBehaviour
         reloadAnchorRefresh = (right != null || left != null) ? refresh : null;
     }
 
+    bool suppressed;
+
+    /// <summary>Temporarily zero the hand IK entirely (both position and rotation weight,
+    /// forced every frame while true) so a full arm-driving override clip - currently just
+    /// AIRelaxedIdle's idle gestures - can show its own pose instead of having the hands
+    /// pulled straight back onto the grip. Doesn't touch rightWeight/leftWeight, so
+    /// un-suppressing resumes blending from wherever it left off instead of snapping.</summary>
+    public void SetSuppressed(bool value) => suppressed = value;
+
     void OnAnimatorIK(int layerIndex)
     {
         if (anim == null) return;
@@ -395,6 +404,15 @@ public class WeaponHandIK : MonoBehaviour
     public void ApplyIK()
     {
         if (anim == null) return;
+
+        if (suppressed)
+        {
+            anim.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
+            anim.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
+            anim.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
+            anim.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
+            return;
+        }
 
         // OnAnimatorIK fires once per layer with an IK pass enabled - both the base and
         // the UpperBody layer have one - so this runs TWICE per frame. The IK goals have

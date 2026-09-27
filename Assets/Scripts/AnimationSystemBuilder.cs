@@ -194,6 +194,23 @@ public static class AnimationSystemBuilder
         new ClipDef("inj_run_fwd",   "Male Injured Pack", "injured run", true),
         new ClipDef("inj_walk_back", "Male Injured Pack", "injured walk backwards", true),
         new ClipDef("inj_run_back",  "Male Injured Pack", "injured run backwards", true),
+
+        // --- Idle gestures (Phase 3, "relaxed idle") - AIRelaxedIdle.cs plays whichever of
+        // these exist on the UpperBody layer (checked at runtime via Animator.HasState, same
+        // pattern CharacterAnimationDriver already uses for optional melee variants) while a
+        // character is genuinely idle and out of combat. Names confirmed against Callum's
+        // actual Mixamo.zip (Gestures Pack Basic, Pro Melee Axe Pack) - marked optional anyway
+        // since the file names weren't cross-checked against what's actually imported into
+        // Assets/LocalAssets/Mixamo in the live project, just against the zip's own listing.
+        new ClipDef("gest_look_away",     "Gestures Pack Basic", "look away gesture", false, optional: true),
+        new ClipDef("gest_weight_shift",  "Gestures Pack Basic", "weight shift", false, optional: true),
+        new ClipDef("gest_relieved_sigh", "Gestures Pack Basic", "relieved sigh", false, optional: true),
+        new ClipDef("gest_thoughtful",    "Gestures Pack Basic", "thoughtful head shake", false, optional: true),
+        // The two "idle looking" variants Callum's original Phase 3 ask specifically named.
+        new ClipDef("gest_melee_look1",   "Pro Melee Axe Pack", "standing idle looking ver. 1", false, optional: true),
+        new ClipDef("gest_melee_look2",   "Pro Melee Axe Pack", "standing idle looking ver. 2", false, optional: true),
+        new ClipDef("gest_unarmed_look1", "Pro Melee Axe Pack", "unarmed idle looking ver. 1", false, optional: true),
+        new ClipDef("gest_unarmed_look2", "Pro Melee Axe Pack", "unarmed idle looking ver. 2", false, optional: true),
     };
 
     // NOTE: Mixamo gives no left/right label on ambiguous pairs. This script assumes
@@ -810,6 +827,19 @@ public static class AnimationSystemBuilder
         AnimatorState pistolPose = AddMotionState(sm, "UB_PistolPose",
             C("pi_kneel_idle") != null ? C("pi_kneel_idle") : C("pi_idle"), new Vector3(440, 0, 0));
         sm.defaultState = idle;
+
+        // Idle gestures (Phase 3, "relaxed idle") - AIRelaxedIdle.cs discovers which of these
+        // exist via Animator.HasState and CrossFadeInFixedTime's straight to whichever it picks,
+        // then back to UB_Idle when done - no transitions needed in the graph at all, same as
+        // how melee variants are already driven entirely from script rather than parameters.
+        AnimatorState gestLookAway = C("gest_look_away") != null ? AddMotionState(sm, "UB_GestureLookAway", C("gest_look_away"), new Vector3(660, 280, 0)) : null;
+        AnimatorState gestWeightShift = C("gest_weight_shift") != null ? AddMotionState(sm, "UB_GestureWeightShift", C("gest_weight_shift"), new Vector3(660, 360, 0)) : null;
+        AnimatorState gestSigh = C("gest_relieved_sigh") != null ? AddMotionState(sm, "UB_GestureSigh", C("gest_relieved_sigh"), new Vector3(660, 440, 0)) : null;
+        AnimatorState gestThoughtful = C("gest_thoughtful") != null ? AddMotionState(sm, "UB_GestureThoughtful", C("gest_thoughtful"), new Vector3(660, 520, 0)) : null;
+        AnimatorState gestMeleeLook1 = C("gest_melee_look1") != null ? AddMotionState(sm, "UB_GestureMeleeLook1", C("gest_melee_look1"), new Vector3(880, 280, 0)) : null;
+        AnimatorState gestMeleeLook2 = C("gest_melee_look2") != null ? AddMotionState(sm, "UB_GestureMeleeLook2", C("gest_melee_look2"), new Vector3(880, 360, 0)) : null;
+        AnimatorState gestUnarmedLook1 = C("gest_unarmed_look1") != null ? AddMotionState(sm, "UB_GestureUnarmedLook1", C("gest_unarmed_look1"), new Vector3(880, 440, 0)) : null;
+        AnimatorState gestUnarmedLook2 = C("gest_unarmed_look2") != null ? AddMotionState(sm, "UB_GestureUnarmedLook2", C("gest_unarmed_look2"), new Vector3(880, 520, 0)) : null;
 
         AddInstantTransition(idle, pistolPose, AnimatorConditionMode.If, 0, "IsCrouching",
             extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
