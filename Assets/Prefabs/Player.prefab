@@ -261,6 +261,7 @@ GameObject:
   - component: {fileID: 3579103132014354902}
   - component: {fileID: 3272267351875027821}
   - component: {fileID: 7850456022116762550}
+  - component: {fileID: 6713652028300273306}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -759,6 +760,24 @@ MonoBehaviour:
   swapRange: 2.5
   inventory: {fileID: 3272267351875027821}
   playerSetup: {fileID: 8380861452952741765}
+--- !u!114 &6713652028300273306
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c77487d0109a2b24b991ffd6a15b705e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerShove
+  range: 2
+  damage: 5
+  pushDistance: 2.5
+  staggerDuration: 0.7
+  cooldown: 1
+  animationDriver: {fileID: 8719003296114661464}
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0

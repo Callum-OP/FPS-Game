@@ -50,7 +50,9 @@ Left leg is bent sideways, also several general issues with animations, will nee
 
 Stepping on a newly formed ragdoll from recent AI death it causes ragdoll body to teleport up and fall back down.
 
-If you holster gun with it is lowered it can appear weird in holster. This is when holstering, switching to weapon or switching to grenade.
+If you holster gun with it is lowered it can appear weird in holster. This is when holstering, switching to weapon or switching to grenade. Changing to grenade sometimes doesn't let you change away from it.
+
+Hands do not always stick firmly to grip points on weapon especially during high speed turning or looking up.
 
 Currently Anatomical Constraints causes issues with animations (especially friendly and enemy AIs) and has currently been disabled for causing more harm than good, but may be worth revisiting.
 

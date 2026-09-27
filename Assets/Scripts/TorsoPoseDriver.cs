@@ -7,7 +7,11 @@ using UnityEngine;
 ///  - Look pitch: looking down bends the spine forward, looking up leans it back (a fraction
 ///    of the camera pitch, spread over spine/chest/upper chest). The camera follows the head's
 ///    actual displacement from this, so it sits where the head really is.
-///  - Reload: torso twists slightly LEFT while reloading (reaching for the mag).
+///  - Reload: torso twists slightly LEFT while reloading (reaching for the mag) - bumped up,
+///    was too subtle.
+///  - Holding/aiming: a small constant RIGHT twist whenever the weapon is actually pointed
+///    (equipped and not lowered/holstered - a shooter doesn't stand square-on even at
+///    hip-fire ready), increasing further while aiming down sights. Zero while lowered.
 ///  - Weapon switch (3), holster and draw: torso twists slightly RIGHT for a moment (reaching
 ///    for the weapon).
 ///  - Aiming: shoulders rise and the upper body moves slightly forward.
@@ -41,7 +45,11 @@ public class TorsoPoseDriver : MonoBehaviour
 
     [Header("Twist (degrees)")]
     [Tooltip("Left twist while reloading.")]
-    public float reloadTwist = 12f;
+    public float reloadTwist = 20f;
+    [Tooltip("Right twist whenever the weapon is actually pointed (equipped and NOT lowered/holstered) - a shooter's torso isn't square-on even at hip-fire ready. Zero while the weapon's lowered; separate from and additional to aimTwist below.")]
+    public float holdTwist = 5f;
+    [Tooltip("Extra right twist while aiming down sights, on top of holdTwist above.")]
+    public float aimTwist = 15f;
     [Tooltip("Right twist pulse when switching weapon / holstering / drawing.")]
     public float switchTwist = 12f;
     public float switchDuration = 0.5f;
@@ -57,6 +65,7 @@ public class TorsoPoseDriver : MonoBehaviour
     Animator anim;
     PlayerSetup setup;
     PlayerMovement pm;
+    WeaponInventory weaponInventory;
     EnemyWeapon aiWeapon;      // enemies and allies: pitch/reload/aim come from here instead
     static readonly int GroundedHash = Animator.StringToHash("IsGrounded");
     float footW;
@@ -172,6 +181,7 @@ public class TorsoPoseDriver : MonoBehaviour
         anim = GetComponent<Animator>();
         setup = GetComponentInParent<PlayerSetup>();
         pm = GetComponentInParent<PlayerMovement>();
+        weaponInventory = GetComponentInParent<WeaponInventory>();
         aiWeapon = GetComponentInParent<EnemyWeapon>();
         if (anim == null || !anim.isHuman || (pm == null && aiWeapon == null)) { enabled = false; return; }
         foreach (var prm in anim.parameters) if (prm.name == "MoveInMetres") fwdMoveScale = 1.4f;
@@ -461,7 +471,29 @@ public class TorsoPoseDriver : MonoBehaviour
 
         bool reloading = pm != null ? (setup != null && setup.activeWeapon != null && setup.activeWeapon.GetIsReloading())
                                     : (aiWeapon != null && aiWeapon.IsReloading);
+        bool aiming = pm != null ? (setup != null && setup.weaponADS != null && setup.weaponADS.IsAiming())
+                                 : (aiWeapon != null && aiWeapon.IsAimingNow);
+
+        // How "pointed" (not lowered/holstered) the weapon is right now, 0-1. Player: binary -
+        // either lowered/holstered or not, smoothed out by the twist Lerp below same as
+        // everything else here. AI: EnemyWeapon's own CombatBlend is already a smooth 0-1 raise/
+        // lower value, so ride that directly for a nicer result than a hard on/off would give.
+        float pointedAmount;
+        if (pm != null)
+        {
+            bool holdingWeapon = setup != null && setup.activeWeapon != null;
+            bool lowered = (setup != null && setup.lowerWeapon != null && setup.lowerWeapon.IsLowered())
+                           || (weaponInventory != null && weaponInventory.IsHolstered);
+            pointedAmount = (holdingWeapon && !lowered) ? 1f : 0f;
+        }
+        else
+        {
+            pointedAmount = aiWeapon != null ? aiWeapon.CombatBlend : 0f;
+        }
+
         float targetTwist = reloading ? -reloadTwist : 0f;
+        targetTwist += pointedAmount * holdTwist;
+        if (aiming) targetTwist += aimTwist;
         if (switchT < 1f)
         {
             switchT += dt / Mathf.Max(0.05f, switchDuration);
@@ -469,8 +501,6 @@ public class TorsoPoseDriver : MonoBehaviour
         }
         twist = Mathf.Lerp(twist, targetTwist, 1f - Mathf.Exp(-twistSpeed * dt));
 
-        bool aiming = pm != null ? (setup != null && setup.weaponADS != null && setup.weaponADS.IsAiming())
-                                 : (aiWeapon != null && aiWeapon.IsAimingNow);
         aimW = Mathf.MoveTowards(aimW, aiming ? 1f : 0f, aimBlendSpeed * dt);
         float aimK = Mathf.SmoothStep(0f, 1f, aimW) * live;
 

@@ -51,6 +51,7 @@ GameObject:
   - component: {fileID: 4092626673707240009}
   - component: {fileID: -8467075519014609456}
   - component: {fileID: 2935768971908545900}
+  - component: {fileID: 8056165510376422429}
   m_Layer: 0
   m_Name: Teammate
   m_TagString: Enemy
@@ -371,6 +372,7 @@ MonoBehaviour:
   animator: {fileID: 3378653021993452407}
   locomotion: {fileID: 3211400689782095061}
   weapon: {fileID: 7738536188537177383}
+  handIK: {fileID: 8056165510376422429}
   settleDelay: 5
   combatBlendThreshold: 0.02
   glanceIntervalRange: {x: 2.5, y: 5}
@@ -382,8 +384,72 @@ MonoBehaviour:
   headWeight: 0.6
   eyesWeight: 1
   clampWeight: 0.5
-  debugIsGlancing: 0
+  playIdleGestures: 1
+  gestureIntervalRange: {x: 8, y: 18}
+  gestureStateNames:
+  - UB_GestureLookAway
+  - UB_GestureWeightShift
+  - UB_GestureSigh
+  - UB_GestureThoughtful
+  - UB_GestureMeleeLook1
+  - UB_GestureMeleeLook2
+  - UB_GestureUnarmedLook1
+  - UB_GestureUnarmedLook2
+  gestureCrossfade: 0.25
+  gestureFallbackDuration: 3
+  debugIsGlancing: 1
   debugLookWeight: 0
+  debugIsGesturing: 1
+  debugValidGestureCount: 0
+--- !u!114 &8056165510376422429
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910542812212260045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58bf2d312f4f39440ad5f56647ee73b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponHandIK
+  blendSpeed: 8
+  rightElbowHint: {fileID: 6636802016294767438}
+  leftElbowHint: {fileID: 1828099462436405279}
+  armReachSafety: 0.95
+  rightGripPose:
+    curlAxis: {x: 1, y: 0, z: 0}
+    thumbCurl: 25
+    indexCurl: 45
+    middleCurl: 50
+    ringCurl: 50
+    pinkyCurl: 50
+  leftGripPose:
+    curlAxis: {x: 1, y: 0, z: 0}
+    thumbCurl: 25
+    indexCurl: 45
+    middleCurl: 50
+    ringCurl: 50
+    pinkyCurl: 50
+  strictHandLock: 1
+  lockMaxStretch: 0.05
+  overrideLeftFingers: 1
+  overrideRightFingers: 0
+  invertLeftCurl: 0
+  invertRightCurl: 0
+  elbowNeverUp: 1
+  elbowMaxUp: -0.15
+  elbowNeverIn: 1
+  elbowMinOutward: 0.1
+  elbowOutward: 0.45
+  maxPullBack: 0.25
+  pullBackSpeed: 10
+  pullBackDeadzone: 0.04
+  pullBackSmoothTime: 0.25
+  lateralPullBackFraction: 0
+  measureReachFromRestingShoulder: 1
+  maxTorsoLean: 8
+  torsoLeanSpeed: 6
 --- !u!1 &3014967846191164479
 GameObject:
   m_ObjectHideFlags: 0
@@ -1020,6 +1086,11 @@ CharacterJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!4 &1828099462436405279 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6176780465991723487, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 5541366930316257728}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &3072352611693218413 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7369529122544886701, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
@@ -1535,6 +1606,11 @@ CharacterJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!4 &6636802016294767438 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1223936316459213454, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
+  m_PrefabInstance: {fileID: 5541366930316257728}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &7412148283750421711 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3043270386267454735, guid: 30aa61ab9764e1f43a09d8ad4b58c5ac, type: 3}
