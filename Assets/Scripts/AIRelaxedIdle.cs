@@ -72,8 +72,6 @@ public class AIRelaxedIdle : MonoBehaviour
     };
     [Tooltip("Crossfade time in/out of a gesture, seconds.")]
     public float gestureCrossfade = 0.25f;
-    [Tooltip("Assumed length of a gesture clip if it can't be read from the Animator state directly (fallback only - normally the actual clip length is used).")]
-    public float gestureFallbackDuration = 3f;
 
     float settleTimer;
     float glanceTimer;
@@ -86,7 +84,6 @@ public class AIRelaxedIdle : MonoBehaviour
     int currentGestureHash;
     float gestureTimer;
     bool gesturing;
-    float gestureEndTime;
 
     [Header("Debug (read-only)")]
     [SerializeField] bool debugIsGlancing;
@@ -139,24 +136,43 @@ public class AIRelaxedIdle : MonoBehaviour
 
         upperBodyLayer = animator.GetLayerIndex("UpperBody");
 
-        if (upperBodyLayer >= 0 && gestureStateNames != null)
+        if (upperBodyLayer >= 0)
         {
-            var names = new System.Collections.Generic.List<string>();
-            var hashes = new System.Collections.Generic.List<int>();
-            foreach (var n in gestureStateNames)
+            // Ensure the UpperBody layer weight is set to 1 so animations are visible
+            animator.SetLayerWeight(upperBodyLayer, 1f);
+
+            if (gestureStateNames != null)
             {
-                if (string.IsNullOrEmpty(n)) continue;
-                int h = Animator.StringToHash(n);
-                if (animator.HasState(upperBodyLayer, h)) { names.Add(n); hashes.Add(h); }
+                var names = new System.Collections.Generic.List<string>();
+                var hashes = new System.Collections.Generic.List<int>();
+                foreach (var n in gestureStateNames)
+                {
+                    if (string.IsNullOrEmpty(n)) continue;
+                    
+                    int h = Animator.StringToHash(n);
+                    int layerPrefixedHash = Animator.StringToHash("UpperBody." + n);
+
+                    if (animator.HasState(upperBodyLayer, h))
+                    {
+                        names.Add(n);
+                        hashes.Add(h);
+                    }
+                    else if (animator.HasState(upperBodyLayer, layerPrefixedHash))
+                    {
+                        names.Add(n);
+                        hashes.Add(layerPrefixedHash);
+                    }
+                }
+                validGestureNames = names.ToArray();
+                validGestureHashes = hashes.ToArray();
             }
-            validGestureNames = names.ToArray();
-            validGestureHashes = hashes.ToArray();
         }
         else
         {
             validGestureNames = new string[0];
             validGestureHashes = new int[0];
         }
+
         debugValidGestureCount = validGestureNames.Length;
         if (playIdleGestures && validGestureNames.Length == 0)
             Debug.Log("[AIRelaxedIdle] playIdleGestures is on but none of gestureStateNames exist on the UpperBody layer - re-run Tools > FPS Game > Build Animation System, or check the gest_* clips actually imported (see the Console output from that tool).", this);
@@ -186,15 +202,22 @@ public class AIRelaxedIdle : MonoBehaviour
         // --- gestures (optional, one-shot on the UpperBody layer) ---
         if (gesturing)
         {
-            // Once the crossfade has actually landed on the gesture state, correct the end
-            // time from its real length instead of the fallback guess used to seed it.
             var info = animator.GetCurrentAnimatorStateInfo(upperBodyLayer);
-            if (info.shortNameHash == currentGestureHash && info.length > 0.01f)
-                gestureEndTime = Time.time + Mathf.Max(0f, (1f - info.normalizedTime) * info.length);
 
-            // Bail early if the character stopped being relaxed mid-gesture (e.g. spotted a
-            // target) - hand control back immediately rather than waiting the clip out.
-            if (!relaxed || Time.time >= gestureEndTime) EndGesture();
+            // Interrupt immediately if the character stops being relaxed mid-gesture
+            if (!relaxed)
+            {
+                EndGesture();
+            }
+            // Once we have completed the transition into the target gesture state...
+            else if (info.shortNameHash == currentGestureHash && !animator.IsInTransition(upperBodyLayer))
+            {
+                // Wait for the non-looping gesture clip to complete (normalizedTime >= 0.95)
+                if (info.normalizedTime >= 0.95f)
+                {
+                    EndGesture();
+                }
+            }
         }
         else if (settled && playIdleGestures && validGestureNames.Length > 0)
         {
@@ -233,12 +256,6 @@ public class AIRelaxedIdle : MonoBehaviour
         animator.CrossFadeInFixedTime(validGestureNames[pick], gestureCrossfade, upperBodyLayer);
         handIK?.SetSuppressed(true);
         gesturing = true;
-
-        float duration = gestureFallbackDuration;
-        // AnimationClip isn't reachable by name here without keeping our own lookup table, so
-        // fall back to the configured duration - close enough for a one-shot gesture, and it's
-        // corrected the moment relaxed becomes false anyway (see Update's early EndGesture).
-        gestureEndTime = Time.time + gestureCrossfade + duration;
     }
 
     void EndGesture()

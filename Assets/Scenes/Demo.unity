@@ -21857,6 +21857,7 @@ MonoBehaviour:
   maxTurnSpeedParam: 200
   weightSmoothing: 0.08
   sampleWindow: 0.1
+  paramSmoothing: 600
   debugResolvedAnimator: {fileID: 0}
   debugTurnRate: 0
   debugLayerWeight: 0
@@ -58372,6 +58373,18 @@ PrefabInstance:
     - target: {fileID: 1974036301361946662, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: settleDelay
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: gestureIntervalRange.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: gestureIntervalRange.y
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
