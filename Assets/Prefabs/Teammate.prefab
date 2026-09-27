@@ -50,7 +50,7 @@ GameObject:
   - component: {fileID: 7738536188537177383}
   - component: {fileID: 4092626673707240009}
   - component: {fileID: -8467075519014609456}
-  - component: {fileID: 4186290501909926101}
+  - component: {fileID: 2935768971908545900}
   m_Layer: 0
   m_Name: Teammate
   m_TagString: Enemy
@@ -180,6 +180,8 @@ MonoBehaviour:
     m_Bits: 4294967295
   groundClampDuration: 4
   groundClampTolerance: 0.35
+  clampLaunchDuringRelax: 1
+  maxUpwardSpeedDuringRelax: 2
   freezeWhenSettled: 1
   settleSpeed: 0.2
   settleTime: 0.6
@@ -270,6 +272,8 @@ MonoBehaviour:
   loweredPositionOffset: {x: 0.12, y: 0.85, z: 0.18}
   loweredRotationOffset: {x: 35, y: 0, z: 0}
   lowerBlendSpeed: 4
+  readyHoldTime: 1.5
+  aimHeightDrop: 0.06
   magazineSize: 15
   reloadTime: 2.2
   reloadGrabOffset: {x: -0.15, y: 0, z: 0.12}
@@ -352,7 +356,7 @@ MonoBehaviour:
   scavengeReach: 1.4
   scavengeMinPickupAge: 1
   onlyUpgradeOutOfCombat: 1
---- !u!114 &4186290501909926101
+--- !u!114 &2935768971908545900
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -361,64 +365,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 910542812212260045}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bff050179b1bbb944b20edc22e239b32, type: 3}
+  m_Script: {fileID: 11500000, guid: 4de2ea8fe1857ba42837a2b116906ef3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AnatomicalConstraints
-  limits:
-  - bone: 7
-    twistMin: -20
-    twistMax: 20
-    bendMin: -25
-    bendMax: 35
-    lateralLimit: 20
-  - bone: 8
-    twistMin: -15
-    twistMax: 15
-    bendMin: -20
-    bendMax: 25
-    lateralLimit: 15
-  - bone: 10
-    twistMin: -70
-    twistMax: 70
-    bendMin: -45
-    bendMax: 40
-    lateralLimit: 20
-  - bone: 1
-    twistMin: -20
-    twistMax: 20
-    bendMin: -25
-    bendMax: 110
-    lateralLimit: 35
-  - bone: 2
-    twistMin: -20
-    twistMax: 20
-    bendMin: -25
-    bendMax: 110
-    lateralLimit: 35
-  - bone: 3
-    twistMin: -6
-    twistMax: 6
-    bendMin: 0
-    bendMax: 140
-    lateralLimit: 8
-  - bone: 4
-    twistMin: -6
-    twistMax: 6
-    bendMin: 0
-    bendMax: 140
-    lateralLimit: 8
-  - bone: 5
-    twistMin: -15
-    twistMax: 15
-    bendMin: -30
-    bendMax: 45
-    lateralLimit: 15
-  - bone: 6
-    twistMin: -15
-    twistMax: 15
-    bendMin: -30
-    bendMax: 45
-    lateralLimit: 15
+  m_EditorClassIdentifier: Assembly-CSharp::AIRelaxedIdle
+  animator: {fileID: 3378653021993452407}
+  locomotion: {fileID: 3211400689782095061}
+  weapon: {fileID: 7738536188537177383}
+  settleDelay: 5
+  combatBlendThreshold: 0.02
+  glanceIntervalRange: {x: 2.5, y: 5}
+  glanceYawRange: 50
+  glancePitchRange: 15
+  glanceDistance: 3
+  weightSmoothing: 0.6
+  bodyWeight: 0.1
+  headWeight: 0.6
+  eyesWeight: 1
+  clampWeight: 0.5
+  debugIsGlancing: 0
+  debugLookWeight: 0
 --- !u!1 &3014967846191164479
 GameObject:
   m_ObjectHideFlags: 0

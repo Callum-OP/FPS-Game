@@ -54,6 +54,12 @@ public class EnemyWeapon : MonoBehaviour
     public Vector3 loweredRotationOffset = new Vector3(35f, 0f, 0f);
     [Tooltip("How fast the gun raises/lowers when combat starts or ends.")]
     public float lowerBlendSpeed = 4f;
+    [Tooltip("Seconds to keep the weapon raised/ready after combat actually ends before starting to lower to the relaxed pose above. Enemy.cs/FriendlyAI.cs still call SetCombatReady(false) the instant they leave combat - this hold is applied entirely here so neither of those scripts needs changing. Re-entering combat (SetCombatReady(true)) always takes effect immediately, no hold on raising.")]
+    public float readyHoldTime = 1.5f;
+
+    [Header("AI Aim Height")]
+    [Tooltip("Meters to drop the aim/ready pose below an exact match of the player's own eye height. ComputeEyeLocal below samples the player's camera height 1:1, which reads as too high/alert on an NPC seen from outside - this softens it for a more relaxed look without a whole separate pose.")]
+    public float aimHeightDrop = 0.06f;
 
     [Header("Ammo / Reload")]
     [Tooltip("Rounds before this enemy has to reload. Set per weapon type on the prefab.")]
@@ -101,6 +107,8 @@ public class EnemyWeapon : MonoBehaviour
     bool aiming;
     float aimBlend;
     bool combatReady;
+    bool wantCombatReady;   // what SetCombatReady was actually last told, before the hold delay
+    float readyHoldTimer;
     float combatBlend;
     bool dropped;
     int ammo;
@@ -286,13 +294,19 @@ public class EnemyWeapon : MonoBehaviour
         }
 
         if (hasEyeSample)
-            return transform.InverseTransformPoint(anim.transform.TransformPoint(eyeInModel));
+        {
+            Vector3 local = transform.InverseTransformPoint(anim.transform.TransformPoint(eyeInModel));
+            local.y -= aimHeightDrop;
+            return local;
+        }
 
         Transform head = anim.GetBoneTransform(HumanBodyBones.Head);
         Vector3 world = head != null
             ? head.position + anim.transform.up * 0.08f + anim.transform.forward * 0.1f
             : transform.position + Vector3.up * 1.6f;
-        return transform.InverseTransformPoint(world);
+        Vector3 fallbackLocal = transform.InverseTransformPoint(world);
+        fallbackLocal.y -= aimHeightDrop;
+        return fallbackLocal;
     }
 
     /// <summary>Tell the weapon what it's aiming at so the gun pitches up/down towards it
@@ -616,6 +630,15 @@ public class EnemyWeapon : MonoBehaviour
     {
         if (anchor == null) return;
 
+        // Post-combat hold: don't start lowering the instant combat ends - stay ready for
+        // readyHoldTime first. Re-raising (wantCombatReady becoming true) is handled
+        // immediately in SetCombatReady below, not here.
+        if (!wantCombatReady && combatReady)
+        {
+            readyHoldTimer += Time.deltaTime;
+            if (readyHoldTimer >= readyHoldTime) combatReady = false;
+        }
+
         // Back to the primary once the fighting's over (a sidearm is for emergencies).
         if (combatReady) calmTimer = 0f; else calmTimer += Time.deltaTime;
         if (!combatReady && calmTimer > returnToPrimaryDelay && !reloading && !dropped
@@ -656,10 +679,21 @@ public class EnemyWeapon : MonoBehaviour
     }
 
     /// <summary>Gun up (in combat) or down at the waist (patrolling/idle). Called by EnemyAI
-    /// as it changes state.</summary>
-    public void SetCombatReady(bool value) => combatReady = value;
+    /// as it changes state. Raising is immediate; lowering is delayed by readyHoldTime
+    /// (see Update) so the gun doesn't snap down the instant a target is lost.</summary>
+    public void SetCombatReady(bool value)
+    {
+        wantCombatReady = value;
+        if (value) { combatReady = true; readyHoldTimer = 0f; }
+    }
 
     public bool IsReloading => reloading;
+    /// <summary>True once actually raised (post-hold) - false only once the hold above has
+    /// elapsed and lowering has genuinely started, not the instant combat is left.</summary>
+    public bool IsCombatReady => combatReady;
+    /// <summary>0 = fully lowered, 1 = fully raised. Use this (not IsCombatReady alone) to tell
+    /// whether the gun has actually finished lowering, not just started to.</summary>
+    public float CombatBlend => combatBlend;
     /// <summary>Gun pitch towards the target, degrees, + = down (same convention as the player's camera pitch).</summary>
     public float EyePitch => eyePitch;
     public bool IsAimingNow => aiming && !reloading;

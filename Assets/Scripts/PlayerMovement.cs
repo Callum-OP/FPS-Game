@@ -25,7 +25,17 @@ public class PlayerMovement : MonoBehaviour
 {
     // Movement settings
     [Header("Movement")]
-    public float walkSpeed = 5f;
+    // Matched to the rifle pack's authored Walk clip speed (see AnimationSystemBuilder.BuildBaseLayer,
+    // "rifle 8-way pack walk 1.86") so default movement actually blends to the Walk pose instead of
+    // sitting between Run and Sprint - the old 5 was already past Run's 4.64 authored speed, which is
+    // why default movement looked like running (and LowerWeapon's 1.15x multiplier on top of that
+    // pushed it well into Sprint territory). Pistol/Unarmed clips are authored slightly differently
+    // (2.57 / 1.60) so this is a compromise, not a perfect match for every weapon - if a specific
+    // weapon still looks off, the proper fix is feeding CharacterLocomotion a per-weapon-class walk
+    // speed rather than one global number, which is a bigger change than this pass makes.
+    public float walkSpeed = 1.9f;
+    // Not read anywhere in HandleMovement below - reserved for a future dedicated sprint action/key,
+    // separate from the weapon-lowered/holstered speed bumps. Leave unset until that's built.
     public float runSpeed = 9f;
     public float jumpHeight = 1.5f;
     public float gravity = -19.62f;
@@ -215,13 +225,13 @@ public class PlayerMovement : MonoBehaviour
             animationDriver?.SetCrouching(isCrouching);
         }
 
-        // No sprint key any more - lowering the gun (LowerWeapon, key 2) is what makes
-        // the player move fast, purely via SetSpeedMultiplier below. This used to ALSO
-        // jump the base speed from walkSpeed up to runSpeed on top of that multiplier -
-        // 5 * 1.5 became 9 * 1.5 = 13.5, a double boost - which is why lowering the gun
-        // ended up faster than sprinting ever was. Base speed now always starts from
-        // walkSpeed; the multiplier alone (fastWalkMultiplier on LowerWeapon, still
-        // 1.5x by default) is the entire "sprint replacement".
+        // No sprint key any more - the two speed bumps both come from SetSpeedMultiplier,
+        // applied on top of the (now walk-paced) base speed above: LowerWeapon's tap-2
+        // "lowered" pose uses a small multiplier so it stays a fast WALK (see LowerWeapon.
+        // fastWalkMultiplier), and WeaponInventory's hold-2 "holstered" state uses a bigger
+        // one so it reads as an actual RUN (see WeaponInventory.holsterSpeedMultiplier).
+        // True Sprint is intentionally not wired to anything yet - reserved for a later,
+        // dedicated action/key rather than being folded into either of these.
         bool isFast = speedMultiplier > 1.01f;
 
         float speed = walkSpeed;

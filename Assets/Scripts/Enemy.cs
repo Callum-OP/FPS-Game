@@ -38,8 +38,14 @@ public class EnemyAI : MonoBehaviour
     public bool crouchInCover = true;
 
     [Header("Movement")]
-    public float walkSpeed = 2.5f;
-    public float chaseSpeed = 5f;
+    // Matched to the rifle pack's authored Walk clip (1.86 m/s, see PlayerMovement.walkSpeed for the
+    // same reasoning) so patrol reads as a clean walk instead of blending toward Run.
+    public float walkSpeed = 1.9f;
+    // A fast walk, not a run - Callum wants enemies to stay walk-paced even while chasing, since
+    // there's no "weapon holstered" equivalent state for enemies to reserve an actual Run for.
+    // Tune by eye; if chase feels too sluggish this can come up, just keep it well under the
+    // rifle pack's Run speed (4.64) so it doesn't start blending into that pose.
+    public float chaseSpeed = 2.3f;
     public float turnSpeed = 8f;
 
     [Header("Patrol")]

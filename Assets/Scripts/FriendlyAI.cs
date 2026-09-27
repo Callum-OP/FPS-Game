@@ -37,8 +37,11 @@ public class FriendlyAI : MonoBehaviour
     public float patrolMaxPause = 4f;
     [Tooltip("Distance at which it gives up on combat/cover and catches up to the player instead.")]
     public float leashDistance = 18f;
-    public float walkSpeed = 3.5f;
-    public float chaseSpeed = 5.5f;
+    // Matched to the rifle pack's authored Walk clip (1.86 m/s) - see Enemy.walkSpeed/PlayerMovement.walkSpeed
+    // for the same reasoning. Was 3.5, which already blended partway into Run.
+    public float walkSpeed = 1.9f;
+    // Fast walk, not a run - same call as Enemy.chaseSpeed. Tune by eye if follow feels too slow.
+    public float chaseSpeed = 2.3f;
     public float turnSpeed = 8f;
 
     [Header("Combat")]
