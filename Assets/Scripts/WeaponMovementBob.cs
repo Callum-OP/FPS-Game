@@ -11,7 +11,7 @@ using UnityEngine;
 ///    That's the "gun teleports forward away from the hands while reloading and walking"
 ///    - it only showed up while walking because the bob scales with movement speed.
 ///  - Hip bob is also what real FPS weapon bob is modelled on, so it lines up with the
-///    footfalls the way Call of Duty's does.
+///    footfalls the way a typical modern shooter's does.
 ///
 /// Amounts are deliberately small and clamped hard. Sideways movement is scaled down
 /// separately (lateralScale) because left/right weapon travel is the most obvious and

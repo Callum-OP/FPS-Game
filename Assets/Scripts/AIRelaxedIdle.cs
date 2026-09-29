@@ -1,31 +1,29 @@
 using UnityEngine;
 
 /// <summary>
-/// Phase 3 (relaxed idle): while an enemy/ally is genuinely idle (CharacterLocomotion.IsIdle)
-/// AND out of combat with the weapon actually all the way down (EnemyWeapon.IsCombatReady
-/// false AND CombatBlend settled near 0, not just "just told to lower") this:
+/// Relaxed idle: while an enemy/ally is genuinely idle (CharacterLocomotion.IsIdle) AND out of
+/// combat with the weapon actually all the way down (EnemyWeapon.IsCombatReady false AND
+/// CombatBlend settled near 0, not just "just told to lower") this:
 ///
 ///  1. Fades in Unity's built-in Humanoid look-at IK and has the character glance around at a
 ///     slowly-changing point out in front of itself - the head/eyes turn, the body barely
 ///     follows. Always on while relaxed; not affected by playIdleGestures below.
 ///
-///  2. If playIdleGestures is true, ALSO occasionally crossfades the masked UpperBody layer
-///     (the same layer Aim/Fire/Reload/Melee already use) into a one-shot idle gesture clip -
-///     "look away gesture", "weight shift" etc. from Gestures Pack Basic, and the "idle
-///     looking" variants from Pro Melee Axe Pack Callum's original Phase 3 ask specifically
-///     named - then back to UB_Idle when it's done. Only whichever of those clips actually
-///     got imported (see the gest_* ClipDef entries in AnimationSystemBuilder) are ever
-///     picked, checked at runtime via Animator.HasState, so a name that doesn't match what's
-///     in the live project is silently skipped rather than breaking anything.
+///  2. If playIdleGestures is true, ALSO occasionally crossfades into a full-body idle-gesture
+///     clip (see CharacterAnimationDriver.CrossFadeBase) - "Check Shoe" (right hand only: the
+///     left stays on the weapon grip) or "Arm Stretching" (both hands - only offered while
+///     unarmed or holding a pistol, since a rifle needs both hands on the grip to make sense
+///     held). Only whichever of those clips actually exist on the controller (checked via
+///     Animator.HasState) are ever picked, so a name that doesn't match the live project is
+///     silently skipped rather than breaking anything.
 ///
 /// playIdleGestures is exposed separately (default true) so a character can be set to just
-/// glance around without ever stopping to play a gesture clip, per Callum's ask.
+/// glance around without ever stopping to play a gesture clip.
 ///
-/// Does NOT touch Enemy.cs/FriendlyAI.cs - purely additive, same spirit as TurnInPlace/
-/// AnatomicalConstraints. Add it manually next to Animator/CharacterLocomotion/EnemyWeapon
-/// on enemy and ally prefabs. DOES need Tools > FPS Game > Build Animation System re-run at
-/// least once for the gesture half (the UB_Gesture* states have to exist on the controller) -
-/// the look-at glancing half works with no rebuild.
+/// Does NOT touch Enemy.cs/FriendlyAI.cs - purely additive. Add it manually next to Animator/
+/// CharacterLocomotion/EnemyWeapon on enemy and ally prefabs. DOES need the animation system
+/// rebuilt at least once for the gesture half (the Gesture_* states have to exist on the
+/// controller) - the look-at glancing half works with no rebuild.
 /// </summary>
 [RequireComponent(typeof(Animator))]
 public class AIRelaxedIdle : MonoBehaviour
@@ -33,56 +31,54 @@ public class AIRelaxedIdle : MonoBehaviour
     public Animator animator;
     public CharacterLocomotion locomotion;
     public EnemyWeapon weapon;
-    public WeaponHandIK handIK;
+    public CharacterAnimationDriver driver;
 
     [Header("When it's allowed to relax")]
-    [Tooltip("Extra seconds of being fully idle AND fully weapon-lowered before glancing/gestures start - stops a character that just stopped walking or just finished lowering their gun from snapping straight into it.")]
+    [Tooltip("Extra seconds of being fully idle AND fully weapon-lowered before glancing/gestures start.")]
     public float settleDelay = 1f;
-    [Tooltip("CombatBlend must be below this (see EnemyWeapon) to count as 'fully lowered' - keeps relaxing from starting while the gun is still mid-way through lowering.")]
+    [Tooltip("CombatBlend must be below this (see EnemyWeapon) to count as 'fully lowered'.")]
     public float combatBlendThreshold = 0.02f;
 
     [Header("Glance behaviour (always on while relaxed)")]
-    [Tooltip("How often (min/max seconds) a new glance target is picked while relaxed.")]
     public Vector2 glanceIntervalRange = new Vector2(2.5f, 5f);
-    [Tooltip("Horizontal degrees either side of forward the glance can aim.")]
     public float glanceYawRange = 50f;
-    [Tooltip("Vertical degrees up/down from level the glance can aim.")]
     public float glancePitchRange = 15f;
-    [Tooltip("Distance out in front to place the glance target - just needs to be far enough that the head/eye rotation reads clearly, doesn't need to hit anything real.")]
     public float glanceDistance = 3f;
-    [Tooltip("Seconds (smoothing time) for the look-at weight to fade in when glancing starts and out when it stops.")]
     public float weightSmoothing = 0.6f;
 
     [Header("Look-at weights (see Animator.SetLookAtWeight)")]
     [Range(0f, 1f)] public float bodyWeight = 0.1f;
     [Range(0f, 1f)] public float headWeight = 0.6f;
     [Range(0f, 1f)] public float eyesWeight = 1f;
-    [Tooltip("Unity's own clamp on how far the head/eyes are allowed to turn from the forward direction before the body has to help. 0.5 is Unity's default.")]
     [Range(0f, 1f)] public float clampWeight = 0.5f;
 
+    [System.Serializable]
+    public struct GestureOption
+    {
+        public string state;
+        [Tooltip("How much of each arm follows the clip - the Right Hand gesture leaves the left on the weapon grip; Both Hands frees both.")]
+        [Range(0f, 1f)] public float rightFollow, leftFollow;
+        [Tooltip("If set, this gesture is only offered while unarmed or holding a pistol - a rifle needs both hands to make sense held.")]
+        public bool pistolOrUnarmedOnly;
+    }
+
     [Header("Idle gestures (optional - untick for glance-only)")]
-    [Tooltip("If off, this character only glances around (above) and never stops to play a full gesture clip. Enemies/allies you want relaxed without standing around doing something specific should have this unticked.")]
     public bool playIdleGestures = true;
-    [Tooltip("How often (min/max seconds) a gesture is triggered while relaxed and playIdleGestures is on. Independent of the glance interval above.")]
     public Vector2 gestureIntervalRange = new Vector2(8f, 18f);
-    [Tooltip("Names checked (via Animator.HasState) against the UpperBody layer at Start - only ones that actually exist get picked from. Matches the UB_Gesture* states AnimationSystemBuilder creates for whichever gest_* clips were found; edit freely to add/remove candidates without touching code.")]
-    public string[] gestureStateNames = {
-        "UB_GestureLookAway", "UB_GestureWeightShift", "UB_GestureSigh", "UB_GestureThoughtful",
-        "UB_GestureMeleeLook1", "UB_GestureMeleeLook2", "UB_GestureUnarmedLook1", "UB_GestureUnarmedLook2",
+    [Tooltip("Candidates checked at Start via Animator.HasState - only ones that actually exist on the controller are used.")]
+    public GestureOption[] gestureOptions =
+    {
+        new GestureOption { state = "Gesture_CheckShoe",  rightFollow = 1f, leftFollow = 0f, pistolOrUnarmedOnly = false },
+        new GestureOption { state = "Gesture_ArmStretch", rightFollow = 1f, leftFollow = 1f, pistolOrUnarmedOnly = true },
     };
-    [Tooltip("Crossfade time in/out of a gesture, seconds.")]
-    public float gestureCrossfade = 0.25f;
+    public float gestureFallbackDuration = 3f;
 
-    float settleTimer;
-    float glanceTimer;
-    float lookWeight;
-    Vector3 glanceLocalDir; // already scaled by glanceDistance, relative to this transform's own axes
+    float settleTimer, glanceTimer, lookWeight;
+    Vector3 glanceLocalDir;
 
-    int upperBodyLayer = -1;
-    int[] validGestureHashes;
-    string[] validGestureNames;
-    int currentGestureHash;
-    float gestureTimer;
+    GestureOption[] validGestures;
+    int currentGestureHash = -1;
+    float gestureTimer, gestureEndTime;
     bool gesturing;
 
     [Header("Debug (read-only)")]
@@ -95,27 +91,20 @@ public class AIRelaxedIdle : MonoBehaviour
     {
         if (animator == null)
         {
-            // Same resolution order as TurnInPlace/AnatomicalConstraints - ask
-            // CharacterAnimationDriver for the Animator it already correctly picked out
-            // (this project's rigs can carry more than one Animator - see the recurring
-            // "wrong Animator" issue noted throughout this project's history) before
-            // falling back to a plain Humanoid-with-a-controller hunt.
-            var driver = GetComponentInChildren<CharacterAnimationDriver>();
-            if (driver != null) animator = driver.BodyAnimator;
+            var d = GetComponentInChildren<CharacterAnimationDriver>();
+            if (d != null) animator = d.BodyAnimator;
         }
         if (animator == null)
         {
             foreach (var candidate in GetComponentsInChildren<Animator>(true))
-            {
                 if (candidate.runtimeAnimatorController != null && candidate.avatar != null && candidate.avatar.isHuman) { animator = candidate; break; }
-            }
         }
         if (locomotion == null) locomotion = GetComponentInParent<CharacterLocomotion>();
         if (locomotion == null) locomotion = GetComponentInChildren<CharacterLocomotion>();
         if (weapon == null) weapon = GetComponentInParent<EnemyWeapon>();
         if (weapon == null) weapon = GetComponentInChildren<EnemyWeapon>();
-        if (handIK == null) handIK = GetComponentInParent<WeaponHandIK>();
-        if (handIK == null) handIK = GetComponentInChildren<WeaponHandIK>();
+        if (driver == null) driver = GetComponentInParent<CharacterAnimationDriver>();
+        if (driver == null) driver = GetComponentInChildren<CharacterAnimationDriver>();
 
         if (animator == null)
         {
@@ -124,9 +113,6 @@ public class AIRelaxedIdle : MonoBehaviour
             return;
         }
 
-        // OnAnimatorIK only fires on the GameObject that actually holds the Animator -
-        // WeaponHandIK hit exactly this issue, solved with WeaponHandIKAnimatorBridge.
-        // Reuse the same fix rather than inventing a second bridge component.
         if (animator.gameObject != gameObject)
         {
             var bridge = animator.gameObject.GetComponent<AIRelaxedIdleAnimatorBridge>();
@@ -134,48 +120,14 @@ public class AIRelaxedIdle : MonoBehaviour
             bridge.owner = this;
         }
 
-        upperBodyLayer = animator.GetLayerIndex("UpperBody");
-
-        if (upperBodyLayer >= 0)
-        {
-            // Ensure the UpperBody layer weight is set to 1 so animations are visible
-            animator.SetLayerWeight(upperBodyLayer, 1f);
-
-            if (gestureStateNames != null)
-            {
-                var names = new System.Collections.Generic.List<string>();
-                var hashes = new System.Collections.Generic.List<int>();
-                foreach (var n in gestureStateNames)
-                {
-                    if (string.IsNullOrEmpty(n)) continue;
-                    
-                    int h = Animator.StringToHash(n);
-                    int layerPrefixedHash = Animator.StringToHash("UpperBody." + n);
-
-                    if (animator.HasState(upperBodyLayer, h))
-                    {
-                        names.Add(n);
-                        hashes.Add(h);
-                    }
-                    else if (animator.HasState(upperBodyLayer, layerPrefixedHash))
-                    {
-                        names.Add(n);
-                        hashes.Add(layerPrefixedHash);
-                    }
-                }
-                validGestureNames = names.ToArray();
-                validGestureHashes = hashes.ToArray();
-            }
-        }
-        else
-        {
-            validGestureNames = new string[0];
-            validGestureHashes = new int[0];
-        }
-
-        debugValidGestureCount = validGestureNames.Length;
-        if (playIdleGestures && validGestureNames.Length == 0)
-            Debug.Log("[AIRelaxedIdle] playIdleGestures is on but none of gestureStateNames exist on the UpperBody layer - re-run Tools > FPS Game > Build Animation System, or check the gest_* clips actually imported (see the Console output from that tool).", this);
+        var valid = new System.Collections.Generic.List<GestureOption>();
+        if (driver != null && gestureOptions != null)
+            foreach (var g in gestureOptions)
+                if (!string.IsNullOrEmpty(g.state) && driver.HasBaseState(g.state)) valid.Add(g);
+        validGestures = valid.ToArray();
+        debugValidGestureCount = validGestures.Length;
+        if (playIdleGestures && validGestures.Length == 0)
+            Debug.Log("[AIRelaxedIdle] playIdleGestures is on but none of gestureOptions exist on the base layer - rebuild the animation system, or check the gest_* clips actually imported.", this);
 
         PickNewGlanceTarget();
         PickNewGestureTimer();
@@ -192,41 +144,26 @@ public class AIRelaxedIdle : MonoBehaviour
         settleTimer = relaxed ? settleTimer + Time.deltaTime : 0f;
         bool settled = relaxed && settleTimer >= settleDelay;
 
-        // --- glancing (always on while settled) ---
         glanceTimer -= Time.deltaTime;
         if (settled && glanceTimer <= 0f) PickNewGlanceTarget();
 
         float targetWeight = settled ? 1f : 0f;
         lookWeight = Mathf.MoveTowards(lookWeight, targetWeight, Time.deltaTime / Mathf.Max(weightSmoothing, 0.01f));
 
-        // --- gestures (optional, one-shot on the UpperBody layer) ---
         if (gesturing)
         {
-            var info = animator.GetCurrentAnimatorStateInfo(upperBodyLayer);
-
-            // Interrupt immediately if the character stops being relaxed mid-gesture
-            if (!relaxed)
+            if (currentGestureHash >= 0)
             {
-                EndGesture();
+                var info = animator.GetCurrentAnimatorStateInfo(0);
+                if (info.shortNameHash == currentGestureHash && info.length > 0.01f)
+                    gestureEndTime = Time.time + Mathf.Max(0f, (1f - info.normalizedTime) * info.length);
             }
-            // Once we have completed the transition into the target gesture state...
-            else if (info.shortNameHash == currentGestureHash && !animator.IsInTransition(upperBodyLayer))
-            {
-                // Wait for the non-looping gesture clip to complete (normalizedTime >= 0.95)
-                if (info.normalizedTime >= 0.95f)
-                {
-                    EndGesture();
-                }
-            }
+            if (!relaxed || Time.time >= gestureEndTime) EndGesture();
         }
-        else if (settled && playIdleGestures && validGestureNames.Length > 0)
+        else if (settled && playIdleGestures && validGestures.Length > 0 && (driver == null || !driver.InFullBodyAction))
         {
             gestureTimer -= Time.deltaTime;
             if (gestureTimer <= 0f) StartGesture();
-        }
-        else
-        {
-            gestureTimer = Mathf.Max(gestureTimer, 0f); // don't let it run down while not eligible
         }
 
         debugIsGlancing = settled;
@@ -239,36 +176,40 @@ public class AIRelaxedIdle : MonoBehaviour
         glanceTimer = Random.Range(glanceIntervalRange.x, glanceIntervalRange.y);
         float yaw = Random.Range(-glanceYawRange, glanceYawRange);
         float pitch = Random.Range(-glancePitchRange, glancePitchRange);
-        // Pitch as a rotation around the local right axis so positive pitch looks up.
         Quaternion rot = Quaternion.Euler(-pitch, yaw, 0f);
         glanceLocalDir = rot * Vector3.forward * glanceDistance;
     }
 
-    void PickNewGestureTimer()
-    {
-        gestureTimer = Random.Range(gestureIntervalRange.x, gestureIntervalRange.y);
-    }
+    void PickNewGestureTimer() => gestureTimer = Random.Range(gestureIntervalRange.x, gestureIntervalRange.y);
 
     void StartGesture()
     {
-        int pick = Random.Range(0, validGestureNames.Length);
-        currentGestureHash = validGestureHashes[pick];
-        animator.CrossFadeInFixedTime(validGestureNames[pick], gestureCrossfade, upperBodyLayer);
-        handIK?.SetSuppressed(true);
-        gesturing = true;
+        bool canBothHands = driver == null || driver.CurrentWeaponClass != CharacterWeaponClass.Rifle;
+        var pool = new System.Collections.Generic.List<GestureOption>();
+        foreach (var g in validGestures)
+            if (!g.pistolOrUnarmedOnly || canBothHands) pool.Add(g);
+        if (pool.Count == 0) { PickNewGestureTimer(); return; }
+
+        var pick = pool[Random.Range(0, pool.Count)];
+        if (driver != null && driver.CrossFadeBase(pick.state, 0.25f, pick.rightFollow, pick.leftFollow))
+        {
+            currentGestureHash = Animator.StringToHash(pick.state);
+            gesturing = true;
+            gestureEndTime = Time.time + 0.25f + gestureFallbackDuration; // corrected from the real clip length once Update sees it playing
+        }
+        else PickNewGestureTimer();
     }
 
     void EndGesture()
     {
         gesturing = false;
-        handIK?.SetSuppressed(false);
-        if (upperBodyLayer >= 0) animator.CrossFadeInFixedTime("UB_Idle", gestureCrossfade, upperBodyLayer);
+        currentGestureHash = -1;
+        driver?.EndFullBodyAction();
         PickNewGestureTimer();
     }
 
-    /// <summary>Called from OnAnimatorIK, either directly (if this component sits on the same
-    /// GameObject as the Animator) or via AIRelaxedIdleAnimatorBridge forwarding from the real
-    /// (possibly nested) Animator's GameObject.</summary>
+    /// <summary>Called from OnAnimatorIK, either directly or via AIRelaxedIdleAnimatorBridge forwarding
+    /// from the real (possibly nested) Animator's GameObject.</summary>
     public void ApplyLookAt()
     {
         if (animator == null) return;
@@ -276,11 +217,6 @@ public class AIRelaxedIdle : MonoBehaviour
         animator.SetLookAtWeight(lookWeight, bodyWeight, headWeight, eyesWeight, clampWeight);
         if (lookWeight > 0.001f)
         {
-            // Anchored on the head bone (works regardless of this character's actual height)
-            // and aimed using the ROOT's forward/right/up, not wherever the head currently
-            // happens to be looking - using the head's own current rotation here would create
-            // a feedback loop (this frame's look-at output feeding next frame's glance
-            // direction) that could drift or oscillate.
             Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
             Vector3 origin = head != null ? head.position : transform.position + Vector3.up * 1.6f;
             Vector3 worldTarget = origin + transform.TransformDirection(glanceLocalDir);
@@ -288,10 +224,7 @@ public class AIRelaxedIdle : MonoBehaviour
         }
     }
 
-    void OnAnimatorIK(int layerIndex)
-    {
-        ApplyLookAt();
-    }
+    void OnAnimatorIK(int layerIndex) => ApplyLookAt();
 }
 
 public class AIRelaxedIdleAnimatorBridge : MonoBehaviour

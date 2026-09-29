@@ -177,9 +177,30 @@ public static class AnimationSystemBuilder
         new ClipDef("act_melee",      "Pro Melee Axe Pack", "standing melee attack horizontal", false),
         new ClipDef("act_melee_b",    "Pro Melee Axe Pack", "standing melee attack backhand", false),
         new ClipDef("act_melee_d",    "Pro Melee Axe Pack", "standing melee attack downward", false),
-        // Full-body shove/kick (right-click) - unlike the melee swings this is NOT masked to the
-        // upper body, because a kick is a leg motion; see the "Shove" state below.
-        new ClipDef("act_kick",       "Pro Melee Axe Pack", "standing melee attack kick ver. 2", false),
+        // --- Custom selection (Assets/LocalAssets/Mixamo/Custom Selection) -----------------------------
+        // Shove: the attacker's clips. The punch is authored with the LEFT hand, so its state is mirrored.
+        new ClipDef("shove_punch", "Custom Selection/Shove/Shover", "Standing Melee Punch", false, optional: true),
+        new ClipDef("shove_kick",  "Custom Selection/Shove/Shover", "Standing Melee Kick",  false, optional: true),
+        // Shove: the victim's reactions, named for the side the shove came FROM. Imported in-place like every
+        // other clip (lockRootPositionXZ) - Health.PushRoutine moves the body, not the pose.
+        new ClipDef("shoved_front", "Custom Selection/Shove/Shoved", "Standing React Large From Front", false, optional: true),
+        new ClipDef("shoved_back",  "Custom Selection/Shove/Shoved", "Standing React Large From Back",  false, optional: true),
+        new ClipDef("shoved_left",  "Custom Selection/Shove/Shoved", "Standing React Large From Left",  false, optional: true),
+        new ClipDef("shoved_right", "Custom Selection/Shove/Shoved", "Standing React Large From Right", false, optional: true),
+        // Vault / climb: imported in-place like every other clip - VaultClimb moves the root along a path
+        // measured from the clip's own hip motion (see VaultClimb.VaultProfile).
+        new ClipDef("vault_step", "Custom Selection/Vault", "Step Up",    false, optional: true),
+        new ClipDef("vault_over", "Custom Selection/Vault", "Vault Over", false, optional: true),
+        new ClipDef("vault_wall", "Custom Selection/Vault", "Wall Climb", false, optional: true),
+        // Stumble to the floor when shot while moving (death variants, baked like the other death clips).
+        new ClipDef("stumble_front", "Custom Selection/StumbleToFloor", "Shot From Front", false, optional: true),
+        new ClipDef("stumble_back",  "Custom Selection/StumbleToFloor", "Shot From Back",  false, optional: true),
+        new ClipDef("stumble_left",  "Custom Selection/StumbleToFloor", "Shot From Left",  false, optional: true),
+        new ClipDef("stumble_right", "Custom Selection/StumbleToFloor", "Shot From Right", false, optional: true),
+        // Idle gestures. "Right Hand" ones only move the right arm (the left hand stays on the grip);
+        // "Both Hands" ones are for pistol/unarmed only and free both hands.
+        new ClipDef("gest_shoe",    "Custom Selection/IdleGestures/Right Hand",  "Check Shoe", false, optional: true),
+        new ClipDef("gest_stretch", "Custom Selection/IdleGestures/Both Hands",  "Pistol Or Unarmed Arm Stretching", false, optional: true),
 
         // Airborne fallback (any weapon) - Action Adventure Pack
         new ClipDef("airborne_idle",  "Action Adventure Pack", "falling idle", true),
@@ -194,23 +215,6 @@ public static class AnimationSystemBuilder
         new ClipDef("inj_run_fwd",   "Male Injured Pack", "injured run", true),
         new ClipDef("inj_walk_back", "Male Injured Pack", "injured walk backwards", true),
         new ClipDef("inj_run_back",  "Male Injured Pack", "injured run backwards", true),
-
-        // --- Idle gestures (Phase 3, "relaxed idle") - AIRelaxedIdle.cs plays whichever of
-        // these exist on the UpperBody layer (checked at runtime via Animator.HasState, same
-        // pattern CharacterAnimationDriver already uses for optional melee variants) while a
-        // character is genuinely idle and out of combat. Names confirmed against Callum's
-        // actual Mixamo.zip (Gestures Pack Basic, Pro Melee Axe Pack) - marked optional anyway
-        // since the file names weren't cross-checked against what's actually imported into
-        // Assets/LocalAssets/Mixamo in the live project, just against the zip's own listing.
-        new ClipDef("gest_look_away",     "Gestures Pack Basic", "look away gesture", false, optional: true),
-        new ClipDef("gest_weight_shift",  "Gestures Pack Basic", "weight shift", false, optional: true),
-        new ClipDef("gest_relieved_sigh", "Gestures Pack Basic", "relieved sigh", false, optional: true),
-        new ClipDef("gest_thoughtful",    "Gestures Pack Basic", "thoughtful head shake", false, optional: true),
-        // The two "idle looking" variants Callum's original Phase 3 ask specifically named.
-        new ClipDef("gest_melee_look1",   "Pro Melee Axe Pack", "standing idle looking ver. 1", false, optional: true),
-        new ClipDef("gest_melee_look2",   "Pro Melee Axe Pack", "standing idle looking ver. 2", false, optional: true),
-        new ClipDef("gest_unarmed_look1", "Pro Melee Axe Pack", "unarmed idle looking ver. 1", false, optional: true),
-        new ClipDef("gest_unarmed_look2", "Pro Melee Axe Pack", "unarmed idle looking ver. 2", false, optional: true),
     };
 
     // NOTE: Mixamo gives no left/right label on ambiguous pairs. This script assumes
@@ -221,18 +225,21 @@ public static class AnimationSystemBuilder
         "pi_left/right -> Pistol pack 'pistol strafe'/'pistol strafe (2)'. Verify in the Animator preview.";
 
     static Dictionary<string, AnimationClip> _clipLookup;
+    static HashSet<string> _optionalKeys;
 
     [MenuItem("Tools/FPS Game/Build Animation System")]
     public static void Build()
     {
         _clipLookup = new Dictionary<string, AnimationClip>();
+        _optionalKeys = new HashSet<string>();
         Directory.CreateDirectory(OutDir);
 
         int imported = 0, missing = 0;
         foreach (var def in Clips)
         {
+            if (def.optional) _optionalKeys.Add(def.key);
             var clip = ImportClip(def);
-            if (clip == null) { missing++; continue; }
+            if (clip == null) { if (!def.optional) missing++; continue; }
             _clipLookup[def.key] = clip;
             imported++;
         }
@@ -405,7 +412,7 @@ public static class AnimationSystemBuilder
     static AnimationClip C(string key)
     {
         _clipLookup.TryGetValue(key, out var c);
-        if (c == null && !key.EndsWith("crouch_b")) Debug.LogWarning($"[AnimationSystemBuilder] Clip '{key}' unavailable - a blend tree node will be empty.");
+        if (c == null && !key.EndsWith("crouch_b") && !_optionalKeys.Contains(key)) Debug.LogWarning($"[AnimationSystemBuilder] Clip '{key}' unavailable - a blend tree node will be empty.");
         return c;
     }
 
@@ -503,6 +510,8 @@ public static class AnimationSystemBuilder
         // Which melee swing to play (0 horizontal, 1 backhand, 2 downward). Set before the Melee trigger.
         controller.AddParameter("MeleeIndex", AnimatorControllerParameterType.Int);
         controller.AddParameter("Shove", AnimatorControllerParameterType.Trigger);
+        // Which shove to play: false = the light punch shove, true = the heavy kick shove. Set before the Shove trigger.
+        controller.AddParameter("ShoveHeavy", AnimatorControllerParameterType.Bool);
         controller.AddParameter("Injured", AnimatorControllerParameterType.Bool);
         // Which death clip to play - set by CharacterAnimationDriver.SetDead(dead, fromBack).
         controller.AddParameter("DeathFromBack", AnimatorControllerParameterType.Bool);
@@ -622,13 +631,53 @@ public static class AnimationSystemBuilder
         AnimatorState sAir     = AddMotionState(sm, "JumpUp", C("ri_jump_up") != null ? C("ri_jump_up") : C("airborne_idle"), new Vector3(220, 460, 0));
         AnimatorState sAirLoop = AddMotionState(sm, "Airborne", C("ri_jump_loop") != null ? C("ri_jump_loop") : C("airborne_idle"), new Vector3(220, 540, 0));
         AnimatorState sLand    = AddMotionState(sm, "Land", C("ri_jump_down"), new Vector3(0, 540, 0));
-        // Full-body kick/shove (right-click - PlayerShove/EnemyAI). Base layer, not the masked
-        // UpperBody one the swings/fire/reload use, because the legs need to actually kick; the
-        // driver temporarily fades the UpperBody layer to 0 for the same reason (see
-        // CharacterAnimationDriver.PlayShove), so the arms come from this clip too rather than
-        // being pinned to whatever aim/idle pose the upper body layer was holding.
-        AnimatorState sShove = C("act_kick") != null ? AddMotionState(sm, "Shove", C("act_kick"), new Vector3(660, 540, 0)) : null;
-        if (sShove != null) sShove.speed = 1.3f;
+        // ---- full-body one-shot actions (base layer, so the legs and torso are driven too) ----------------
+        // The masked UpperBody layer is faded out while any of these plays (CharacterAnimationDriver does it),
+        // so the arms come from these clips; WeaponHandIK then decides per hand whether the clip or the weapon
+        // grip owns it (SetAnimationFollow) and blends between the two.
+        //
+        // Shove: the light shove is the punch (authored left-handed, so the state is mirrored to punch with the
+        // right hand); the heavy shove is the kick. Entered by the Shove trigger from any weapon pose.
+        AnimatorState sShoveLight = C("shove_punch") != null ? AddMotionState(sm, "ShoveLight", C("shove_punch"), new Vector3(660, 540, 0)) : null;
+        if (sShoveLight != null) { sShoveLight.mirror = true; sShoveLight.speed = CharacterAnimationDriver.ShoveLightSpeed; }
+        AnimatorState sShoveHeavy = C("shove_kick") != null ? AddMotionState(sm, "ShoveHeavy", C("shove_kick"), new Vector3(660, 620, 0)) : null;
+        if (sShoveHeavy != null) sShoveHeavy.speed = CharacterAnimationDriver.ShoveHeavySpeed;
+        var shoveStates = new List<AnimatorState>();
+        if (sShoveLight != null) shoveStates.Add(sShoveLight);
+        if (sShoveHeavy != null) shoveStates.Add(sShoveHeavy);
+
+        // Shoved: the victim's stagger, one clip per side the shove came from. Entered by script (CrossFade),
+        // never by a transition, so any character in any pose can be shoved.
+        var oneShotStates = new List<AnimatorState>();   // every state below exits back to the weapon pose
+        float osY = 700f;
+        foreach (var (stateName, key) in new[] { ("Shoved_Front", "shoved_front"), ("Shoved_Back", "shoved_back"),
+                                                 ("Shoved_Left", "shoved_left"), ("Shoved_Right", "shoved_right") })
+        {
+            if (C(key) == null) continue;
+            var st = AddMotionState(sm, stateName, C(key), new Vector3(880, osY, 0));
+            st.speed = CharacterAnimationDriver.ShovedSpeed;
+            oneShotStates.Add(st);
+            osY += 60f;
+        }
+        // Vault / climb / step up: entered by script (VaultClimb), exit is timed so the crossfade back to the
+        // weapon pose ends exactly on the last frame of the clip (VaultClimb relies on that timing).
+        var vaultStates = new List<(AnimatorState state, float length)>();
+        foreach (var (stateName, key) in new[] { ("Vault_StepUp", "vault_step"), ("Vault_Over", "vault_over"), ("Vault_Wall", "vault_wall") })
+        {
+            if (C(key) == null) continue;
+            var st = AddMotionState(sm, stateName, C(key), new Vector3(1100, osY, 0));
+            vaultStates.Add((st, C(key).length));
+            osY += 60f;
+        }
+        // Idle gestures: full-body, entered by script (AIRelaxedIdle), same exit pattern.
+        var gestureStates = new List<AnimatorState>();
+        foreach (var (stateName, key) in new[] { ("Gesture_CheckShoe", "gest_shoe"), ("Gesture_ArmStretch", "gest_stretch") })
+        {
+            if (C(key) == null) continue;
+            var st = AddMotionState(sm, stateName, C(key), new Vector3(1320, osY, 0));
+            gestureStates.Add(st);
+            osY += 60f;
+        }
         AnimatorState sDeadCrouch = AddMotionState(sm, "DeathCrouch", C("ri_death_crouch") != null ? C("ri_death_crouch") : C("ri_death_front"), new Vector3(660, 620, 0));
         AnimatorState sInjured = AddMotionState(sm, "Injured", injured, new Vector3(660, 300, 0));
         AnimatorState sDead     = AddMotionState(sm, "Death", C("ri_death_front"), new Vector3(220, 620, 0));
@@ -659,6 +708,12 @@ public static class AnimationSystemBuilder
         AddDeathVariant(sm, "Death_ShotFrontM",  C("x_shot_front"),    true,  new Vector3(660,  dy + 240, 0));
         AddDeathVariant(sm, "Death_ShotBack",    C("x_shot_back"),     false, new Vector3(0,    dy + 320, 0));
         AddDeathVariant(sm, "Death_ShotBackM",   C("x_shot_back"),     true,  new Vector3(220,  dy + 320, 0));
+        // Stumble to the floor - the four directional clips picked by CharacterAnimationDriver.TryChooseStumble when a
+        // moving body is shot (chance-based, see Ragdoll). Named for the side the shot came from.
+        AddDeathVariant(sm, "Death_StumbleFront", C("stumble_front"),  false, new Vector3(440,  dy + 320, 0));
+        AddDeathVariant(sm, "Death_StumbleBack",  C("stumble_back"),   false, new Vector3(660,  dy + 320, 0));
+        AddDeathVariant(sm, "Death_StumbleLeft",  C("stumble_left"),   false, new Vector3(0,    dy + 400, 0));
+        AddDeathVariant(sm, "Death_StumbleRight", C("stumble_right"),  false, new Vector3(220,  dy + 400, 0));
 
         var weaponStates = new[] { sUnarmed, sPistol, sRifle };
         for (int i = 0; i < weaponStates.Length; i++)
@@ -692,25 +747,35 @@ public static class AnimationSystemBuilder
         AddInstantTransition(sAirLoop, sLand, AnimatorConditionMode.If, 0, "IsGrounded");
         AddInstantTransition(sLand, sAir, AnimatorConditionMode.IfNot, 0, "IsGrounded");
 
-        // Shove: from any grounded weapon pose (not while airborne, crouched, or already injured -
-        // kicking mid-air or mid-crouch has no clip to back it), plays out, then returns to whichever
-        // pose matches the current weapon - same pattern as landing.
-        if (sShove != null)
+        // Shove: from any grounded weapon pose (not while airborne, crouched or injured), plays out, then returns to
+        // whichever pose matches the current weapon. Light (punch) and heavy (kick) are separate states chosen by
+        // the ShoveHeavy bool, each wired in from and out to every weapon pose.
+        var weaponPoseStates = new[] { sUnarmed, sPistol, sRifle };
+        foreach (var (shoveState, heavy) in new[] { (sShoveLight, false), (sShoveHeavy, true) })
         {
-            foreach (var s in new[] { sUnarmed, sPistol, sRifle })
+            if (shoveState == null) continue;
+            foreach (var src in weaponPoseStates)
             {
-                var into = s.AddTransition(sShove);
-                into.hasExitTime = false; into.duration = 0.08f;
+                var into = src.AddTransition(shoveState);
+                into.hasExitTime = false; into.duration = 0.1f;
                 into.AddCondition(AnimatorConditionMode.If, 0, "Shove");
+                into.AddCondition(heavy ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot, 0, "ShoveHeavy");
             }
-            for (int wc = 0; wc < 3; wc++)
-            {
-                var back = sShove.AddTransition(wc == 0 ? sUnarmed : (wc == 1 ? sPistol : sRifle));
-                back.hasExitTime = true; back.exitTime = 0.85f; back.duration = 0.15f;
-                back.AddCondition(AnimatorConditionMode.Equals, wc, "WeaponClass");
-            }
-            // Safety: if the ground disappears mid-kick (walked off a ledge), don't get stuck.
-            AddInstantTransition(sShove, sAir, AnimatorConditionMode.IfNot, 0, "IsGrounded");
+            AddExitToWeaponPose(shoveState, weaponPoseStates, 0.78f, 0.22f, false);
+            AddInstantTransition(shoveState, sAir, AnimatorConditionMode.IfNot, 0, "IsGrounded");
+        }
+        foreach (var st in oneShotStates)
+        {
+            AddExitToWeaponPose(st, weaponPoseStates, 0.72f, 0.28f, false);
+            AddInstantTransition(st, sAir, AnimatorConditionMode.IfNot, 0, "IsGrounded");
+        }
+        // Vaults and gestures: the crossfade out is FIXED-length and timed to finish on the clip's last frame.
+        foreach (var (st, len) in vaultStates)
+            AddExitToWeaponPose(st, weaponPoseStates, Mathf.Clamp01(1f - CharacterAnimationDriver.OneShotExitFade / Mathf.Max(0.1f, len / Mathf.Max(0.01f, st.speed))), CharacterAnimationDriver.OneShotExitFade, true);
+        foreach (var st in gestureStates)
+        {
+            float len = st.motion != null ? st.motion.averageDuration : 3f;
+            AddExitToWeaponPose(st, weaponPoseStates, Mathf.Clamp01(1f - CharacterAnimationDriver.OneShotExitFade / Mathf.Max(0.1f, len / Mathf.Max(0.01f, st.speed))), CharacterAnimationDriver.OneShotExitFade, true);
         }
 
         // Landing plays out, then returns to whichever pose matches the weapon.
@@ -725,9 +790,8 @@ public static class AnimationSystemBuilder
         // Death from anywhere - added before the Injured wiring below so it's
         // evaluated first: Unity checks a state's transitions in the order
         // they were added, and Dead must win if both are true simultaneously.
-        var deathSources = sShove != null
-            ? new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sAirLoop, sLand, sInjured, sShove }
-            : new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sAirLoop, sLand, sInjured };
+        var deathSources = new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sAirLoop, sLand, sInjured }
+            .Concat(shoveStates).Concat(oneShotStates).Concat(vaultStates.Select(v => v.state)).Concat(gestureStates).ToArray();
         foreach (var s in deathSources)
         {
             if (s == sCrouch)
@@ -757,6 +821,20 @@ public static class AnimationSystemBuilder
         AddInstantTransition(sInjured, sUnarmed, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
         AddInstantTransition(sInjured, sPistol, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
         AddInstantTransition(sInjured, sRifle, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
+    }
+
+    // Exit from a one-shot base-layer action back to whichever weapon pose is active (one transition per weapon
+    // class, told apart by the WeaponClass condition). fixedDuration = crossfade length in seconds (true) or as a
+    // fraction of the clip (false).
+    static void AddExitToWeaponPose(AnimatorState from, AnimatorState[] weaponPoses, float exitTime, float duration, bool fixedDuration)
+    {
+        for (int wc = 0; wc < weaponPoses.Length; wc++)
+        {
+            var back = from.AddTransition(weaponPoses[wc]);
+            back.hasExitTime = true; back.exitTime = exitTime;
+            back.hasFixedDuration = fixedDuration; back.duration = duration;
+            back.AddCondition(AnimatorConditionMode.Equals, wc, "WeaponClass");
+        }
     }
 
     // A death state that is only ever entered by CrossFade. Skipped when its clip wasn't imported.
@@ -827,19 +905,6 @@ public static class AnimationSystemBuilder
         AnimatorState pistolPose = AddMotionState(sm, "UB_PistolPose",
             C("pi_kneel_idle") != null ? C("pi_kneel_idle") : C("pi_idle"), new Vector3(440, 0, 0));
         sm.defaultState = idle;
-
-        // Idle gestures (Phase 3, "relaxed idle") - AIRelaxedIdle.cs discovers which of these
-        // exist via Animator.HasState and CrossFadeInFixedTime's straight to whichever it picks,
-        // then back to UB_Idle when done - no transitions needed in the graph at all, same as
-        // how melee variants are already driven entirely from script rather than parameters.
-        AnimatorState gestLookAway = C("gest_look_away") != null ? AddMotionState(sm, "UB_GestureLookAway", C("gest_look_away"), new Vector3(660, 280, 0)) : null;
-        AnimatorState gestWeightShift = C("gest_weight_shift") != null ? AddMotionState(sm, "UB_GestureWeightShift", C("gest_weight_shift"), new Vector3(660, 360, 0)) : null;
-        AnimatorState gestSigh = C("gest_relieved_sigh") != null ? AddMotionState(sm, "UB_GestureSigh", C("gest_relieved_sigh"), new Vector3(660, 440, 0)) : null;
-        AnimatorState gestThoughtful = C("gest_thoughtful") != null ? AddMotionState(sm, "UB_GestureThoughtful", C("gest_thoughtful"), new Vector3(660, 520, 0)) : null;
-        AnimatorState gestMeleeLook1 = C("gest_melee_look1") != null ? AddMotionState(sm, "UB_GestureMeleeLook1", C("gest_melee_look1"), new Vector3(880, 280, 0)) : null;
-        AnimatorState gestMeleeLook2 = C("gest_melee_look2") != null ? AddMotionState(sm, "UB_GestureMeleeLook2", C("gest_melee_look2"), new Vector3(880, 360, 0)) : null;
-        AnimatorState gestUnarmedLook1 = C("gest_unarmed_look1") != null ? AddMotionState(sm, "UB_GestureUnarmedLook1", C("gest_unarmed_look1"), new Vector3(880, 440, 0)) : null;
-        AnimatorState gestUnarmedLook2 = C("gest_unarmed_look2") != null ? AddMotionState(sm, "UB_GestureUnarmedLook2", C("gest_unarmed_look2"), new Vector3(880, 520, 0)) : null;
 
         AddInstantTransition(idle, pistolPose, AnimatorConditionMode.If, 0, "IsCrouching",
             extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));

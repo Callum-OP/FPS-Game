@@ -86,6 +86,7 @@
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\BigRookGames\_AssetPacks\Stylized Weapon Pack\M4 Scoped Assault Rifle\Scripts\GunfireController.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\ExplosiveObjects\Scripts\ExplosiveObject.cs" />
     <Compile Include="Assets\Scripts\CasingEjector.cs" />
+    <Compile Include="Assets\Scripts\VaultClimb.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_ExampleScript_01.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMPro_InstructionOverlay.cs" />
     <Compile Include="Assets\Scripts\Enemy.cs" />
@@ -203,6 +204,7 @@
     <None Include="Assets\TextMesh Pro\Examples &amp; Extras\Fonts\Oswald-Bold - OFL.txt" />
     <None Include="Assets\TextMesh Pro\Examples &amp; Extras\Fonts\Roboto-Bold - AFL.txt" />
     <None Include="Assets\LocalAssets\lilToon\Shader\Includes\lil_common_vert.hlsl" />
+    <None Include="Assets\LocalAssets\Mixamo\Custom Selection\StumbleToFloor\Details.txt" />
     <None Include="Assets\LocalAssets\lilToon\Shader\lts_overlay_one.shader" />
     <None Include="Assets\LocalAssets\lilToon\Shader\lts_furonly.shader" />
     <None Include="Assets\TextMesh Pro\Examples &amp; Extras\Fonts\Anton OFL.txt" />
@@ -294,6 +296,7 @@
     <None Include="Assets\LocalAssets\lilToon\Shader\ltspass_tess_transparent.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF Overlay.shader" />
     <None Include="Assets\LocalAssets\lilToon\Shader\Includes\lil_pass_depthonly.hlsl" />
+    <None Include="Assets\LocalAssets\Mixamo\Custom Selection\Shove\Details.txt" />
     <None Include="Assets\LocalAssets\lilToon\Shader\ltspass_proponly.shader" />
     <None Include="Assets\LocalAssets\lilToon\Shader\ltsl_trans.shader" />
     <None Include="Assets\LocalAssets\lilToon\Shader\ltsmulti_fur.shader" />
@@ -308,6 +311,7 @@
     <None Include="Assets\LocalAssets\lilToon\Shader\lts_ref_blur.shader" />
     <None Include="Assets\LocalAssets\lilToon\Shader\Includes\lil_pass_depthnormals.hlsl" />
     <None Include="Assets\LocalAssets\lilToon\Shader\Includes\lil_pass_forward_normal.hlsl" />
+    <None Include="Assets\LocalAssets\Mixamo\Custom Selection\Vault\Details.txt" />
     <None Include="Assets\LocalAssets\lilToon\Shader\Includes\lil_common_input_base.hlsl" />
     <None Include="Assets\LocalAssets\lilToon\Shader\lts_tess_trans.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Sprite.shader" />
@@ -315,6 +319,7 @@
     <None Include="Assets\LocalAssets\lilToon\Shader\Includes\lil_pass_forward_fur.hlsl" />
     <None Include="Assets\TextMesh Pro\Examples &amp; Extras\Fonts\Bangers - OFL.txt" />
     <None Include="Assets\LocalAssets\lilToon\Shader\lts_o.shader" />
+    <None Include="Assets\LocalAssets\Mixamo\Custom Selection\IdleGestures\Details.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

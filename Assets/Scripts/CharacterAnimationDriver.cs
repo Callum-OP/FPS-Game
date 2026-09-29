@@ -13,6 +13,9 @@ public struct DeathRequest
 {
     /// <summary>Horizontal, character-local (x right, z forward): the way the body should fall.</summary>
     public Vector3 fallDirLocal;
+    /// <summary>Horizontal, character-local, unit length: the direction the killing shot was TRAVELLING (no momentum mixed in).
+    /// Front hits travel towards -z, hits from the character's left travel towards +x.</summary>
+    public Vector3 hitDirLocal;
     public bool headshot;
     public bool crouching;
     public bool allowMirrored;
@@ -25,6 +28,9 @@ public struct DeathRequest
     /// gate on now, instead of the old instant planarSpeed check (a single fast frame could trigger a
     /// full stumble before).</summary>
     public bool sustainedMovement;
+    /// <summary>Chance (0-1) that this death plays one of the stumble-to-the-floor clips instead of a normal variant.
+    /// Ragdoll works it out from speed and how hard the killing blast hit; 0 = never.</summary>
+    public float stumbleChance;
     /// <summary>A knockback-sized hit (shotgun blast at close range): only the fast "as if shotgunned" clips qualify.</summary>
     public bool heavy;
 }
@@ -37,6 +43,8 @@ public struct DeathChoice
     /// <summary>How far through THIS clip the ragdoll should take over (fraction, at the default 0.33 setting). Measured
     /// per clip so the handoff happens as the body commits to falling but before it reaches the floor.</summary>
     public float handoffPoint;
+    /// <summary>The clip already carries the body's own forward travel, so Ragdoll's extra momentum slide is skipped.</summary>
+    public bool skipSlide;
 }
 
 /// <summary>
@@ -76,13 +84,26 @@ public class CharacterAnimationDriver : MonoBehaviour
     bool hasTouchParam;
     static readonly int MeleeIndexHash = Animator.StringToHash("MeleeIndex");
     static readonly int ShoveHash = Animator.StringToHash("Shove");
-    bool hasMeleeIndexParam, hasShoveParam;
+    static readonly int ShoveHeavyHash = Animator.StringToHash("ShoveHeavy");
+    bool hasMeleeIndexParam, hasShoveParam, hasShoveHeavyParam;
     int meleeVariants = 1;
 
-    /// <summary>Seconds from the shove trigger to the moment the kick connects (measured from the
-    /// clip: peak foot speed at 0.60s into the raw 1.40s clip, played at 1.3x - see
-    /// AnimationSystemBuilder's Shove state).</summary>
-    public const float ShoveStrikeDelay = 0.46f;
+    // Playback speeds of the shove clips (set on their states by AnimationSystemBuilder).
+    public const float ShoveLightSpeed = 1.25f;
+    public const float ShoveHeavySpeed = 1.15f;
+    // Playback speed of the shoved reactions, and the crossfade (seconds) from a vault or gesture clip back to the
+    // weapon pose - both read by AnimationSystemBuilder; VaultClimb assumes the fade length.
+    public const float ShovedSpeed = 1.3f;
+    public const float OneShotExitFade = 0.25f;
+
+    // Seconds from the Shove trigger to the moment each shove connects. Measured from the clips (peak limb speed:
+    // punch arm ~0.30s into the raw clip, kick leg ~0.34s) and divided by the playback speeds above.
+    public const float ShoveLightStrikeDelay = 0.30f / ShoveLightSpeed;
+    public const float ShoveHeavyStrikeDelay = 0.34f / ShoveHeavySpeed;
+    public static float ShoveStrikeDelayFor(bool heavy) => heavy ? ShoveHeavyStrikeDelay : ShoveLightStrikeDelay;
+    // How long each shove takes to play out (raw clip length / speed) - hand follow is released around then.
+    const float ShoveLightDuration = 1.00f / ShoveLightSpeed;
+    const float ShoveHeavyDuration = 1.43f / ShoveHeavySpeed;
 
     /// <summary>True when the controller was built with the velocity-space (m/s) blend trees. False for a controller
     /// that hasn't been rebuilt yet, which still expects the old 0-3 tier values.</summary>
@@ -173,6 +194,9 @@ public class CharacterAnimationDriver : MonoBehaviour
                 if (animators[i].runtimeAnimatorController != null) { animator = animators[i]; break; }
             }
         }
+        // Several clips (vaults, shoved reactions) are imported with their horizontal travel extracted so code can
+        // move the character; the Animator must never apply that itself.
+        if (animator != null) animator.applyRootMotion = false;
         currentWeaponClass = defaultWeaponClass;
         ragdollOwner = GetComponentInParent<Ragdoll>();
         if (ragdollOwner == null) ragdollOwner = GetComponentInChildren<Ragdoll>();
@@ -185,6 +209,7 @@ public class CharacterAnimationDriver : MonoBehaviour
                 if (p.nameHash == TouchHash) hasTouchParam = true;
                 if (p.nameHash == MeleeIndexHash) hasMeleeIndexParam = true;
                 if (p.nameHash == ShoveHash) hasShoveParam = true;
+                if (p.nameHash == ShoveHeavyHash) hasShoveHeavyParam = true;
                 if (p.name == "MoveInMetres") UsesVelocityBlend = true;
             }
             animator.SetInteger(WeaponClassHash, (int)currentWeaponClass);
@@ -271,23 +296,104 @@ public class CharacterAnimationDriver : MonoBehaviour
         if (polish != null) polish.Lunge();
     }
 
-    /// <summary>Right-click shove/kick: a full-body base-layer state (see AnimationSystemBuilder),
-    /// so - unlike the melee swings - the masked UpperBody layer is faded to 0 for the duration
-    /// instead of just left running: it would otherwise sit on top of the kick and lock the arms
-    /// into whatever aim/idle pose they were in, which looks wrong for a full-body move.</summary>
-    public void PlayShove()
+    // ---- full-body one-shot actions (shove, shoved, vault, gestures) -------------------------------------
+    // These play on the base layer so the legs and torso are animated too. While one plays the masked UpperBody
+    // layer is faded out (it would otherwise pin the arms/spine to the aim or idle pose) and WeaponHandIK is told,
+    // per hand, how much of that arm to hand to the clip: 1 = the clip owns the hand, 0 = it stays on the weapon
+    // grip. Everything blends both ways, so hands ease into and out of the animation instead of snapping.
+    WeaponHandIK handIK;
+    bool handIKResolved;
+    Coroutine upperFade;
+    Coroutine actionRelease;
+    bool fullBodyAction;
+
+    public WeaponHandIK Hands
     {
-        if (!hasShoveParam || !CanAnimate()) return;
-        animator.SetTrigger(ShoveHash);
-        BlendOutUpperBody(0.08f);
-        StartCoroutine(RestoreUpperBodyAfter(ShoveStrikeDelay + 0.35f));
-        if (polish != null) StartCoroutine(LungeAfter(ShoveStrikeDelay * 0.6f));
+        get
+        {
+            if (!handIKResolved)
+            {
+                handIKResolved = true;
+                handIK = GetComponentInParent<WeaponHandIK>();
+                if (handIK == null) handIK = GetComponentInChildren<WeaponHandIK>();
+            }
+            return handIK;
+        }
     }
 
-    IEnumerator RestoreUpperBodyAfter(float delay)
+    public bool InFullBodyAction => fullBodyAction;
+    public bool HasBaseState(string name) => CanAnimate() && HasState(name);
+
+    /// <summary>Crossfades the base layer into a one-shot state and hands the given fraction of each arm to the clip.
+    /// False (and nothing changes) if the controller doesn't contain that state yet.</summary>
+    public bool CrossFadeBase(string stateName, float fade, float rightHandFollow, float leftHandFollow)
     {
-        yield return new WaitForSeconds(delay);
-        RestoreUpperBody(0.15f);
+        if (!HasBaseState(stateName)) return false;
+        animator.CrossFadeInFixedTime(Animator.StringToHash(stateName), Mathf.Max(0.01f, fade), 0);
+        BlendOutUpperBody(0.1f);
+        Hands?.SetAnimationFollow(rightHandFollow, leftHandFollow);
+        fullBodyAction = true;
+        return true;
+    }
+
+    /// <summary>Gives both arms back to the weapon grip and fades the UpperBody layer back in.</summary>
+    public void EndFullBodyAction(float upperBodyFade = 0.2f)
+    {
+        if (actionRelease != null) { StopCoroutine(actionRelease); actionRelease = null; }
+        Hands?.ClearAnimationFollow();
+        RestoreUpperBody(upperBodyFade);
+        fullBodyAction = false;
+    }
+
+    /// <summary>Ends the current full-body action after `seconds`.</summary>
+    public void EndFullBodyActionAfter(float seconds)
+    {
+        if (actionRelease != null) StopCoroutine(actionRelease);
+        actionRelease = StartCoroutine(EndActionRoutine(seconds));
+    }
+
+    IEnumerator EndActionRoutine(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        actionRelease = null;
+        EndFullBodyAction();
+    }
+
+    /// <summary>Right-click shove. Light (tap) is the punch - authored left-handed and mirrored, so the RIGHT hand
+    /// follows the clip while the left stays on the weapon grip. Heavy (hold) is the kick - hands stay on the grip.
+    /// The UpperBody layer is faded out for the duration (see above).</summary>
+    public void PlayShove(bool heavy = false)
+    {
+        if (!hasShoveParam || !CanAnimate()) return;
+        if (hasShoveHeavyParam) animator.SetBool(ShoveHeavyHash, heavy);
+        animator.SetTrigger(ShoveHash);
+        BlendOutUpperBody(0.08f);
+        Hands?.SetAnimationFollow(heavy ? 0f : 1f, 0f);
+        fullBodyAction = true;
+        EndFullBodyActionAfter((heavy ? ShoveHeavyDuration : ShoveLightDuration) * 0.78f);
+        if (polish != null) StartCoroutine(LungeAfter(ShoveStrikeDelayFor(heavy) * 0.6f));
+    }
+
+    [Header("Shoved Reaction")]
+    [Tooltip("How much of each arm follows the stagger clip while shoved (the rest stays on the weapon grip, so a held gun isn't dropped).")]
+    [Range(0f, 1f)] public float shovedHandFollow = 0.6f;
+    [Tooltip("Seconds the shoved stagger holds the arms/upper body before handing them back (raw clip length / playback speed is about 1.05-1.3s).")]
+    public float shovedDuration = 1.0f;
+
+    /// <summary>Plays the stagger for a body pushed along `pushDirectionWorld` (the way it is being shoved - away from
+    /// whoever shoved it). The clip is picked by which side of the body the shove came FROM. False if the controller
+    /// has no shoved states (rebuild the animation system) so the caller can fall back to a plain flinch.</summary>
+    public bool PlayShoved(Vector3 pushDirectionWorld)
+    {
+        if (!CanAnimate() || pushDirectionWorld.sqrMagnitude < 1e-4f) return false;
+        Vector3 from = animator.transform.InverseTransformDirection(-pushDirectionWorld);
+        from.y = 0f;
+        string state;
+        if (Mathf.Abs(from.x) > Mathf.Abs(from.z)) state = from.x > 0f ? "Shoved_Right" : "Shoved_Left";
+        else state = from.z > 0f ? "Shoved_Front" : "Shoved_Back";
+        if (!CrossFadeBase(state, 0.1f, shovedHandFollow, shovedHandFollow)) return false;
+        EndFullBodyActionAfter(shovedDuration);
+        return true;
     }
 
     /// <summary>Fades the masked UpperBody layer back up to full weight - the counterpart to
@@ -382,6 +488,10 @@ public class CharacterAnimationDriver : MonoBehaviour
             for (int i = 0; i < DeathTable.Length; i++) deathStateExists[i] = HasState(DeathTable[i].state);
         }
 
+        // Chance-based: a body that was moving when it was shot may stumble to the floor instead of dropping.
+        if (req.sustainedMovement && req.stumbleChance > 0f && Random.value < req.stumbleChance && TryChooseStumble(req, out choice))
+            return true;
+
         Vector3 fall = new Vector3(req.fallDirLocal.x, 0f, req.fallDirLocal.z);
         fall = fall.sqrMagnitude > 1e-4f ? fall.normalized : new Vector3(0f, 0f, -1f);
 
@@ -427,6 +537,42 @@ public class CharacterAnimationDriver : MonoBehaviour
         return true;
     }
 
+    // Stumble-to-the-floor clips, one per side the shot came from. handoff = fraction of the clip at which the
+    // ragdoll takes over, measured directly from each clip (shortly before the hips drop below 40cm - much
+    // earlier than the normal deaths' ~1/3 because these clips carry the character most of the way to the floor
+    // themselves before the ragdoll needs to take over).
+    struct StumbleDef { public string state; public float handoff; }
+    static readonly StumbleDef StumbleFront = new StumbleDef { state = "Death_StumbleFront", handoff = 0.35f };
+    static readonly StumbleDef StumbleBack  = new StumbleDef { state = "Death_StumbleBack",  handoff = 0.30f };
+    static readonly StumbleDef StumbleLeft  = new StumbleDef { state = "Death_StumbleLeft",  handoff = 0.33f };
+    static readonly StumbleDef StumbleRight = new StumbleDef { state = "Death_StumbleRight", handoff = 0.50f };
+
+    /// <summary>Picks the stumble clip matching the side the killing shot came from (hitDirLocal: the direction the
+    /// shot was TRAVELLING, character-local - a shot travelling towards -z came from the front). False if the
+    /// controller has none of the four states yet.</summary>
+    bool TryChooseStumble(DeathRequest req, out DeathChoice choice)
+    {
+        choice = default;
+        Vector3 hit = new Vector3(req.hitDirLocal.x, 0f, req.hitDirLocal.z);
+        if (hit.sqrMagnitude < 1e-4f) hit = new Vector3(req.fallDirLocal.x, 0f, req.fallDirLocal.z);
+        if (hit.sqrMagnitude < 1e-4f) return false;
+
+        StumbleDef def;
+        if (Mathf.Abs(hit.x) > Mathf.Abs(hit.z)) def = hit.x > 0f ? StumbleLeft : StumbleRight;   // travelling +x = came from the left
+        else def = hit.z < 0f ? StumbleFront : StumbleBack;                                        // travelling -z = came from the front
+        if (!HasState(def.state)) return false;
+
+        choice = new DeathChoice
+        {
+            stateName = def.state,
+            stateHash = Animator.StringToHash(def.state),
+            fallDirLocal = hit,
+            handoffPoint = def.handoff,
+            skipSlide = true      // the clip already carries the body's own travel to the floor
+        };
+        return true;
+    }
+
     /// <summary>Crossfades the base layer into the chosen death state and clears the upper-body layer
     /// so the arms fall with the rest of the body instead of holding the aim pose.</summary>
     public void PlayDeath(DeathChoice choice, float crossfade, float speed)
@@ -442,7 +588,8 @@ public class CharacterAnimationDriver : MonoBehaviour
     public void BlendOutUpperBody(float duration)
     {
         if (upperBodyLayer < 0 || !CanAnimate()) return;
-        StartCoroutine(FadeLayer(upperBodyLayer, duration));
+        if (upperFade != null) StopCoroutine(upperFade);
+        upperFade = StartCoroutine(FadeLayer(upperBodyLayer, duration));
     }
 
     IEnumerator FadeLayer(int layer, float duration) => FadeLayerTo(layer, 0f, duration);

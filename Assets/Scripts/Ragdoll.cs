@@ -64,6 +64,17 @@ public class Ragdoll : MonoBehaviour
     public float momentumSteering = 0.35f;
     [Tooltip("Planar speed (m/s) that counts as 'moving' for the sustained-movement timer below.")]
     public float movingSpeedThreshold = 1f;
+    [Header("Stumble To The Floor")]
+    [Tooltip("Base chance that a body killed while moving stumbles to the floor (one of the four directional clips) instead of dropping.")]
+    [Range(0f, 1f)] public float stumbleBaseChance = 0.2f;
+    [Tooltip("Chance reached by a full close-range shotgun blast at full speed.")]
+    [Range(0f, 1f)] public float stumbleMaxChance = 0.85f;
+    [Tooltip("Fraction of knockbackSkipAnimationThreshold the accumulated hit force must pass before the blast starts adding to the chance. A single rifle round stays under this, so rifles keep the base chance.")]
+    [Range(0f, 1f)] public float stumbleBlastStart = 0.45f;
+    [Tooltip("Speed (m/s) at and below which the chance is scaled down to stumbleSlowScale, and above which it is fully applied.")]
+    public Vector2 stumbleSpeedRange = new Vector2(1.5f, 4.5f);
+    [Range(0f, 1f)] public float stumbleSlowScale = 0.5f;
+
     [Tooltip("Seconds of CONTINUOUS movement above movingSpeedThreshold required before the momentum slide above, or a moving-flagged death clip (Death_Moving, Death_Stumble, Death_FallOver and mirrors), is allowed to trigger. Previously there was no duration check - a single fast frame right before death was enough to get a full stumble.")]
     public float requiredMovingDuration = 2f;
 
@@ -347,7 +358,7 @@ public class Ragdoll : MonoBehaviour
         else if (driver != null && driver.Polish != null) driver.Polish.EnterDeathMode();
 
         Vector3 planar = new Vector3(rootVelocity.x, 0f, rootVelocity.z);
-        if (momentumCarry > 0f && sustainedMovement && planar.sqrMagnitude > 0.25f)
+        if (momentumCarry > 0f && sustainedMovement && planar.sqrMagnitude > 0.25f && !(animate && choice.skipSlide))
             StartCoroutine(SlideRoutine(planar * momentumCarry));
 
         histCount = 0;
@@ -430,8 +441,28 @@ public class Ragdoll : MonoBehaviour
             rightDeathFallsLeft = rightDeathFallsLeft,
             planarSpeed = vel.magnitude,
             sustainedMovement = sustainedMovement,
+            stumbleChance = ComputeStumbleChance(vel.magnitude),
+            hitDirLocal = HitDirectionLocal(hit),
             heavy = knockedBack
         };
+    }
+
+    Vector3 HitDirectionLocal(Vector3 hitWorldPlanar)
+    {
+        Vector3 l = transform.InverseTransformDirection(hitWorldPlanar);
+        l.y = 0f;
+        return l.sqrMagnitude > 1e-4f ? l.normalized : Vector3.zero;
+    }
+
+    /// <summary>Base chance, raised by how hard the killing blast was (accumulated hit force - several shotgun pellets at close
+    /// range add up, a single rifle round does not) and scaled by how fast the body was moving.</summary>
+    float ComputeStumbleChance(float planarSpeed)
+    {
+        float blast = Mathf.Clamp01(pendingHitForceSum / Mathf.Max(0.01f, knockbackSkipAnimationThreshold));
+        float blastK = Mathf.InverseLerp(stumbleBlastStart, 1f, blast);
+        float chance = Mathf.Lerp(stumbleBaseChance, stumbleMaxChance, blastK);
+        float speedK = Mathf.InverseLerp(stumbleSpeedRange.x, stumbleSpeedRange.y, planarSpeed);
+        return Mathf.Clamp01(chance * Mathf.Lerp(stumbleSlowScale, 1f, speedK));
     }
 
     bool IsAirborne()

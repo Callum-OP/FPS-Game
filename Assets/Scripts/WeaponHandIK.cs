@@ -385,14 +385,31 @@ public class WeaponHandIK : MonoBehaviour
         reloadAnchorRefresh = (right != null || left != null) ? refresh : null;
     }
 
-    bool suppressed;
+    // ---- animation follow (per hand) ---------------------------------------------------
+    // How much each hand is handed over to whatever the Animator is playing, 0 = locked to the weapon
+    // grip (normal), 1 = the clip owns that hand and arm completely. Used by full-body actions: shove
+    // (right hand follows the punch, left stays on the grip), vault/climb (left hand follows, right stays
+    // on the grip), idle gestures (right-hand ones: right follows; both-hand ones: both follow). Blended
+    // smoothly both ways at followBlendSpeed so hands never snap between the clip and the grip.
+    // Only the hand POSITION/ROTATION lock is handed over - the finger curl below keeps using the grip
+    // pose regardless (finger curl stays as it was authored, ignoring whatever the clip's own fingers do).
+    [Tooltip("How fast a hand blends between grip-locked and animation-driven, per second (5 = about 0.2s).")]
+    public float followBlendSpeed = 5f;
+    float followR, followL, followRTarget, followLTarget;
 
-    /// <summary>Temporarily zero the hand IK entirely (both position and rotation weight,
-    /// forced every frame while true) so a full arm-driving override clip - currently just
-    /// AIRelaxedIdle's idle gestures - can show its own pose instead of having the hands
-    /// pulled straight back onto the grip. Doesn't touch rightWeight/leftWeight, so
-    /// un-suppressing resumes blending from wherever it left off instead of snapping.</summary>
-    public void SetSuppressed(bool value) => suppressed = value;
+    /// <summary>0 = hand stays locked to its grip, 1 = hand follows the playing animation. Blends smoothly.</summary>
+    public void SetAnimationFollow(float right, float left)
+    {
+        followRTarget = Mathf.Clamp01(right);
+        followLTarget = Mathf.Clamp01(left);
+    }
+
+    public void ClearAnimationFollow() => SetAnimationFollow(0f, 0f);
+    public float RightFollow => followR;
+    public float LeftFollow => followL;
+
+    /// <summary>Old all-or-nothing switch (kept so existing callers still compile): both hands follow the animation.</summary>
+    public void SetSuppressed(bool value) => SetAnimationFollow(value ? 1f : 0f, value ? 1f : 0f);
 
     void OnAnimatorIK(int layerIndex)
     {
@@ -404,15 +421,6 @@ public class WeaponHandIK : MonoBehaviour
     public void ApplyIK()
     {
         if (anim == null) return;
-
-        if (suppressed)
-        {
-            anim.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
-            anim.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
-            anim.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
-            anim.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
-            return;
-        }
 
         // OnAnimatorIK fires once per layer with an IK pass enabled - both the base and
         // the UpperBody layer have one - so this runs TWICE per frame. The IK goals have
@@ -435,15 +443,22 @@ public class WeaponHandIK : MonoBehaviour
             float leftTarget = effectiveLeft != null ? 1f : 0f;
             rightWeight = Mathf.MoveTowards(rightWeight, rightTarget, blendSpeed * Time.deltaTime);
             leftWeight = Mathf.MoveTowards(leftWeight, leftTarget, blendSpeed * Time.deltaTime);
+            followR = Mathf.MoveTowards(followR, followRTarget, followBlendSpeed * Time.deltaTime);
+            followL = Mathf.MoveTowards(followL, followLTarget, followBlendSpeed * Time.deltaTime);
         }
+
+        // What actually reaches the IK goals and the strict lock: the grip weight minus however much
+        // of that hand is currently handed to the animation. Fingers keep the FULL grip weight.
+        float rightIK = rightWeight * (1f - followR);
+        float leftIK = leftWeight * (1f - followL);
 
         // The strict lock also covers reload targets: the hand has to land EXACTLY on the
         // mag pouch / reload point, not wherever later scripts and the moving gun leave it.
         lockRightGrip = effectiveRight;
         lockLeftGrip = effectiveLeft;
 
-        Vector3 rightExcessVec = ApplyHand(AvatarIKGoal.RightHand, effectiveRight, rightWeight, rightElbowHint, AvatarIKHint.RightElbow, rightShoulder, rightArmReach);
-        Vector3 leftExcessVec = ApplyHand(AvatarIKGoal.LeftHand, effectiveLeft, leftWeight, leftElbowHint, AvatarIKHint.LeftElbow, leftShoulder, leftArmReach);
+        Vector3 rightExcessVec = ApplyHand(AvatarIKGoal.RightHand, effectiveRight, rightIK, rightElbowHint, AvatarIKHint.RightElbow, rightShoulder, rightArmReach);
+        Vector3 leftExcessVec = ApplyHand(AvatarIKGoal.LeftHand, effectiveLeft, leftIK, leftElbowHint, AvatarIKHint.LeftElbow, leftShoulder, leftArmReach);
 
         // A reload override sends a hand somewhere on the BODY (the hip mag pouch, then
         // back) - deliberately away from its weapon grip. That's not the weapon being out
@@ -456,6 +471,9 @@ public class WeaponHandIK : MonoBehaviour
         // to maxPullBack. That's the reload-while-walking forward jump.
         if (reloadRightOverride != null) rightExcessVec = Vector3.zero;
         if (reloadLeftOverride != null) leftExcessVec = Vector3.zero;
+        // A hand that's following the animation isn't reaching for the grip, so it can't be "short" of it.
+        rightExcessVec *= (1f - followR);
+        leftExcessVec *= (1f - followL);
 
         if (!firstPassThisFrame) return;
 
@@ -494,7 +512,7 @@ public class WeaponHandIK : MonoBehaviour
         // Twist the torso towards the off-hand's grip so it doesn't have to rely on arm
         // stretch and pull-back alone to reach a two-handed weapon's foregrip - a real
         // shoulder would lead into the reach rather than staying square to the target.
-        float targetLean = leftWeight > 0f ? maxTorsoLean * leftWeight : 0f;
+        float targetLean = leftIK > 0f ? maxTorsoLean * leftIK : 0f;
         currentTorsoLean = Mathf.MoveTowards(currentTorsoLean, targetLean, torsoLeanSpeed * Time.deltaTime);
         if (chestBone != null && Mathf.Abs(currentTorsoLean) > 0.01f)
             chestBone.Rotate(Vector3.up, currentTorsoLean, Space.Self);
@@ -515,8 +533,8 @@ public class WeaponHandIK : MonoBehaviour
             if (reloadAnchorRefresh != null && (reloadRightOverride != null || reloadLeftOverride != null))
                 reloadAnchorRefresh();
 
-            if (lockRightGrip != null) LockHand(rightShoulder, rightLowerArm, rightHandBone, lockRightGrip, rightWeight, true);
-            if (lockLeftGrip != null) LockHand(leftShoulder, leftLowerArm, leftHandBone, lockLeftGrip, leftWeight, false);
+            if (lockRightGrip != null) LockHand(rightShoulder, rightLowerArm, rightHandBone, lockRightGrip, rightWeight * (1f - followR), true);
+            if (lockLeftGrip != null) LockHand(leftShoulder, leftLowerArm, leftHandBone, lockLeftGrip, leftWeight * (1f - followL), false);
         }
         if (overrideRightFingers) ApplyFingerOverride(rightRig, rightFingerBones, rightGripPose, rightWeight);
         if (overrideLeftFingers) ApplyFingerOverride(leftRig, leftFingerBones, leftGripPose, leftWeight);

@@ -166,6 +166,13 @@ MonoBehaviour:
   momentumCarry: 0.6
   slideDamping: 3.5
   momentumSteering: 0.35
+  movingSpeedThreshold: 1
+  stumbleBaseChance: 0.2
+  stumbleMaxChance: 0.85
+  stumbleBlastStart: 0.45
+  stumbleSpeedRange: {x: 1.5, y: 4.5}
+  stumbleSlowScale: 0.5
+  requiredMovingDuration: 2
   velocityInheritance: 1
   angularInheritance: 1
   maxHandoffSpeed: 7
@@ -225,6 +232,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterAnimationDriver
   defaultWeaponClass: 1
+  shovedHandFollow: 0.6
+  shovedDuration: 1
   hitReactionCooldown: 0.8
 --- !u!114 &3211400689782095061
 MonoBehaviour:
@@ -372,7 +381,7 @@ MonoBehaviour:
   animator: {fileID: 3378653021993452407}
   locomotion: {fileID: 3211400689782095061}
   weapon: {fileID: 7738536188537177383}
-  handIK: {fileID: 8056165510376422429}
+  driver: {fileID: 7892662152946834436}
   settleDelay: 5
   combatBlendThreshold: 0.02
   glanceIntervalRange: {x: 2.5, y: 5}
@@ -386,16 +395,15 @@ MonoBehaviour:
   clampWeight: 0.5
   playIdleGestures: 1
   gestureIntervalRange: {x: 8, y: 18}
-  gestureStateNames:
-  - UB_GestureLookAway
-  - UB_GestureWeightShift
-  - UB_GestureSigh
-  - UB_GestureThoughtful
-  - UB_GestureMeleeLook1
-  - UB_GestureMeleeLook2
-  - UB_GestureUnarmedLook1
-  - UB_GestureUnarmedLook2
-  gestureCrossfade: 0.25
+  gestureOptions:
+  - state: Gesture_CheckShoe
+    rightFollow: 1
+    leftFollow: 0
+    pistolOrUnarmedOnly: 0
+  - state: Gesture_ArmStretch
+    rightFollow: 1
+    leftFollow: 1
+    pistolOrUnarmedOnly: 1
   gestureFallbackDuration: 3
   debugIsGlancing: 1
   debugLookWeight: 0
@@ -450,6 +458,7 @@ MonoBehaviour:
   measureReachFromRestingShoulder: 1
   maxTorsoLean: 8
   torsoLeanSpeed: 6
+  followBlendSpeed: 5
 --- !u!1 &3014967846191164479
 GameObject:
   m_ObjectHideFlags: 0

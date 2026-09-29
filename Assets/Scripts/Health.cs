@@ -50,7 +50,7 @@ public class Health : MonoBehaviour
 
     public float GetHealthPercent() => currentHealth / maxHealth;
 
-    /// <summary>A physical shove (PlayerShove, right-click) - not damage, not the death-time ragdoll
+    /// <summary>A physical shove (PlayerShove, right mouse button) - not damage, not the death-time ragdoll
     /// knockback: just slides a LIVING body backward over `duration` and briefly stuns it (reusing
     /// EnemyAI.Stun where present), the way an actual push would. Uses whatever NavMeshAgent this
     /// character moves with; does nothing for anything that doesn't have one (the player never
@@ -64,7 +64,9 @@ public class Health : MonoBehaviour
         if (agent == null) return;
 
         GetComponent<EnemyAI>()?.Stun(duration);
-        GetComponentInChildren<CharacterAnimationDriver>()?.PlayHit();
+        // Full stagger clip for the side the shove came from; a plain flinch if the controller has no shoved states yet.
+        var animDriver = GetComponentInChildren<CharacterAnimationDriver>();
+        if (animDriver != null && !animDriver.PlayShoved(worldDirection)) animDriver.PlayHit();
         StartCoroutine(PushRoutine(agent, worldDirection.normalized, Mathf.Max(0f, distance), Mathf.Max(0.05f, duration)));
     }
 
@@ -72,9 +74,10 @@ public class Health : MonoBehaviour
     {
         bool wasStopped = agent.isStopped;
         agent.isStopped = true;
-        // Fast out, easing off - most of the slide happens in the first fraction of a second, same
-        // shape a person stumbling backward from a shove actually moves.
-        float slide = Mathf.Min(duration, 0.35f);
+        // Fast out, easing off - most of the slide happens early, same shape a person stumbling backward from a
+        // shove actually moves. Spread over about 0.6s so it lines up with the stagger animation instead of the body
+        // shooting away before the reaction has started.
+        float slide = Mathf.Min(duration, 0.6f);
         float t = 0f;
         while (t < slide && agent != null && agent.enabled && agent.isOnNavMesh)
         {
