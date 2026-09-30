@@ -35,6 +35,18 @@ public class FriendlyAI : MonoBehaviour
     [Tooltip("How long the ally pauses at each patrol point before picking a new one.")]
     public float patrolMinPause = 1.5f;
     public float patrolMaxPause = 4f;
+
+    [Header("Calm behaviour (player standing still)")]
+    [Tooltip("When the player stops, stop wandering too: stand still, and only take a short wander now and then. Off = wander constantly like before.")]
+    public bool settleWhenPlayerStill = true;
+    [Tooltip("How long (seconds) the player must have been standing still before the ally settles.")]
+    public float playerStillTime = 3f;
+    [Tooltip("Player speed (m/s) below which they count as standing still.")]
+    public float playerStillSpeed = 0.3f;
+    [Tooltip("Once settled, seconds the ally stands still between wanders.")]
+    public float settledWaitTime = 30f;
+    [Tooltip("Once settled, seconds a wander lasts before the ally stops again (it finishes the step it is on).")]
+    public float settledWanderTime = 5f;
     [Tooltip("Distance at which it gives up on combat/cover and catches up to the player instead.")]
     public float leashDistance = 18f;
     // Matched to the rifle pack's authored Walk clip (1.86 m/s) - see Enemy.walkSpeed/PlayerMovement.walkSpeed
@@ -105,6 +117,19 @@ public class FriendlyAI : MonoBehaviour
     bool patrolWaiting;
     float patrolPauseTimer;
 
+    // Calm behaviour
+    Vector3 lastPlayerPos;
+    bool hasLastPlayerPos;
+    float playerStillTimer;
+    float settledTimer;
+    bool settledWandering;
+    float settledWanderTimer;
+
+    /// <summary>True while just following/wandering near the player with nothing to fight and the player in range.
+    /// AIRelaxedIdle uses this: an idle gesture is cut short when it goes false (combat, or the player wandering off).</summary>
+    public bool IsCalm => currentState == State.Follow && target == null && player != null
+                          && Vector3.Distance(transform.position, player.position) <= activeFollowRange;
+
 
     void Start()
     {
@@ -162,6 +187,14 @@ public class FriendlyAI : MonoBehaviour
     {
         float distToPlayer = Vector3.Distance(transform.position, player.position);
 
+        // Is the player standing still? (Speed measured from how far they moved since last frame.)
+        if (!hasLastPlayerPos) { lastPlayerPos = player.position; hasLastPlayerPos = true; }
+        float playerSpeed = Time.deltaTime > 0f ? (player.position - lastPlayerPos).magnitude / Time.deltaTime : 0f;
+        lastPlayerPos = player.position;
+        if (playerSpeed < playerStillSpeed) playerStillTimer += Time.deltaTime;
+        else { playerStillTimer = 0f; settledTimer = 0f; settledWandering = false; }
+        bool settled = settleWhenPlayerStill && playerStillTimer >= playerStillTime;
+
         if (distToPlayer > activeFollowRange)
         {
             // Too far to bother patrolling - drop it and head straight back.
@@ -183,6 +216,22 @@ public class FriendlyAI : MonoBehaviour
             // them like a shadow.
             agent.speed = walkSpeed;
 
+            // Settled (player standing still): stand still for settledWaitTime, wander for settledWanderTime, repeat.
+            if (settled)
+            {
+                if (settledWandering)
+                {
+                    settledWanderTimer -= Time.deltaTime;
+                    if (settledWanderTimer <= 0f) { settledWandering = false; settledTimer = 0f; }
+                }
+                else if (!hasPatrolTarget || patrolWaiting)
+                {
+                    settledTimer += Time.deltaTime;
+                    if (settledTimer >= settledWaitTime) { settledWandering = true; settledWanderTimer = settledWanderTime; }
+                }
+            }
+            bool mayPickNewTarget = !settled || settledWandering;
+
             if (patrolWaiting)
             {
                 agent.isStopped = true;
@@ -197,6 +246,10 @@ public class FriendlyAI : MonoBehaviour
                     // Arrived - pause before wandering off to somewhere new.
                     patrolWaiting = true;
                     patrolPauseTimer = Random.Range(patrolMinPause, patrolMaxPause);
+                }
+                else if (!mayPickNewTarget)
+                {
+                    agent.isStopped = true; // settled: stand still until the next wander
                 }
                 else
                 {

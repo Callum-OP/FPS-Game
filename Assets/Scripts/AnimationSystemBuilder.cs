@@ -202,6 +202,18 @@ public static class AnimationSystemBuilder
         new ClipDef("gest_shoe",    "Custom Selection/IdleGestures/Right Hand",  "Check Shoe", false, optional: true),
         new ClipDef("gest_stretch", "Custom Selection/IdleGestures/Both Hands",  "Pistol Or Unarmed Arm Stretching", false, optional: true),
 
+        // Basic idle gestures (the original set): played on the masked UpperBody layer by AIRelaxedIdle as soon as
+        // a character has settled into the relaxed state, just to give the torso/head some varied movement.
+        // Untouched from how they always were - the two full-body gestures above are the "special" ones.
+        new ClipDef("gest_look_away",     "Gestures Pack Basic", "look away gesture", false, optional: true),
+        new ClipDef("gest_weight_shift",  "Gestures Pack Basic", "weight shift", false, optional: true),
+        new ClipDef("gest_relieved_sigh", "Gestures Pack Basic", "relieved sigh", false, optional: true),
+        new ClipDef("gest_thoughtful",    "Gestures Pack Basic", "thoughtful head shake", false, optional: true),
+        new ClipDef("gest_melee_look1",   "Pro Melee Axe Pack", "standing idle looking ver. 1", false, optional: true),
+        new ClipDef("gest_melee_look2",   "Pro Melee Axe Pack", "standing idle looking ver. 2", false, optional: true),
+        new ClipDef("gest_unarmed_look1", "Pro Melee Axe Pack", "unarmed idle looking ver. 1", false, optional: true),
+        new ClipDef("gest_unarmed_look2", "Pro Melee Axe Pack", "unarmed idle looking ver. 2", false, optional: true),
+
         // Airborne fallback (any weapon) - Action Adventure Pack
         new ClipDef("airborne_idle",  "Action Adventure Pack", "falling idle", true),
 
@@ -905,6 +917,18 @@ public static class AnimationSystemBuilder
         AnimatorState pistolPose = AddMotionState(sm, "UB_PistolPose",
             C("pi_kneel_idle") != null ? C("pi_kneel_idle") : C("pi_idle"), new Vector3(440, 0, 0));
         sm.defaultState = idle;
+
+        // Basic idle gestures - AIRelaxedIdle discovers which of these exist via Animator.HasState and
+        // CrossFadeInFixedTime's straight to whichever it picks, then back to UB_Idle when done. No transitions
+        // needed in the graph at all, same as how melee variants are driven entirely from script.
+        if (C("gest_look_away") != null)     AddMotionState(sm, "UB_GestureLookAway",     C("gest_look_away"),     new Vector3(660, 280, 0));
+        if (C("gest_weight_shift") != null)  AddMotionState(sm, "UB_GestureWeightShift",  C("gest_weight_shift"),  new Vector3(660, 360, 0));
+        if (C("gest_relieved_sigh") != null) AddMotionState(sm, "UB_GestureSigh",         C("gest_relieved_sigh"), new Vector3(660, 440, 0));
+        if (C("gest_thoughtful") != null)    AddMotionState(sm, "UB_GestureThoughtful",   C("gest_thoughtful"),    new Vector3(660, 520, 0));
+        if (C("gest_melee_look1") != null)   AddMotionState(sm, "UB_GestureMeleeLook1",   C("gest_melee_look1"),   new Vector3(880, 280, 0));
+        if (C("gest_melee_look2") != null)   AddMotionState(sm, "UB_GestureMeleeLook2",   C("gest_melee_look2"),   new Vector3(880, 360, 0));
+        if (C("gest_unarmed_look1") != null) AddMotionState(sm, "UB_GestureUnarmedLook1", C("gest_unarmed_look1"), new Vector3(880, 440, 0));
+        if (C("gest_unarmed_look2") != null) AddMotionState(sm, "UB_GestureUnarmedLook2", C("gest_unarmed_look2"), new Vector3(880, 520, 0));
 
         AddInstantTransition(idle, pistolPose, AnimatorConditionMode.If, 0, "IsCrouching",
             extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));

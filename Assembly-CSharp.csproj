@@ -138,6 +138,7 @@
     <Compile Include="Assets\Scripts\Health.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\CameraController.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Rotatable.cs" />
+    <Compile Include="Assets\Scripts\WeaponHandFollow.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\Benchmark03.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Easy FPS\Scripts\BulletScript.cs" />
     <Compile Include="Assets\Scripts\PlayerShove.cs" />

@@ -302,7 +302,6 @@ public class CharacterAnimationDriver : MonoBehaviour
     // per hand, how much of that arm to hand to the clip: 1 = the clip owns the hand, 0 = it stays on the weapon
     // grip. Everything blends both ways, so hands ease into and out of the animation instead of snapping.
     WeaponHandIK handIK;
-    bool handIKResolved;
     Coroutine upperFade;
     Coroutine actionRelease;
     bool fullBodyAction;
@@ -311,9 +310,11 @@ public class CharacterAnimationDriver : MonoBehaviour
     {
         get
         {
-            if (!handIKResolved)
+            // Keep looking until it exists: EnemyWeapon adds the WeaponHandIK when it equips its gun, which can be
+            // after the first time anything asks for it. Caching that early "null" meant a full-body action
+            // never handed an arm to its clip (the hand stayed glued to the gun while the body moved).
+            if (handIK == null)
             {
-                handIKResolved = true;
                 handIK = GetComponentInParent<WeaponHandIK>();
                 if (handIK == null) handIK = GetComponentInChildren<WeaponHandIK>();
             }
@@ -323,6 +324,55 @@ public class CharacterAnimationDriver : MonoBehaviour
 
     public bool InFullBodyAction => fullBodyAction;
     public bool HasBaseState(string name) => CanAnimate() && HasState(name);
+
+    // ---- weapon rides in the animated right hand ---------------------------------------------------------
+    WeaponHandFollow weaponFollow;
+
+    /// <summary>While true (and the right hand has been handed to a clip) the held weapon moves with that hand and
+    /// the left hand stays on its foregrip - see WeaponHandFollow. Works for the player and for AI. Released
+    /// automatically by EndFullBodyAction.</summary>
+    public void SetWeaponFollowsHand(bool value)
+    {
+        if (weaponFollow == null)
+        {
+            if (!value) return;
+            var hands = Hands;
+            if (hands == null) return;
+            weaponFollow = hands.GetComponent<WeaponHandFollow>();
+            if (weaponFollow == null) weaponFollow = hands.gameObject.AddComponent<WeaponHandFollow>();
+            weaponFollow.handIK = hands;
+        }
+        weaponFollow.SetActive(value);
+    }
+
+    // ---- clip-driven pose (idle gestures) ----------------------------------------------------------------
+    // The procedural layers that sit on top of the Animator (TorsoPoseDriver's stabilisers and hip lock,
+    // CharacterMotionPolish's head look / weight shift, AnatomicalConstraints' joint limits) are all built to
+    // keep a WALKING body steady around the gun. That is exactly wrong while a full-body gesture is playing:
+    // they flatten the torso lean, pin the hips over the feet (so a planted foot slides), fight the head nod and
+    // clamp a raised foot. While this is above 0 they all back off by that fraction and let the clip through.
+    // Eased over ~0.25s both ways so nothing snaps. Read by those scripts; set by AIRelaxedIdle.
+    [Header("Clip-Driven Pose (idle gestures)")]
+    [Tooltip("How fast the procedural torso/head/limit layers fade out and back in around a gesture (per second, 4 = about 0.25s).")]
+    public float clipDrivenBlendSpeed = 4f;
+    float clipDrivenTarget, clipDrivenValue;
+    int clipDrivenFrame = -1;
+
+    /// <summary>0 = normal procedural body, 1 = the playing clip owns the torso, head and legs. Eased, cached per frame.</summary>
+    public float ClipDriven
+    {
+        get
+        {
+            if (clipDrivenFrame != Time.frameCount)
+            {
+                clipDrivenFrame = Time.frameCount;
+                clipDrivenValue = Mathf.MoveTowards(clipDrivenValue, clipDrivenTarget, clipDrivenBlendSpeed * Time.deltaTime);
+            }
+            return clipDrivenValue;
+        }
+    }
+
+    public void SetClipDriven(float target) { clipDrivenTarget = Mathf.Clamp01(target); }
 
     /// <summary>Crossfades the base layer into a one-shot state and hands the given fraction of each arm to the clip.
     /// False (and nothing changes) if the controller doesn't contain that state yet.</summary>
@@ -336,11 +386,26 @@ public class CharacterAnimationDriver : MonoBehaviour
         return true;
     }
 
+    /// <summary>Cuts a full-body clip short: crossfades the base layer straight back to the pose for the current
+    /// weapon (Unarmed / Pistol / Rifle). A gesture that just plays out needs none of this (its state exits by
+    /// itself on the last frame); this is for being interrupted half-way - e.g. combat starting while the
+    /// character has a foot raised. False if the controller has no such state.</summary>
+    public bool ReturnToWeaponPose(float fade = 0.25f)
+    {
+        if (!CanAnimate()) return false;
+        string state = currentWeaponClass == CharacterWeaponClass.Rifle ? "Rifle"
+                     : currentWeaponClass == CharacterWeaponClass.Pistol ? "Pistol" : "Unarmed";
+        if (!HasState(state)) return false;
+        animator.CrossFadeInFixedTime(Animator.StringToHash(state), Mathf.Max(0.01f, fade), 0);
+        return true;
+    }
+
     /// <summary>Gives both arms back to the weapon grip and fades the UpperBody layer back in.</summary>
     public void EndFullBodyAction(float upperBodyFade = 0.2f)
     {
         if (actionRelease != null) { StopCoroutine(actionRelease); actionRelease = null; }
         Hands?.ClearAnimationFollow();
+        SetWeaponFollowsHand(false);
         RestoreUpperBody(upperBodyFade);
         fullBodyAction = false;
     }
@@ -369,9 +434,58 @@ public class CharacterAnimationDriver : MonoBehaviour
         animator.SetTrigger(ShoveHash);
         BlendOutUpperBody(0.08f);
         Hands?.SetAnimationFollow(heavy ? 0f : 1f, 0f);
+        // The punch: the gun goes with the punching (right) hand and the left hand stays on its foregrip.
+        // The kick keeps both hands on the gun, so the gun stays put.
+        SetWeaponFollowsHand(!heavy);
+        if (heavy) StartKickCamera();
         fullBodyAction = true;
         EndFullBodyActionAfter((heavy ? ShoveHeavyDuration : ShoveLightDuration) * 0.78f);
         if (polish != null) StartCoroutine(LungeAfter(ShoveStrikeDelayFor(heavy) * 0.6f));
+    }
+
+    [Header("Kick Shove Camera (player)")]
+    [Tooltip("Degrees the view tips UP during the kick shove, then comes back down - so the camera moves with the body and head. 0 = off.")]
+    public float kickCameraPitch = 12f;
+    [Tooltip("Seconds to tip up (the leg coming up).")]
+    public float kickCameraUpTime = 0.22f;
+    [Tooltip("Seconds held at the top (the kick landing).")]
+    public float kickCameraHoldTime = 0.1f;
+    [Tooltip("Seconds to settle back down.")]
+    public float kickCameraDownTime = 0.45f;
+    Coroutine kickCamera;
+    PlayerMovement kickCameraOwner;
+
+    void StartKickCamera()
+    {
+        if (kickCameraPitch <= 0.01f) return;
+        if (kickCameraOwner == null) kickCameraOwner = GetComponentInParent<PlayerMovement>();
+        if (kickCameraOwner == null) return; // AI have no camera
+        if (kickCamera != null) StopCoroutine(kickCamera);
+        kickCamera = StartCoroutine(KickCameraRoutine());
+    }
+
+    IEnumerator KickCameraRoutine()
+    {
+        float t = 0f;
+        float total = kickCameraUpTime + kickCameraHoldTime + kickCameraDownTime;
+        while (t < total)
+        {
+            t += Time.deltaTime;
+            float k;
+            if (t < kickCameraUpTime) k = Mathf.SmoothStep(0f, 1f, t / Mathf.Max(0.01f, kickCameraUpTime));
+            else if (t < kickCameraUpTime + kickCameraHoldTime) k = 1f;
+            else k = 1f - Mathf.SmoothStep(0f, 1f, (t - kickCameraUpTime - kickCameraHoldTime) / Mathf.Max(0.01f, kickCameraDownTime));
+            kickCameraOwner.SetCameraActionPitch(kickCameraPitch * k);
+            yield return null;
+        }
+        kickCameraOwner.SetCameraActionPitch(0f);
+        kickCamera = null;
+    }
+
+    void OnDisable()
+    {
+        if (kickCamera != null) { StopCoroutine(kickCamera); kickCamera = null; }
+        if (kickCameraOwner != null) kickCameraOwner.SetCameraActionPitch(0f);
     }
 
     [Header("Shoved Reaction")]

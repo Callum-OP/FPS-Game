@@ -27271,6 +27271,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1454482104356440768, guid: 38be789410d69ef40a29459dfa506f11, type: 3}
   m_PrefabInstance: {fileID: 752366441}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &755817214 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8056165510376422429, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+  m_PrefabInstance: {fileID: 1703360297}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58bf2d312f4f39440ad5f56647ee73b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponHandIK
 --- !u!1001 &756181683
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -29533,14 +29544,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 7259129468435164857, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1221179424}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
 --- !u!1001 &819586449
 PrefabInstance:
@@ -43720,40 +43727,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5412017221204367677, guid: abe3d47b915ca924a9e06dd6d3321396, type: 3}
   m_PrefabInstance: {fileID: 1220930167}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1221179380 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 8403096973582887497, guid: d7615e8c8a60a1c4da935f0e2b1a633a, type: 3}
-  m_PrefabInstance: {fileID: 819495767}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1221179424
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1221179380}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b54f64eead7908143a95ae18cb28a55c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VaultClimb
-  vaultLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  checkDistance: 0.8
-  obstacleCheckHeight: 1
-  minVaultHeight: 0.4
-  maxVaultHeight: 1.3
-  standHeight: 1.8
-  standRadius: 0.3
-  landForwardOffset: 0.35
-  vaultDuration: 0.55
-  arcExtraHeight: 0.15
-  landAnimFraction: 0.75
-  cooldown: 0.5
-  aiStuckSpeedThreshold: 0.15
-  aiStuckTime: 0.6
-  debugVaulting: 1
 --- !u!1001 &1221871205
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -58412,16 +58385,36 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: handIK
+      value: 
+      objectReference: {fileID: 755817214}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
       propertyPath: settleDelay
-      value: 0.1
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: debugIsSpecial
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: specialCalmDelay
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: specialRepeatDelay
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
+      propertyPath: perGestureRepeatDelay
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
       propertyPath: gestureIntervalRange.x
-      value: 2
+      value: 8
       objectReference: {fileID: 0}
     - target: {fileID: 2935768971908545900, guid: 01c1037a7e3325a4e82f4e837eee3c69, type: 3}
       propertyPath: gestureIntervalRange.y
-      value: 2
+      value: 18
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

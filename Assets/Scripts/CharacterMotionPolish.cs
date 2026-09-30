@@ -146,6 +146,10 @@ public class CharacterMotionPolish : MonoBehaviour
     bool dead;
     float deadBlend;
 
+    // Idle gestures: while a full-body gesture clip plays this whole layer (weight shift, turn lag, head look,
+    // idle glances) fades out so it can't fight the clip's own torso and head movement.
+    CharacterAnimationDriver driver;
+
     /// <summary>Which way the character is currently being asked to look, if anywhere.</summary>
     public bool HasLookTarget => lookTransform != null || hasLookPoint;
 
@@ -159,6 +163,9 @@ public class CharacterMotionPolish : MonoBehaviour
         var ragdoll = GetComponentInParent<Ragdoll>();
         root = pm != null ? pm.transform : (ragdoll != null ? ragdoll.transform : transform.root);
         hasTorsoDriver = GetComponent<TorsoPoseDriver>() != null;
+        driver = GetComponent<CharacterAnimationDriver>();
+        if (driver == null) driver = GetComponentInParent<CharacterAnimationDriver>();
+        if (driver == null) driver = GetComponentInChildren<CharacterAnimationDriver>();
 
         spine = anim.GetBoneTransform(HumanBodyBones.Spine);
         chest = anim.GetBoneTransform(HumanBodyBones.Chest);
@@ -261,7 +268,7 @@ public class CharacterMotionPolish : MonoBehaviour
 
         deadBlend = Mathf.MoveTowards(deadBlend, dead ? 1f : 0f, dt / 0.1f);
         float live = 1f - deadBlend;
-        float strength = StrengthNow() * live;
+        float strength = StrengthNow() * live * (1f - (driver != null ? driver.ClipDriven : 0f));
 
         if (strength <= 0.001f)
         {

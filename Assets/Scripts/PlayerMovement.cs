@@ -160,6 +160,12 @@ public class PlayerMovement : MonoBehaviour
         leanShiftX = shiftX;
     }
 
+    /// <summary>Extra view pitch in degrees, positive = looking UP, for full-body actions like the kick shove
+    /// (CharacterAnimationDriver). Composed on top of the mouse pitch and never changes it, so the view settles
+    /// back exactly where the player was looking.</summary>
+    public void SetCameraActionPitch(float degreesUp) => cameraActionPitch = degreesUp;
+    float cameraActionPitch;
+
     /// <summary>Extra local-space camera position offset (CameraBodyFollow).</summary>
     public void SetCameraPositionOffset(Vector3 offset) => cameraPositionOffset = offset;
 
@@ -173,7 +179,7 @@ public class PlayerMovement : MonoBehaviour
         // Composed from state every frame - never read back off the transform, so no
         // script can feed its own (or anyone else's) previous output back into itself.
         cameraTransform.localRotation =
-            Quaternion.Euler(xRotation, leanYawY, leanTiltZ) * cameraRotationOffset;
+            Quaternion.Euler(xRotation - cameraActionPitch, leanYawY, leanTiltZ) * cameraRotationOffset;
 
         cameraTransform.localPosition = standingCameraLocalPos
             + new Vector3(leanShiftX, -currentCrouchDrop, 0f)

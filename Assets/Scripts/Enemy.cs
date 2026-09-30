@@ -83,6 +83,10 @@ public class EnemyAI : MonoBehaviour
 
     // State
     private State currentState = State.Patrol;
+
+    /// <summary>True while just patrolling/standing guard - nothing has been seen or heard. AIRelaxedIdle uses this
+    /// to know an idle gesture should be cut short (the AI has something to deal with).</summary>
+    public bool IsCalm => currentState == State.Patrol || currentState == State.Idle;
     private NavMeshAgent agent;
     private Health health;
     private Transform player;

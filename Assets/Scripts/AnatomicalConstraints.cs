@@ -86,6 +86,7 @@ public class AnatomicalConstraints : MonoBehaviour
     Transform[] bones;
     Quaternion[] restLocal;
     bool[] valid;
+    CharacterAnimationDriver driver;
 
     void Start() => TryInit();
 
@@ -94,11 +95,10 @@ public class AnatomicalConstraints : MonoBehaviour
         // Ask CharacterAnimationDriver for the Animator it already correctly resolved, rather
         // than re-deriving this here.
         anim = animatorOverride; // manual override wins outright - see its tooltip
-        if (anim == null)
-        {
-            var driver = GetComponentInChildren<CharacterAnimationDriver>();
-            if (driver != null) anim = driver.BodyAnimator;
-        }
+        driver = GetComponent<CharacterAnimationDriver>();
+        if (driver == null) driver = GetComponentInParent<CharacterAnimationDriver>();
+        if (driver == null) driver = GetComponentInChildren<CharacterAnimationDriver>();
+        if (anim == null && driver != null) anim = driver.BodyAnimator;
         if (anim == null)
         {
             foreach (var candidate in GetComponentsInChildren<Animator>(true))
@@ -128,9 +128,17 @@ public class AnatomicalConstraints : MonoBehaviour
     void LateUpdate()
     {
         if (bones == null) return; // not initialized - see TryInit
+
+        // Idle gestures: the gesture clips are authored poses (a raised foot, a head nodded well past the
+        // walking limits), so while one plays the limits fade out and the clip's own pose comes through.
+        // Everything is back to normal by the time the gesture has blended out.
+        float clip = driver != null ? driver.ClipDriven : 0f;
         for (int i = 0; i < limits.Length; i++)
         {
-            if (valid[i]) Clamp(bones[i], restLocal[i], limits[i]);
+            if (!valid[i]) continue;
+            Quaternion authored = clip > 0.001f ? bones[i].localRotation : Quaternion.identity;
+            Clamp(bones[i], restLocal[i], limits[i]);
+            if (clip > 0.001f) bones[i].localRotation = Quaternion.Slerp(bones[i].localRotation, authored, clip);
         }
     }
 

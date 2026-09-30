@@ -321,6 +321,17 @@ public class WeaponHandIK : MonoBehaviour
     public Transform GetHandBone(bool isRight) =>
         anim != null ? anim.GetBoneTransform(isRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand) : null;
 
+    // Read-only arm data for WeaponHandFollow (idle gestures), which needs to know how far the off-hand can reach.
+    /// <summary>Measured upper-arm + forearm length of the left arm (x armReachSafety), metres. Infinity if the rig has no arm chain.</summary>
+    public float LeftArmReach => leftArmReach;
+    /// <summary>The left upper-arm bone (the shoulder joint the arm reach is measured from).</summary>
+    public Transform LeftShoulderBone => leftShoulder;
+    /// <summary>How far past full extension the strict lock lets the hand stretch to stay on its grip.</summary>
+    public float LockStretch => lockMaxStretch;
+    /// <summary>The grip the right hand is currently locked to (a reload override if there is one, otherwise the weapon's).</summary>
+    public Transform CurrentRightGrip => reloadRightOverride != null ? reloadRightOverride : rightGrip;
+    public Transform CurrentLeftGrip => reloadLeftOverride != null ? reloadLeftOverride : leftGrip;
+
     Transform reloadGrabAnchor;
 
     /// <summary>Auto-creates (once) and repositions a child of the character's own Hips

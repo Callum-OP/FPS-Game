@@ -67,6 +67,8 @@ public class TorsoPoseDriver : MonoBehaviour
     PlayerMovement pm;
     WeaponInventory weaponInventory;
     EnemyWeapon aiWeapon;      // enemies and allies: pitch/reload/aim come from here instead
+    CharacterAnimationDriver driver; // only read for ClipDriven (idle gestures) - see LateUpdate
+    float clipK;                     // 0..1 how much a playing full-body gesture owns the body this frame
     static readonly int GroundedHash = Animator.StringToHash("IsGrounded");
     float footW;
     Transform hips, lUpperArm, rUpperArm;
@@ -183,6 +185,9 @@ public class TorsoPoseDriver : MonoBehaviour
         pm = GetComponentInParent<PlayerMovement>();
         weaponInventory = GetComponentInParent<WeaponInventory>();
         aiWeapon = GetComponentInParent<EnemyWeapon>();
+        driver = GetComponent<CharacterAnimationDriver>();
+        if (driver == null) driver = GetComponentInParent<CharacterAnimationDriver>();
+        if (driver == null) driver = GetComponentInChildren<CharacterAnimationDriver>();
         if (anim == null || !anim.isHuman || (pm == null && aiWeapon == null)) { enabled = false; return; }
         foreach (var prm in anim.parameters) if (prm.name == "MoveInMetres") fwdMoveScale = 1.4f;
         root = pm != null ? pm.transform : (aiWeapon != null ? aiWeapon.transform : transform);
@@ -234,9 +239,12 @@ public class TorsoPoseDriver : MonoBehaviour
         }
         var st = anim.GetCurrentAnimatorStateInfo(0);
         bool air = st.IsName("JumpUp") || st.IsName("Airborne") || st.IsName("Land");
+        // A full-body gesture (raised foot, weight shift) owns the legs: the foot/knee alignment and the hip
+        // stabiliser fade out with it, otherwise they turn a raised foot and drag the planted one.
+        float groundK = 1f - (driver != null ? driver.ClipDriven : 0f);
         footW = Mathf.MoveTowards(footW, air ? 1f : 0f, dt * (air ? 10f : 6f));
-        groundW = Mathf.MoveTowards(groundW, (!air && stabilizeHips) ? 1f : 0f, dt * 8f);
-        alignW = Mathf.MoveTowards(alignW, (!air && !stabilizeHips) ? 1f : 0f, dt * 8f);
+        groundW = Mathf.MoveTowards(groundW, (!air && stabilizeHips) ? groundK : 0f, dt * 8f);
+        alignW = Mathf.MoveTowards(alignW, (!air && !stabilizeHips) ? groundK : 0f, dt * 8f);
 
         if (groundW > 0.001f) StabilizeHipsIK(dt);
         else if (alignW > 0.001f) AlignFeet();
@@ -267,7 +275,7 @@ public class TorsoPoseDriver : MonoBehaviour
             Vector3 f = Vector3.ProjectOnPlane(br * Vector3.forward, root.up);
             float yaw = f.sqrMagnitude > 1e-4f ? Vector3.SignedAngle(root.forward, f, root.up) : 0f;
             if (!hasBodyRest) { bodyRest = local; bodyRestYaw = yaw; hasBodyRest = true; }
-            float k = 1f - Mathf.Exp(-restingRate * dt);
+            float k = (1f - Mathf.Exp(-restingRate * dt)) * (1f - clipK); // frozen while a gesture plays, so it doesn't learn the gesture as "rest"
             bodyRest = Vector3.Lerp(bodyRest, local, k);
             bodyRestYaw = Mathf.LerpAngle(bodyRestYaw, yaw, k);
 
@@ -454,15 +462,20 @@ public class TorsoPoseDriver : MonoBehaviour
         float dt = Time.deltaTime;
 
         deadBlend = Mathf.MoveTowards(deadBlend, dead ? 1f : 0f, dt / 0.12f);
-        live = 1f - deadBlend;
-        if (live <= 0.001f)
+        float alive = 1f - deadBlend;
+        if (alive <= 0.001f)
         {
+            live = 0f;
             // Fully dead: nothing of ours is applied any more. Put the model back where the hip
             // lock had it standing (it has been eased to zero offset by now, this just makes sure).
             if (hasModelBase && transform.localPosition != modelBaseLocal) transform.localPosition = modelBaseLocal;
             if (pm != null) pm.SetCameraTorsoOffset(Vector3.zero);
             return;
         }
+        // Idle gestures: every correction below is scaled by `live`, so folding the gesture blend into it hands the
+        // torso, head, shoulders and hips to the clip (see CharacterAnimationDriver.ClipDriven).
+        clipK = driver != null ? driver.ClipDriven : 0f;
+        live = alive * (1f - clipK);
 
         // --- targets ---
         float rawPitch = pm != null ? pm.CameraPitch : (aiWeapon != null ? aiWeapon.EyePitch : 0f);
@@ -565,7 +578,7 @@ public class TorsoPoseDriver : MonoBehaviour
         float yaw = fwdFlat.sqrMagnitude > 1e-4f ? Vector3.SignedAngle(root.forward, fwdFlat, root.up) : 0f;
 
         if (!hasRest) { restLocal = local; restYaw = yaw; hasRest = true; }
-        float k = 1f - Mathf.Exp(-restingRate * dt);
+        float k = (1f - Mathf.Exp(-restingRate * dt)) * (1f - clipK);
         restLocal = Vector3.Lerp(restLocal, local, k);
         restYaw = Mathf.LerpAngle(restYaw, yaw, k);
 
@@ -596,7 +609,8 @@ public class TorsoPoseDriver : MonoBehaviour
         Vector2 rel = new Vector2(animHips.x - modelBaseLocal.x, animHips.z - modelBaseLocal.z);
 
         // Learn where the hips sit over the feet when standing still (so the body doesn't get dragged off-centre).
-        if (Mathf.Abs(anim.GetFloat(MoveXH)) < 0.05f && Mathf.Abs(anim.GetFloat(MoveYH)) < 0.05f)
+        // (Not while a gesture plays: the clip legitimately shifts the hips 10-20cm and that must not become "rest".)
+        if (clipK < 0.001f && Mathf.Abs(anim.GetFloat(MoveXH)) < 0.05f && Mathf.Abs(anim.GetFloat(MoveYH)) < 0.05f)
             hipRest = Vector2.Lerp(hipRest, rel, 1f - Mathf.Exp(-4f * dt));
 
         Vector2 off = -(rel - hipRest) * hipLockStrength * live;
@@ -636,7 +650,7 @@ public class TorsoPoseDriver : MonoBehaviour
         Vector2 slide = new Vector2(cl.x, cl.z);
 
         if (!hasShRest) { shRest = slide; shRestRoll = roll; hasShRest = true; }
-        float k = 1f - Mathf.Exp(-restingRate * dt);
+        float k = (1f - Mathf.Exp(-restingRate * dt)) * (1f - clipK);
         shRest = Vector2.Lerp(shRest, slide, k);
         shRestRoll = Mathf.Lerp(shRestRoll, roll, k);
 

@@ -687,6 +687,10 @@ public class EnemyWeapon : MonoBehaviour
         if (value) { combatReady = true; readyHoldTimer = 0f; }
     }
 
+    /// <summary>The transform the held weapon hangs off (eye/hip position in front of the chest). WeaponHandFollow
+    /// moves it during idle gestures so the gun rides in the animated right hand.</summary>
+    public Transform Anchor => anchor;
+
     public bool IsReloading => reloading;
     /// <summary>True once actually raised (post-hold) - false only once the hold above has
     /// elapsed and lowering has genuinely started, not the instant combat is left.</summary>
