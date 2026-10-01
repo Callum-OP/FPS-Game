@@ -239,14 +239,23 @@ public class CharacterAnimationDriver : MonoBehaviour
         animator.SetFloat(MoveYHash, y);
     }
 
+    float groundedHoldUntil;
+
+    /// <summary>Report "grounded" to the Animator for this many seconds whatever the ground check says. Used while a
+    /// script carries the character (vault/climb): its CharacterController/agent is switched off, which reads as
+    /// airborne and would drop the Animator into the jump states the moment the clip ends.</summary>
+    public void HoldGrounded(float seconds) { groundedHoldUntil = Mathf.Max(groundedHoldUntil, Time.time + seconds); }
+
     public void SetGrounded(bool grounded)
     {
+        if (Time.time < groundedHoldUntil) grounded = true;
         if (CanAnimate()) animator.SetBool(IsGroundedHash, grounded);
     }
 
     /// <summary>The REAL ground contact (IsGrounded may be switched on early to start the landing).</summary>
     public void SetTouchingGround(bool touching)
     {
+        if (Time.time < groundedHoldUntil) touching = true;
         if (hasTouchParam && CanAnimate()) animator.SetBool(TouchHash, touching);
     }
 

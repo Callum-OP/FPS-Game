@@ -50,8 +50,9 @@ public static class AnimationSystemBuilder
         public bool loop;
         public bool rootMotion; // bake XZ root motion out (we always drive movement via code)
         public bool optional;   // missing file is logged quietly, not as a warning
-        public ClipDef(string key, string pack, string file, bool loop, bool optional = false)
-        { this.key = key; this.pack = pack; this.file = file; this.loop = loop; this.rootMotion = false; this.optional = optional; }
+        public bool extractRoot; // take the clip's whole-body travel (up, forward/sideways AND turning) OUT of the pose - code moves the character instead
+        public ClipDef(string key, string pack, string file, bool loop, bool optional = false, bool extractRoot = false)
+        { this.key = key; this.pack = pack; this.file = file; this.loop = loop; this.rootMotion = false; this.optional = optional; this.extractRoot = extractRoot; }
     }
 
     // Every clip the animator system references. Edit this table to swap packs/clips.
@@ -189,9 +190,13 @@ public static class AnimationSystemBuilder
         new ClipDef("shoved_right", "Custom Selection/Shove/Shoved", "Standing React Large From Right", false, optional: true),
         // Vault / climb: imported in-place like every other clip - VaultClimb moves the root along a path
         // measured from the clip's own hip motion (see VaultClimb.VaultProfile).
-        new ClipDef("vault_step", "Custom Selection/Vault", "Step Up",    false, optional: true),
-        new ClipDef("vault_over", "Custom Selection/Vault", "Vault Over", false, optional: true),
-        new ClipDef("vault_wall", "Custom Selection/Vault", "Wall Climb", false, optional: true),
+        // extractRoot: the clips' own travel must NOT stay in the pose, because VaultClimb moves the root along the
+        // real ledge by the same amount - baked in, the body went twice as far as the ledge: up (0.45m / 0.42m /
+        // 2.14m of hip rise), FORWARD (0.49m / 1.66m / 2.21m of hip travel - this is what carried the model out in
+        // front of the camera and gun) and, in Vault Over, round to face sideways (hips turn 145 degrees).
+        new ClipDef("vault_step", "Custom Selection/Vault", "Step Up",    false, optional: true, extractRoot: true),
+        new ClipDef("vault_over", "Custom Selection/Vault", "Vault Over", false, optional: true, extractRoot: true),
+        new ClipDef("vault_wall", "Custom Selection/Vault", "Wall Climb", false, optional: true, extractRoot: true),
         // Stumble to the floor when shot while moving (death variants, baked like the other death clips).
         new ClipDef("stumble_front", "Custom Selection/StumbleToFloor", "Shot From Front", false, optional: true),
         new ClipDef("stumble_back",  "Custom Selection/StumbleToFloor", "Shot From Back",  false, optional: true),
@@ -377,9 +382,9 @@ public static class AnimationSystemBuilder
         clipSettings.name = wantedName;
         clipSettings.loopTime = def.loop;
         clipSettings.loopPose = def.loop;
-        clipSettings.lockRootRotation = true;
+        clipSettings.lockRootRotation = !def.extractRoot; // false = body turning extracted, so the model keeps facing where the camera does
         clipSettings.keepOriginalOrientation = false;
-        clipSettings.lockRootHeightY = true;
+        clipSettings.lockRootHeightY = !def.extractRoot; // false = vertical travel extracted (vault clips - see ClipDef.extractRoot)
         // "Original" is right for every pack except the Male Injured Pack, which is
         // authored with a hunched, lowered pelvis that doesn't match the standing pose
         // every other pack assumes.
@@ -398,7 +403,7 @@ public static class AnimationSystemBuilder
         bool useFeetBasis = def.pack == "Male Injured Pack";
         clipSettings.keepOriginalPositionY = !useFeetBasis;
         clipSettings.heightFromFeet = useFeetBasis;
-        clipSettings.lockRootPositionXZ = true;
+        clipSettings.lockRootPositionXZ = !def.extractRoot; // false = forward/sideways travel extracted (vault clips)
         clipSettings.keepOriginalPositionXZ = def.rootMotion;
 
         importer.clipAnimations = new[] { clipSettings };

@@ -82,6 +82,17 @@ public class PlayerMovement : MonoBehaviour
     public float CameraPitch => xRotation;
     /// <summary>Set by ThirdPersonMode while the camera is being orbited, so the mouse moves the camera and not the aim.</summary>
     public bool LookDetached { get; set; }
+
+    /// <summary>True while a script is carrying the player (VaultClimb): no input movement, no jumping, no mouse
+    /// look - but the camera is still composed every frame so it can carry action pitch/dip. Unlike disabling this
+    /// component, that keeps the camera, crouch height and every other channel running.</summary>
+    public bool MovementLocked { get; private set; }
+    public void SetMovementLocked(bool locked)
+    {
+        MovementLocked = locked;
+        PlanarVelocity = Vector3.zero;
+        velocity = locked ? Vector3.zero : new Vector3(0f, -2f, 0f);
+    }
     private float xRotation = 0f;
 
     // Input actions
@@ -124,6 +135,9 @@ public class PlayerMovement : MonoBehaviour
     {
         controller = GetComponent<CharacterController>();
         if (animationDriver == null) animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
+        // The jump-key vault lives on the player root next to this. Nothing else adds it, so if it was never put on
+        // the prefab by hand the vault silently never existed - make sure it is there.
+        if (GetComponent<VaultClimb>() == null) gameObject.AddComponent<VaultClimb>();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
@@ -139,8 +153,11 @@ public class PlayerMovement : MonoBehaviour
 
     void Update()
     {
-        HandleMouseLook();
-        HandleMovement();
+        if (!MovementLocked)
+        {
+            HandleMouseLook();
+            HandleMovement();
+        }
         HandleCrouchHeight();
         ApplyCameraTransform();
     }
