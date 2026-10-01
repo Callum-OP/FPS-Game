@@ -13,6 +13,7 @@ using UnityEngine.InputSystem;
 ///   Ctrl crouch                Shift aim                    Space jump
 ///   Q/E cant                   V melee                      Left click fire
 ///   Right click shove/kick      C slow-mo (moved off right click - see below)
+///   6  cycle how the gun is held (WeaponHoldStyles)
 ///
 /// There is no dedicated sprint any more - lowering the gun (2) already gives a speed
 /// boost via LowerWeapon.fastWalkMultiplier, which does the job a sprint key would have
@@ -42,6 +43,7 @@ public static class PlayerInputMap
     public const string Fire         = "<Mouse>/leftButton";
     public const string Aim          = "<Keyboard>/leftShift";
     public const string ThirdPerson  = "<Keyboard>/5";
+    public const string HoldStyle    = "<Keyboard>/6";
     public const string OrbitCamera  = "<Keyboard>/leftAlt";
 
     public static InputAction Make(string name, string binding)

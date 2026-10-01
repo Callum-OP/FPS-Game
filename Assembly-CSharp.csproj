@@ -107,6 +107,7 @@
     <Compile Include="Assets\Scripts\AmmoHUD.cs" />
     <Compile Include="Assets\Scripts\AnimationSystemBuilder.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\PrefabGroup.cs" />
+    <Compile Include="Assets\Scripts\WeaponHoldStyles.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TMP_TextInfoDebugTool.cs" />
     <Compile Include="Assets\Scripts\PlayerSetup.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Synty\PolygonGeneric\Scripts\Generic_SimpleTranslate.cs" />

@@ -39657,6 +39657,7 @@ MonoBehaviour:
   reloadTime: 1
   reloadCycles: 8
   isAutomatic: 0
+  isMeleeWeapon: 0
   isShotgun: 1
   pelletCount: 8
   spreadAngle: 10

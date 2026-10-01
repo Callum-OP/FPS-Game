@@ -105,10 +105,14 @@ public class LowerWeapon : MonoBehaviour
 
         float speed = isLowered ? lowerSpeed : raisedSpeed;
 
-        Vector3 targetPos = isLowered
-            ? new Vector3(loweredPosition.x, loweredHeight, loweredPosition.z)
-            : originalPosition;
-        Quaternion targetRot = isLowered ? Quaternion.Euler(loweredRotation) : originalRotation;
+        // The lowered pose of the selected hold style (WeaponHoldStyles); Default = the values above.
+        Vector3 lowPos = new Vector3(loweredPosition.x, loweredHeight, loweredPosition.z);
+        Vector3 lowRot = loweredRotation;
+        var hold = weaponADS != null ? weaponADS.Hold : null;
+        if (hold != null) hold.GetLowered(lowPos, lowRot, out lowPos, out lowRot);
+
+        Vector3 targetPos = isLowered ? lowPos : originalPosition;
+        Quaternion targetRot = isLowered ? Quaternion.Euler(lowRot) : originalRotation;
 
         basePosition = Vector3.Lerp(basePosition, targetPos, speed * Time.deltaTime);
         baseRotation = Quaternion.Lerp(baseRotation, targetRot, speed * Time.deltaTime);

@@ -46,6 +46,19 @@ public class WeaponADS : MonoBehaviour
     private InputAction aimAction;
     private bool isAiming = false;
 
+    // Alternative ways of holding this gun (WeaponHoldStyles). Style 0 is the hipPosition/hipRotation above, so a
+    // weapon with nothing set up behaves exactly as before. ADS is never affected.
+    WeaponHoldStyles hold;
+    public WeaponHoldStyles Hold => hold;
+
+    /// <summary>The held (hip) pose in use right now: hipPosition/hipRotation, or the selected hold style's, eased
+    /// between them. Everything that used to read hipPosition/hipRotation for the CURRENT pose reads this.</summary>
+    public void GetEffectiveHip(out Vector3 position, out Vector3 rotation)
+    {
+        if (hold != null) hold.GetHip(hipPosition, hipRotation, out position, out rotation);
+        else { position = hipPosition; rotation = hipRotation; }
+    }
+
     // AI mode (EnemyWeapon): the same component that holds the player's tuned hip/ADS
     // pose also holds allies' and enemies' guns, so they sit exactly like the player's.
     // Aim comes from code instead of the mouse, and it never touches the player's
@@ -59,6 +72,7 @@ public class WeaponADS : MonoBehaviour
         aimAction?.Disable();
         fpCamera = null;
         animationDriver = null;
+        hold?.SetPlayerControlled(false); // an AI's hold style comes from EnemyWeapon.holdStyle, not the key
     }
     public void SetExternalAim(bool aiming) => externalAim = aiming;
 
@@ -81,6 +95,10 @@ public class WeaponADS : MonoBehaviour
         if (animationDriver == null) animationDriver = GetComponentInParent<CharacterAnimationDriver>();
         if (animationDriver == null) animationDriver = FindFirstObjectByType<CharacterAnimationDriver>();
 
+        hold = GetComponent<WeaponHoldStyles>();
+        if (hold == null) hold = gameObject.AddComponent<WeaponHoldStyles>();
+        if (externalControl) hold.SetPlayerControlled(false); // SetExternalControl ran before this Awake (inactive prefab)
+
         // Right mouse to aim - see PlayerInputMap for the full layout (shift is sprint now).
         aimAction = new InputAction("Aim", binding: PlayerInputMap.Aim);
         aimAction.Enable();
@@ -89,8 +107,9 @@ public class WeaponADS : MonoBehaviour
     void Start()
     {
         // Start in hip position
-        basePosition = hipPosition;
-        baseRotation = Quaternion.Euler(hipRotation);
+        GetEffectiveHip(out Vector3 startPos, out Vector3 startRot);
+        basePosition = startPos;
+        baseRotation = Quaternion.Euler(startRot);
         ApplyTransform();
     }
 
@@ -133,8 +152,9 @@ public class WeaponADS : MonoBehaviour
         isAiming = externalControl ? externalAim : aimAction.ReadValue<float>() > 0.5f;
         if (isAiming != wasAiming && !externalControl) animationDriver?.SetAiming(isAiming);
 
-        Vector3 targetPos = isAiming ? adsPosition : hipPosition;
-        Vector3 targetRot = isAiming ? adsRotation : hipRotation;
+        GetEffectiveHip(out Vector3 hipPos, out Vector3 hipRot);
+        Vector3 targetPos = isAiming ? adsPosition : hipPos;
+        Vector3 targetRot = isAiming ? adsRotation : hipRot;
         float   speed     = isAiming ? adsSpeed    : hipSpeed;
 
         // Get cant fraction from WeaponCant
@@ -149,8 +169,8 @@ public class WeaponADS : MonoBehaviour
         {
             // Reduces hip fire rotation when canting left
             targetRot.z = isCanted && cantFraction > 0f
-                ? Mathf.Lerp(hipRotation.z, 0f, cantFraction)
-                : hipRotation.z;
+                ? Mathf.Lerp(hipRot.z, 0f, cantFraction)
+                : hipRot.z;
         }
 
         basePosition = Vector3.Lerp(basePosition, targetPos, speed * Time.deltaTime);
