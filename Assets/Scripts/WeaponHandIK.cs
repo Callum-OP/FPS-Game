@@ -329,6 +329,16 @@ public class WeaponHandIK : MonoBehaviour
     /// <summary>How far past full extension the strict lock lets the hand stretch to stay on its grip.</summary>
     public float LockStretch => lockMaxStretch;
     /// <summary>The grip the right hand is currently locked to (a reload override if there is one, otherwise the weapon's).</summary>
+    // Read-only arm/grip state for WeaponReachAssist (AI reach correction).
+    public Transform RightShoulderBone => rightShoulder;
+    public float RightArmReach => rightArmReach;
+    /// <summary>How strongly each hand is currently locked to its grip (0-1, already ignores the clip-follow share).</summary>
+    public float RightGripWeight => rightWeight * (1f - followR);
+    public float LeftGripWeight => leftWeight * (1f - followL);
+    /// <summary>True while a reload is sending that hand to something other than the weapon's own grip.</summary>
+    public bool RightGripOverridden => reloadRightOverride != null;
+    public bool LeftGripOverridden => reloadLeftOverride != null;
+
     public Transform CurrentRightGrip => reloadRightOverride != null ? reloadRightOverride : rightGrip;
     public Transform CurrentLeftGrip => reloadLeftOverride != null ? reloadLeftOverride : leftGrip;
 

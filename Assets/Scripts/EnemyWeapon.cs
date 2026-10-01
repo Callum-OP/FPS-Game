@@ -192,6 +192,11 @@ public class EnemyWeapon : MonoBehaviour
         // next to a humanoid Animator, same requirement CharacterAnimationDriver has.
         handIK = anim.GetComponent<WeaponHandIK>();
         if (handIK == null) handIK = anim.gameObject.AddComponent<WeaponHandIK>();
+        // Instant reach correction: keeps the off-hand on the foregrip of long guns (see WeaponReachAssist).
+        var reachAssist = handIK.GetComponent<WeaponReachAssist>();
+        if (reachAssist == null) reachAssist = handIK.gameObject.AddComponent<WeaponReachAssist>();
+        reachAssist.handIK = handIK;
+        reachAssist.weapon = this;
 
         if (anchor == null)
         {
