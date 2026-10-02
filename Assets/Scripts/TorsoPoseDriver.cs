@@ -456,6 +456,11 @@ public class TorsoPoseDriver : MonoBehaviour
     /// <summary>Right-hand reach twist (weapon switch, holster, draw).</summary>
     public void PlayWeaponSwitch() => switchT = 0f;
 
+    // Extra torso twist pushed in by another system (GrenadeController's wind-up and throw). Degrees, positive = right,
+    // same sign as holdTwist/aimTwist. Eased by the same twist smoothing as everything else; 0 = no contribution.
+    float externalTwist;
+    public void SetExternalTwist(float degrees) => externalTwist = degrees;
+
     void LateUpdate()
     {
         if (anim == null || !anim.enabled) return;
@@ -507,6 +512,7 @@ public class TorsoPoseDriver : MonoBehaviour
         float targetTwist = reloading ? -reloadTwist : 0f;
         targetTwist += pointedAmount * holdTwist;
         if (aiming) targetTwist += aimTwist;
+        targetTwist += externalTwist;
         if (switchT < 1f)
         {
             switchT += dt / Mathf.Max(0.05f, switchDuration);

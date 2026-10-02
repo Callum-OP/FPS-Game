@@ -80,6 +80,59 @@ public class WeaponInventory : MonoBehaviour
     public bool IsHolstered => holstered;
     public bool IsHolsterBusy => busy;
 
+    // ---- grenade hand-off ----------------------------------------------------------------
+    // While a grenade is out the gun is on the body and must STAY there: left click, aim and reload
+    // all draw a holstered weapon (UpdateHolsterInput), which used to pull the gun back out in the
+    // middle of every throw. GrenadeController brackets the whole thing with Begin/EndGrenade.
+    [Header("Grenade")]
+    [Tooltip("Walk-speed multiplier while a grenade is in hand (1 = normal walk).")]
+    public float grenadeSpeedMultiplier = 1f;
+    bool grenadeOut, holsteredBeforeGrenade;
+    public bool GrenadeOut => grenadeOut;
+
+    /// <summary>Puts the active weapon away with the normal holster animation (waits for it to finish when yielded).
+    /// Nothing in here reads input until EndGrenade/AbortGrenade is called.</summary>
+    public IEnumerator BeginGrenadeRoutine()
+    {
+        grenadeOut = true;
+        holsteredBeforeGrenade = holstered;
+        while (busy) yield return null;            // a draw/holster already in flight finishes first
+
+        if (!holstered)
+        {
+            bool weaponInHand = playerSetup != null && playerSetup.activeWeapon != null && playerSetup.activeWeapon.gameObject == Active;
+            if (weaponInHand) yield return HolsterRoutine();
+            else HolsterAll();
+        }
+        playerSetup?.playerMovement?.SetSpeedMultiplier(grenadeSpeedMultiplier);
+    }
+
+    /// <summary>Grenade is away: bring the gun back up with the normal draw, unless it was holstered before the grenade
+    /// came out. drawWeapon forces the draw even then (the player asked for the gun with 2 / 3); switchWeapon draws the
+    /// other slot's weapon instead (3: rifle <-> pistol).</summary>
+    public void EndGrenade(bool drawWeapon = false, bool switchWeapon = false)
+    {
+        if (!grenadeOut) return;
+        grenadeOut = false;
+
+        if (switchWeapon)
+        {
+            Slot other = activeSlot == Slot.Primary ? Slot.Secondary : Slot.Primary;
+            if (GetSlot(other) != null) activeSlot = other;
+        }
+
+        if (holsteredBeforeGrenade && !drawWeapon)
+        {
+            playerSetup?.playerMovement?.SetSpeedMultiplier(holsterSpeedMultiplier);
+            return;
+        }
+        playerSetup?.playerMovement?.SetSpeedMultiplier(1f);
+        if (holstered) StartCoroutine(DrawRoutine(false));
+    }
+
+    /// <summary>Grenade state dropped without drawing anything (player died).</summary>
+    public void AbortGrenade() { grenadeOut = false; }
+
     /// <summary>Where the held weapon hangs: the camera normally, the eye mount in third person.</summary>
     public Transform WeaponParent
     {
@@ -144,7 +197,7 @@ public class WeaponInventory : MonoBehaviour
 
     void Update()
     {
-        if (busy) return;
+        if (busy || grenadeOut) return;
         if (toggleWeapon.WasPressedThisFrame()) ToggleActive();
         UpdateHolsterInput();
     }
@@ -326,8 +379,9 @@ public class WeaponInventory : MonoBehaviour
         if (slot == Slot.Primary) { primary = weapon; primaryPrefab = sourcePrefab; }
         else { secondary = weapon; secondaryPrefab = sourcePrefab; }
 
-        if (equipImmediately) Equip(slot);
-        else Holster(weapon, slot);
+        // A grenade in hand: the new weapon goes on the body and becomes the one drawn afterwards.
+        if (equipImmediately && !grenadeOut) Equip(slot);
+        else { if (equipImmediately) activeSlot = slot; Holster(weapon, slot); }
 
         return displaced;
     }

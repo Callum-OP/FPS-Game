@@ -8,7 +8,8 @@ using UnityEngine.InputSystem;
 /// Current layout (left hand stays on WASD, everything else clusters around 1-4):
 ///   1  pick up                 2  tap: lower gun (fast walk) / hold: holster everything
 ///   5  third-person camera (hold Alt to orbit it)
-///   3  toggle rifle/pistol     4  grenade (hold, then left click to throw)
+///   3  toggle rifle/pistol     4  grenade out/away (left click: raise, hold to aim, release to throw)
+///   B  cycle grenade hold style (low / chest / forward)
 ///   R  reload                  F  drop
 ///   Ctrl crouch                Shift aim                    Space jump
 ///   Q/E cant                   V melee                      Left click fire
@@ -33,6 +34,7 @@ public static class PlayerInputMap
     public const string LowerWeapon  = "<Keyboard>/2";
     public const string ToggleWeapon = "<Keyboard>/3";
     public const string Grenade      = "<Keyboard>/4";
+    public const string GrenadeStyle = "<Keyboard>/b";
     public const string Reload       = "<Keyboard>/r";
     public const string Drop         = "<Keyboard>/f";
     public const string Melee        = "<Keyboard>/v";
