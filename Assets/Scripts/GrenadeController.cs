@@ -57,7 +57,10 @@ public class GrenadeController : MonoBehaviour
 {
     [Header("Grenade")]
     public GameObject grenadePrefab;
+    [Tooltip("Legacy. The old throw origin (a fixed point on the player root, which does NOT follow where you look). Only used if no camera can be found.")]
     public Transform throwPoint;
+    [Tooltip("The first-person camera the grenade arm hangs off, so it follows looking up/down exactly like a gun does, and the throw goes where you look. Found automatically.")]
+    public Transform viewPoint;
     public float throwForce = 15f;
     public float throwUpward = 5f;
     public int maxGrenades = 3;
@@ -80,13 +83,13 @@ public class GrenadeController : MonoBehaviour
     public Vector3 visualEuler = Vector3.zero;
 
     [Header("Hold Style")]
-    public GrenadeHoldStyle holdStyle = GrenadeHoldStyle.Low;
+    public GrenadeHoldStyle holdStyle = GrenadeHoldStyle.Forward;
     [Tooltip("Carried by the hip.")]
-    public GrenadePose lowPose = new GrenadePose(new Vector3(0.26f, -0.30f, 0.40f), new Vector3(0f, 0f, 0f));
+    public GrenadePose lowPose = new GrenadePose(new Vector3(0.12f, -0.23f, 0.36f), new Vector3(0f, 0f, 20f));
     [Tooltip("Held up close to the chest.")]
-    public GrenadePose chestPose = new GrenadePose(new Vector3(0.22f, -0.15f, 0.46f), new Vector3(-8f, 0f, 0f));
-    [Tooltip("Arm out in front like a gun.")]
-    public GrenadePose forwardPose = new GrenadePose(new Vector3(0.17f, -0.05f, 0.50f), new Vector3(0f, 0f, 0f));
+    public GrenadePose chestPose = new GrenadePose(new Vector3(0.08f, -0.11f, 0.40f), new Vector3(-8f, 0f, 30f));
+    [Tooltip("Arm out in front like a gun - the default: the same spot the pistol's right hand sits in its normal hip hold (hip pose -1.2/2.2/35, grip point about 0.05, -0.16, 0.33 from the camera).")]
+    public GrenadePose forwardPose = new GrenadePose(new Vector3(0.06f, -0.16f, 0.38f), new Vector3(-1.2f, 2.2f, 35f));
 
     [Header("Throw Poses")]
     [Tooltip("Cocked back and held while the button is down (this is the aiming pose).")]
@@ -181,6 +184,10 @@ public class GrenadeController : MonoBehaviour
     bool drawGunOnExit, switchGunOnExit;      // set by 2 / 3 while putting the grenade away
     static readonly RaycastHit[] hitBuffer = new RaycastHit[8];
 
+    // The transform everything hangs off and is aimed from: the first-person camera (or the first-person eye while the
+    // third-person camera is active, which is what the guns hang off too).
+    Transform View => (ThirdPersonMode.Active && ThirdPersonMode.Eye != null) ? ThirdPersonMode.Eye : viewPoint;
+
     // ---- lifecycle ---------------------------------------------------------------------------
     void Awake()
     {
@@ -197,7 +204,13 @@ public class GrenadeController : MonoBehaviour
         if (inventory == null) inventory = GetComponent<WeaponInventory>();
         if (animationDriver == null) animationDriver = GetComponentInChildren<CharacterAnimationDriver>();
         if (hands == null) hands = GetComponentInChildren<WeaponHandIK>(true);
-        if (throwPoint == null && Camera.main != null) throwPoint = Camera.main.transform;
+        if (viewPoint == null)
+        {
+            var setup = GetComponent<PlayerSetup>();
+            if (setup != null && setup.fpCamera != null) viewPoint = setup.fpCamera.transform;
+            else if (Camera.main != null) viewPoint = Camera.main.transform;
+            else viewPoint = throwPoint;
+        }
 
         ownColliders = GetComponentsInChildren<Collider>(true);
         cc = GetComponent<CharacterController>();
@@ -221,7 +234,7 @@ public class GrenadeController : MonoBehaviour
         HandleGunKeys();
 
         if (state == State.Off || state == State.Waiting) return;
-        if (throwPoint == null) return;
+        if (View == null) return;
 
         bool pressed = throwAction.WasPressedThisFrame();
         bool held = throwAction.ReadValue<float>() > 0.5f;
@@ -262,7 +275,7 @@ public class GrenadeController : MonoBehaviour
         {
             case State.Off:
                 if (currentGrenades <= 0) return;
-                if (grenadePrefab == null || throwPoint == null)
+                if (grenadePrefab == null || View == null)
                 {
                     if (!warned) { warned = true; Debug.LogWarning("GrenadeController needs a grenade prefab and a throw point (the camera).", this); }
                     return;
@@ -415,9 +428,9 @@ public class GrenadeController : MonoBehaviour
     {
         switch (holdStyle)
         {
-            case GrenadeHoldStyle.Chest: return chestPose;
+            case GrenadeHoldStyle.Low: return lowPose;
             case GrenadeHoldStyle.Forward: return forwardPose;
-            default: return lowPose;
+            default: return chestPose;
         }
     }
 
@@ -486,7 +499,7 @@ public class GrenadeController : MonoBehaviour
             grip = new GameObject("RightHandGrip").transform;
             grip.SetParent(rig, false);
         }
-        if (rig.parent != throwPoint) rig.SetParent(throwPoint, false);
+        if (rig.parent != View) rig.SetParent(View, false);
     }
 
     // Where the palm is, in the hand bone's own frame, taken from the finger bones so it doesn't depend on which way
@@ -589,8 +602,8 @@ public class GrenadeController : MonoBehaviour
     // ---- per-frame outputs -------------------------------------------------------------------
     void ApplyPose()
     {
-        if (rig == null || throwPoint == null) return;
-        if (rig.parent != throwPoint) rig.SetParent(throwPoint, false);
+        if (rig == null || View == null) return;
+        if (rig.parent != View) rig.SetParent(View, false);
 
         rig.localPosition = pos;
         rig.localRotation = rot;
@@ -644,7 +657,7 @@ public class GrenadeController : MonoBehaviour
 
     Vector3 ThrowVelocity()
     {
-        Vector3 v = throwPoint.forward * throwForce + Vector3.up * throwUpward;
+        Vector3 v = View.forward * throwForce + Vector3.up * throwUpward;
         if (cc != null && inheritMovement > 0f)
         {
             Vector3 pv = cc.velocity; pv.y = 0f;
@@ -659,12 +672,12 @@ public class GrenadeController : MonoBehaviour
 
         currentGrenades = Mathf.Max(0, currentGrenades - 1);
 
-        Vector3 eye = throwPoint.position;
-        Vector3 start = visual != null ? visual.transform.position : throwPoint.TransformPoint(releasePose.position);
+        Vector3 eye = View.position;
+        Vector3 start = visual != null ? visual.transform.position : View.TransformPoint(releasePose.position);
         // Hand behind a wall or railing: leave the grenade on this side of it.
         if (FirstHit(eye, start, out Vector3 wallPoint)) start = wallPoint - (start - eye).normalized * 0.12f;
 
-        GameObject grenade = Instantiate(grenadePrefab, start, throwPoint.rotation);
+        GameObject grenade = Instantiate(grenadePrefab, start, View.rotation);
 
         Rigidbody rb = grenade.GetComponent<Rigidbody>();
         if (rb != null)
@@ -737,7 +750,7 @@ public class GrenadeController : MonoBehaviour
 
         if (line == null && !BuildLine()) { showTrajectory = false; return; }
 
-        Vector3 p = throwPoint.TransformPoint(releasePose.position);
+        Vector3 p = View.TransformPoint(releasePose.position);
         Vector3 v = ThrowVelocity();
         Vector3 g = Physics.gravity;
         float dt = Mathf.Max(0.01f, trajectoryStep);

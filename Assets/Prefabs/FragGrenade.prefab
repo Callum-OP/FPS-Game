@@ -28,7 +28,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: -0, w: 1}
   m_LocalPosition: {x: -10.27355, y: -0.12899, z: -13.06655}
-  m_LocalScale: {x: 2, y: 2, z: 2}
+  m_LocalScale: {x: 1.4, y: 1.4, z: 1.4}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8572568944173794214}
@@ -77,6 +77,13 @@ MonoBehaviour:
   fuseTime: 3
   explosionRadius: 8
   explosionForce: 600
+  maxDamage: 120
+  damageFalloffPower: 1.6
+  requireLineOfSight: 1
+  blastBlockers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  dismemberDamageFraction: 0.75
   stunRadius: 10
   stunDuration: 3
   fireShrapnel: 1
@@ -91,6 +98,8 @@ MonoBehaviour:
   maxSizeScale: 2
   explosionEffect: {fileID: 104829970813648393, guid: d3015b7eea383f64d8b81f965cc466e7, type: 3}
   explosionSound: {fileID: 8300000, guid: 07345472363f7ea4ab19ffd5ca667f32, type: 3}
+  scaleEffectToRadius: 1
+  effectScale: 0.2
   destroyedPrefab: {fileID: 0}
 --- !u!1 &298371481374024626
 GameObject:
