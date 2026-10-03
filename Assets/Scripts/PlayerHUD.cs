@@ -76,6 +76,23 @@ public class PlayerHUD : MonoBehaviour
         ammoText.text = $"{current} / {max}";
     }
 
+    [Tooltip("What the ammo text shows while a grenade is in hand. {0} = grenades carried, {1} = most you can carry. E.g. \"Grenades {0} / {1}\".")]
+    public string grenadeFormat = "{0} / {1}";
+
+    /// <summary>Grenade in hand: the ammo text shows the grenade count instead (the gun is holstered, so it has no ammo to show).</summary>
+    public void ShowGrenades(int current, int max)
+    {
+        if (ammoText == null) return;
+        ammoText.gameObject.SetActive(true);
+        ammoText.text = string.Format(grenadeFormat, current, max);
+    }
+
+    /// <summary>Grenade put away: back to the last ammo reading (a drawn gun immediately overwrites it with its own).</summary>
+    public void RestoreAmmo()
+    {
+        if (lastAmmo.HasValue) UpdateAmmo(lastAmmo.Value.current, lastAmmo.Value.max);
+    }
+
     public void ShowReloading()
     {
         if (reloadText != null) reloadText.gameObject.SetActive(true);

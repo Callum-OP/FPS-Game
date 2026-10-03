@@ -177,6 +177,8 @@ public class GrenadeController : MonoBehaviour
     Collider[] ownColliders;
     CharacterController cc;
     PlayerHealth playerHealth;
+    PlayerHUD hud;
+    int shownCount = -1;                  // last grenade count written to the HUD (-1 = nothing shown)
     System.Action deathHandler;
     bool warned;
 
@@ -246,6 +248,17 @@ public class GrenadeController : MonoBehaviour
         ApplyPose();
         UpdateTrajectory();
         UpdateTwist(dt);
+        RefreshHud();
+    }
+
+    // While a grenade is in hand the ammo text shows grenades carried / max (same spot as gun ammo). Polled, so it stays
+    // right however the count changes - throwing, pickups, anything else that adds grenades.
+    void RefreshHud()
+    {
+        if (hud == null) { hud = FindFirstObjectByType<PlayerHUD>(); if (hud == null) return; }
+        if (shownCount == currentGrenades) return;
+        shownCount = currentGrenades;
+        hud.ShowGrenades(currentGrenades, maxGrenades);
     }
 
     // ---- input -------------------------------------------------------------------------------
@@ -428,9 +441,9 @@ public class GrenadeController : MonoBehaviour
     {
         switch (holdStyle)
         {
-            case GrenadeHoldStyle.Low: return lowPose;
+            case GrenadeHoldStyle.Chest: return chestPose;
             case GrenadeHoldStyle.Forward: return forwardPose;
-            default: return chestPose;
+            default: return lowPose;
         }
     }
 
@@ -458,6 +471,7 @@ public class GrenadeController : MonoBehaviour
         curlK = 1f; curlTarget = 1f;
         pressQueued = false; releaseQueued = false; cooking = false;
         drawGunOnExit = false; switchGunOnExit = false;
+        shownCount = -1;                      // force the HUD to switch to the grenade count
         BeginTimed(State.Drawing);
         ApplyPose();
     }
@@ -814,6 +828,8 @@ public class GrenadeController : MonoBehaviour
         if (visual != null) { Destroy(visual); visual = null; }
         if (line != null) line.enabled = false;
         if (TorsoPoseDriver.Instance != null) TorsoPoseDriver.Instance.SetExternalTwist(0f);
+        if (hud != null && shownCount >= 0) hud.RestoreAmmo();   // before the gun is drawn - the gun then writes its own ammo
+        shownCount = -1;
         bool drawGun = drawGunOnExit, switchGun = switchGunOnExit;
         drawGunOnExit = false; switchGunOnExit = false;
 
@@ -824,7 +840,7 @@ public class GrenadeController : MonoBehaviour
         }
     }
 
-    // ---- public API --------------------------------------------------------------
+    // ---- public API (unchanged) --------------------------------------------------------------
     public int GetCurrentGrenades() => currentGrenades;
     /// <summary>True while there is room for more grenades (what a GrenadePickup checks).</summary>
     public bool CanCarryMore => currentGrenades < maxGrenades;
