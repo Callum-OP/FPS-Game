@@ -824,8 +824,17 @@ public class GrenadeController : MonoBehaviour
         }
     }
 
-    // ---- public API (unchanged) --------------------------------------------------------------
+    // ---- public API --------------------------------------------------------------
     public int GetCurrentGrenades() => currentGrenades;
+    /// <summary>True while there is room for more grenades (what a GrenadePickup checks).</summary>
+    public bool CanCarryMore => currentGrenades < maxGrenades;
+    /// <summary>Adds grenades up to maxGrenades; returns how many were actually taken.</summary>
+    public int AddGrenades(int amount)
+    {
+        int add = Mathf.Clamp(amount, 0, maxGrenades - currentGrenades);
+        currentGrenades += add;
+        return add;
+    }
     public int GetMaxGrenades() => maxGrenades;
     /// <summary>True from the moment a grenade is taken out until it is put away - what the weapon inventory checks.</summary>
     public bool IsHoldingGrenade() => state != State.Off;
