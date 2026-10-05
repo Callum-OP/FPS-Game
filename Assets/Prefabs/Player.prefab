@@ -248,8 +248,6 @@ GameObject:
   - component: {fileID: 112935996908841648}
   - component: {fileID: 3727270317031304332}
   - component: {fileID: 8380861452952741765}
-  - component: {fileID: 802424425183540071}
-  - component: {fileID: 7209459024370866370}
   - component: {fileID: 7013886737931384741}
   - component: {fileID: 2735340585188078159}
   - component: {fileID: 7219984608590271071}
@@ -263,6 +261,9 @@ GameObject:
   - component: {fileID: 7850456022116762550}
   - component: {fileID: 6713652028300273306}
   - component: {fileID: 3111804581418978501}
+  - component: {fileID: 511188222119842329}
+  - component: {fileID: 6927329549451932948}
+  - component: {fileID: 733569420285162246}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -429,49 +430,6 @@ MonoBehaviour:
   playerHUD: {fileID: 0}
   ammoHUD: {fileID: 0}
   debugLogAttachPoints: 1
---- !u!114 &802424425183540071
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8403096973582887497}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 00f4d59ec70a8694e984677859b72b7e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WeaponDrop
-  playerSetup: {fileID: 8380861452952741765}
-  Mono19WorldPrefab: {fileID: 1118620770691677480, guid: 94da89d0446a7d548a00ad91176e4cdd, type: 3}
-  BreacherM4WorldPrefab: {fileID: 1564011388123885881, guid: f8d52856e543c954ba49faf0e299769a, type: 3}
-  HummingbirdWorldPrefab: {fileID: 2646546962369989747, guid: db365bd36170f3d45865a3e38899ff3e, type: 3}
-  ARWorldPrefab: {fileID: 2678298337533306162, guid: dfb48ee97daedc34ba477de67a465f78, type: 3}
-  ARScopedWorldPrefab: {fileID: 6084218930894187672, guid: 0de7388b40dbb2c4abd4956b0349f4b5, type: 3}
---- !u!114 &7209459024370866370
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8403096973582887497}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 25fc459d55da5b14eb80ff4cef088593, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GrenadeController
-  grenadePrefab: {fileID: 167451984263851421, guid: 5b2b610870ed15f49ac2543192e6b15a, type: 3}
-  throwPoint: {fileID: 6760172537210262285}
-  throwForce: 15
-  throwUpward: 5
-  maxGrenades: 3
-  heldGrenadeVisual: {fileID: 0}
-  heldOffset: {x: 0.18, y: -0.18, z: 0.35}
-  releaseAtFraction: 0.45
-  throwAnimationLength: 1.1
-  cookedThrow: 1
-  stayEquippedAfterThrow: 1
-  inventory: {fileID: 3272267351875027821}
-  animationDriver: {fileID: 8719003296114661464}
 --- !u!114 &7013886737931384741
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -605,6 +563,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterAnimationDriver
   defaultWeaponClass: 1
+  animationVariant: 0
+  variantBlendTime: 0.2
   clipDrivenBlendSpeed: 4
   kickCameraPitch: 12
   kickCameraUpTime: 0.22
@@ -761,6 +721,7 @@ MonoBehaviour:
   holsterSlingSeconds: 0.25
   drawSeconds: 0.35
   holsterSpeedMultiplier: 1.15
+  grenadeSpeedMultiplier: 1
 --- !u!114 &7850456022116762550
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -840,18 +801,138 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   checkDistance: 0.8
-  obstacleCheckHeight: 1
+  rayStep: 0.15
+  maxWallAngle: 50
   standHeight: 1.8
   standRadius: 0.3
   landForwardOffset: 0.35
   bandTolerance: 1.15
   scaleClamp: {x: 0.7, y: 1.4}
+  vaultOverThinObstacles: 1
+  vaultOverHeightRange: {x: 0.45, y: 1.05}
+  maxVaultDepth: 1.1
+  maxVaultDrop: 1.6
+  farLandOffset: 0.35
   enterFade: 0.15
   cooldown: 0.5
+  alignToWall: 1
+  wallStandOff: 0.05
+  cameraDip: 4
   aiStuckSpeedThreshold: 0.15
   aiStuckTime: 0.6
+  logAttempts: 0
   debugVaulting: 1
   debugLastProfile: 
+  debugLastResult: 
+--- !u!114 &511188222119842329
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b9d2f6a8e4c4a1d9c5e7f0a1b2c3d4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponReachAssist
+  handIK: {fileID: 0}
+  weapon: {fileID: 0}
+  enabledAssist: 1
+  extraStretch: 0.02
+  maxShift: 0.4
+  releaseSpeed: 8
+  debugShift: 0
+--- !u!114 &6927329549451932948
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e79d364c7c0c1f46ac92e57db85f308, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GrenadeController
+  grenadePrefab: {fileID: 167451984263851421, guid: 5b2b610870ed15f49ac2543192e6b15a, type: 3}
+  throwPoint: {fileID: 0}
+  viewPoint: {fileID: 0}
+  throwForce: 15
+  throwUpward: 5
+  maxGrenades: 3
+  stayEquippedAfterThrow: 1
+  inheritMovement: 0.6
+  pickupPrefab: {fileID: 167451984263851421, guid: d3a0f3dfe86544b40aa6e79b1848eaae, type: 3}
+  cookFuseWhileHeld: 1
+  autoThrowMargin: 0.6
+  heldGrenadeVisual: {fileID: 0}
+  visualScale: 1
+  visualEuler: {x: 0, y: 0, z: 0}
+  holdStyle: 1
+  lowPose:
+    position: {x: 0.12, y: -0.23, z: 0.36}
+    euler: {x: 0, y: 0, z: 20}
+  chestPose:
+    position: {x: 0.08, y: -0.11, z: 0.4}
+    euler: {x: -8, y: 0, z: 30}
+  forwardPose:
+    position: {x: 0.06, y: -0.16, z: 0.38}
+    euler: {x: -1.2, y: 2.2, z: 35}
+  raisedPose:
+    position: {x: 0.27, y: 0.03, z: 0.08}
+    euler: {x: -30, y: 10, z: 25}
+  releasePose:
+    position: {x: 0.13, y: -0.05, z: 0.5}
+    euler: {x: 20, y: -5, z: -10}
+  followThroughPose:
+    position: {x: 0.05, y: -0.4, z: 0.42}
+    euler: {x: 55, y: -10, z: -20}
+  drawOffset: {x: 0.12, y: -0.4, z: -0.1}
+  gripEuler: {x: -9.027, y: -94.328, z: -102.017}
+  palmForward: 0.85
+  palmLift: 0.035
+  flipPalmSide: 0
+  fallbackPalmOffset: {x: 0.08, y: 0.02, z: 0}
+  curlFingers: 1
+  fingerCurl:
+    curlAxis: {x: 1, y: 0, z: 0}
+    thumbCurl: 30
+    indexCurl: 60
+    middleCurl: 65
+    ringCurl: 65
+    pinkyCurl: 65
+  equipTime: 0.4
+  raiseTime: 0.28
+  quickRaiseSpeed: 1.8
+  throwTime: 0.26
+  followThroughTime: 0.3
+  recoverTime: 0.4
+  putAwayTime: 0.3
+  poseSharpness: 14
+  windUpTwist: 18
+  throwTwist: -8
+  carryTwist: 4
+  showTrajectory: 1
+  trajectoryStep: 0.05
+  trajectoryMaxPoints: 50
+  trajectoryColor: {r: 1, g: 0.85, b: 0.3, a: 0.8}
+  inventory: {fileID: 3272267351875027821}
+  animationDriver: {fileID: 8719003296114661464}
+  hands: {fileID: 8784270823998979221}
+--- !u!114 &733569420285162246
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8403096973582887497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00f4d59ec70a8694e984677859b72b7e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponDrop
+  playerSetup: {fileID: 8380861452952741765}
 --- !u!1001 &2334260011061684335
 PrefabInstance:
   m_ObjectHideFlags: 0

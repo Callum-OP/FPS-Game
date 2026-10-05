@@ -69,6 +69,10 @@ public class GrenadeController : MonoBehaviour
     [Tooltip("How much of the player's own horizontal movement is added to the throw (0 = none, 1 = all of it).")]
     [Range(0f, 1f)] public float inheritMovement = 0.6f;
 
+    [Header("Pickup")]
+    [Tooltip("The pickup that appears when a grenade is dropped (the drop key while a grenade is in hand). A grenade pickup prefab, same idea as WeaponController.pickupPrefab.")]
+    public GameObject pickupPrefab;
+
     [Header("Cooking")]
     [Tooltip("Start the fuse at the click rather than at release. The grenade is thrown automatically when the fuse is nearly out.")]
     public bool cookFuseWhileHeld = false;
@@ -842,6 +846,28 @@ public class GrenadeController : MonoBehaviour
 
     // ---- public API (unchanged) --------------------------------------------------------------
     public int GetCurrentGrenades() => currentGrenades;
+
+    /// <summary>Drops one grenade as a pickup (WeaponDrop calls this when the drop key is pressed with a grenade in hand and no weapon out).
+    /// Only while the grenade is simply being carried - not mid-throw. False if nothing was dropped.</summary>
+    public bool DropHeldGrenade()
+    {
+        if (state != State.Ready || currentGrenades <= 0) return false;
+        if (pickupPrefab == null)
+        {
+            Debug.LogWarning("GrenadeController has no Pickup Prefab set, so a grenade can't be dropped.", this);
+            return false;
+        }
+
+        Transform v = View != null ? View : transform;
+        Vector3 pos = visual != null ? visual.transform.position : v.position + v.forward * 0.5f;
+        GameObject world = Instantiate(pickupPrefab, pos, Quaternion.identity);
+        Rigidbody rb = world.GetComponent<Rigidbody>();
+        if (rb != null) rb.linearVelocity = v.forward * 2f + Vector3.up;
+
+        currentGrenades--;
+        if (currentGrenades <= 0) BeginTimed(State.PuttingAway);   // empty hand: put it away
+        return true;
+    }
     /// <summary>True while there is room for more grenades (what a GrenadePickup checks).</summary>
     public bool CanCarryMore => currentGrenades < maxGrenades;
     /// <summary>Adds grenades up to maxGrenades; returns how many were actually taken.</summary>

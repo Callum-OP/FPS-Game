@@ -47,10 +47,6 @@ public class EnemyWeapon : MonoBehaviour
     [Tooltip("How fast the anchor blends between resting and aiming.")]
     public float aimBlendSpeed = 8f;
 
-    [Header("Hold Style")]
-    [Tooltip("How this character holds its gun, numbered as the player cycles them: 0 = the first style (Straight Right by default), then the rest in order, with Slanted Middle (the weapon's own pose) last. Lets enemies and allies carry the same gun differently. Wraps round if the weapon has fewer styles; can be changed live.")]
-    public int holdStyle = 0;
-
     [Header("Lowered (out of combat)")]
     [Tooltip("Local position of the weapon anchor while the enemy isn't in combat - gun down at the waist, the same idea as the player's X key. Patrolling with a rifle levelled at nothing looks wrong.")]
     public Vector3 loweredPositionOffset = new Vector3(0.12f, 0.85f, 0.18f);
@@ -78,7 +74,7 @@ public class EnemyWeapon : MonoBehaviour
     [Range(0f, 1f)] public float handSeatTime = 0.6f;
 
     [Header("Drop on death")]
-    [Tooltip("The matching *Pickup prefab, e.g. ARPickup.prefab - what actually spawns in the world.")]
+    [Tooltip("LEGACY fallback. The pickup that spawns now comes from the held weapon itself (WeaponController > Pickup Prefab); this is only used if that is empty. Safe to clear once your weapons are connected.")]
     public GameObject worldPickupPrefab;
 
     [Header("Holster Points (visual, for whichever weapon isn't currently held)")]
@@ -273,7 +269,6 @@ public class EnemyWeapon : MonoBehaviour
         if (weaponADS == null) return;
 
         weaponADS.SetExternalControl(true);
-        weaponADS.Hold?.SetIndex(holdStyle, snap: true);
         weaponADS.enabled = true;
         var bob = instance.GetComponent<WeaponMovementBob>();
         if (bob != null) { bob.aiAgent = GetComponent<NavMeshAgent>(); bob.enabled = true; }
@@ -670,20 +665,9 @@ public class EnemyWeapon : MonoBehaviour
 
             // Lowered pose: same world pose the gun had before (the anchor is offset to
             // cancel WeaponADS's hip offset, so it still ends up where loweredPositionOffset says).
-            // The hold style (if any) changes the hip pose being cancelled here and may add its own lowered change.
-            weaponADS.Hold?.SetIndex(holdStyle);
-            weaponADS.GetEffectiveHip(out Vector3 hipPosNow, out Vector3 hipRotNow);
-            Vector3 loweredPos = loweredPositionOffset;
-            Vector3 loweredRot = loweredRotationOffset;
-            if (weaponADS.Hold != null)
-            {
-                weaponADS.Hold.GetLoweredDelta(out Vector3 dPos, out Vector3 dRot);
-                loweredRot += dRot;
-                loweredPos += Quaternion.Euler(loweredRot) * dPos; // the style's lowered move is in the gun's own space
-            }
-            Quaternion hipRot = Quaternion.Euler(hipRotNow);
-            Quaternion lowRot = Quaternion.Euler(loweredRot) * Quaternion.Inverse(hipRot);
-            Vector3 lowPos = loweredPos - lowRot * hipPosNow;
+            Quaternion hipRot = Quaternion.Euler(weaponADS.hipRotation);
+            Quaternion lowRot = Quaternion.Euler(loweredRotationOffset) * Quaternion.Inverse(hipRot);
+            Vector3 lowPos = loweredPositionOffset - lowRot * weaponADS.hipPosition;
 
             anchor.localPosition = Vector3.Lerp(lowPos, eyeLocalPosition, combatBlend);
             anchor.localRotation = Quaternion.Slerp(lowRot, Quaternion.Euler(eyePitch, 0f, 0f), combatBlend);
@@ -844,10 +828,12 @@ public class EnemyWeapon : MonoBehaviour
         // instead of continuing to reach for a now-hidden weapon.
         handIK?.SetGripTargets(null, null);
 
-        if (worldPickupPrefab != null)
+        var heldController = weaponInstance != null ? weaponInstance.GetComponent<WeaponController>() : null;
+        GameObject dropPrefab = heldController != null && heldController.pickupPrefab != null ? heldController.pickupPrefab : worldPickupPrefab;
+        if (dropPrefab != null)
         {
             Vector3 dropPos = transform.position + Vector3.up * 0.5f;
-            GameObject world = Instantiate(worldPickupPrefab, dropPos, Quaternion.identity);
+            GameObject world = Instantiate(dropPrefab, dropPos, Quaternion.identity);
             Rigidbody rb = world.GetComponent<Rigidbody>();
             if (rb != null)
                 rb.linearVelocity = Vector3.up * 1.5f + Random.insideUnitSphere * 0.5f;

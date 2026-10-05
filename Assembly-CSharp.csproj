@@ -148,7 +148,6 @@
     <Compile Include="Assets\Scripts\PlayerMovement.cs" />
     <Compile Include="Assets\Scripts\AIRelaxedIdle.cs" />
     <Compile Include="Assets\LocalAssets\Resources\3DObjects\Weapons\Fries and Seagull\Ultimate Interior Pack\Scene Props\Scripts\Inspector\MaterialHider.cs" />
-    <Compile Include="Assets\Scripts\LegsymCheck.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\DropdownSample.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\VertexColorCycler.cs" />
     <Compile Include="Assets\Scripts\DeathCam.cs" />

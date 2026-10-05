@@ -94,8 +94,6 @@ public class MeleeWeapon : MonoBehaviour
     [Tooltip("Axe heavy: the big 360 swing.")]
     public Swing axeHeavy = new Swing("360 swing", 2.4f, 2.6f, 75f, 2.8f, 1.2f, 5.0f);
 
-    [Tooltip("Shown to the world when this weapon is dropped (the pickup that gives it back).")]
-    public GameObject pickupPrefab;
 
     [Header("Combo")]
     [Tooltip("A click this long before the next swing is allowed is remembered and fires the moment it is.")]

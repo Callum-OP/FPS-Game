@@ -142,6 +142,7 @@ MonoBehaviour:
   fpCamera: {fileID: 0}
   bulletPrefab: {fileID: 0}
   muzzlePoint: {fileID: 0}
+  pickupPrefab: {fileID: 7400000000000000001, guid: fa357135f32446843aa29d2c144e2f68, type: 3}
   rightHandGrip: {fileID: 2634268491302027325}
   leftHandGrip: {fileID: 6333016370408609852}
   fireRate: 0.1
@@ -304,7 +305,6 @@ MonoBehaviour:
     pushDistance: 2.8
     stagger: 1.2
     cameraKick: 5
-  pickupPrefab: {fileID: 0}
   inputBuffer: 0.3
   comboWindow: 0.55
   chainDelayAfterStrike: 0.1

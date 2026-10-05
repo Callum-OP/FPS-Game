@@ -8,6 +8,10 @@ public class WeaponController : MonoBehaviour
     public GameObject bulletPrefab;
     public Transform muzzlePoint;
 
+    [Header("Pickup")]
+    [Tooltip("The pickup prefab that appears in the world when this weapon is dropped (or its owner dies): a prefab with a WeaponPickup whose Held Weapon Prefab is THIS weapon. Every weapon - guns, melee, whatever - carries its own, so there is no list to maintain.")]
+    public GameObject pickupPrefab;
+
     [Header("Hand IK Grips")]
     [Tooltip("Empty child transform positioned/oriented at this weapon's grip - the right hand IK target.")]
     public Transform rightHandGrip;

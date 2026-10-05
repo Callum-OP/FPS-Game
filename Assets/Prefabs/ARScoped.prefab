@@ -8,6 +8,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 923902513769590798, guid: 4111394ae09514e46b75f0be8bbe86ae, type: 3}
+      propertyPath: pickupPrefab
+      value: 
+      objectReference: {fileID: 6084218930894187672, guid: 0de7388b40dbb2c4abd4956b0349f4b5, type: 3}
     - target: {fileID: 3306725795233962420, guid: 4111394ae09514e46b75f0be8bbe86ae, type: 3}
       propertyPath: m_Name
       value: ARScoped

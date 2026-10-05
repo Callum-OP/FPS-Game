@@ -20234,6 +20234,7 @@ MonoBehaviour:
   fpCamera: {fileID: 0}
   bulletPrefab: {fileID: 3032706208577155948, guid: d5aeaa93e76bd3b4397d0f25f9fe53f6, type: 3}
   muzzlePoint: {fileID: 2873470030435797744}
+  pickupPrefab: {fileID: 2678298337533306162, guid: dfb48ee97daedc34ba477de67a465f78, type: 3}
   rightHandGrip: {fileID: 0}
   leftHandGrip: {fileID: 0}
   fireRate: 0.06
@@ -20241,6 +20242,7 @@ MonoBehaviour:
   reloadTime: 2
   reloadCycles: 1
   isAutomatic: 1
+  isMeleeWeapon: 0
   isShotgun: 0
   pelletCount: 8
   spreadAngle: 10
@@ -20297,6 +20299,9 @@ MonoBehaviour:
   handGrabTime: 0.2
   handReloadTime: 0.55
   handReturnTime: 0.9
+  seatHoldSeconds: 0.35
+  gripSettleSeconds: 0.1
+  minReturnSeconds: 0.6
   weaponReloadPivot: {fileID: 8032110994227857892}
   centerCarriedMagOnHand: 1
   carriedMagNudge: {x: 0, y: 0, z: 0}

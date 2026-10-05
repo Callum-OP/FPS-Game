@@ -39650,6 +39650,7 @@ MonoBehaviour:
   fpCamera: {fileID: 0}
   bulletPrefab: {fileID: 1419992393118297956, guid: b12083c72e62959458d5b786f732cf30, type: 3}
   muzzlePoint: {fileID: 7822128958796435203}
+  pickupPrefab: {fileID: 1564011388123885881, guid: f8d52856e543c954ba49faf0e299769a, type: 3}
   rightHandGrip: {fileID: 4986012479232864893}
   leftHandGrip: {fileID: 4264181926291644394}
   fireRate: 0.1
