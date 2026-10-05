@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -601,6 +602,23 @@ public class Ragdoll : MonoBehaviour
         for (int i = 0; i < cols.Length; i++)
             for (int j = i + 1; j < cols.Length; j++)
                 Physics.IgnoreCollision(cols[i], cols[j], true);
+
+        // Any solid collider on the character that ISN'T one of the ragdoll's own bones has to go too. Enemies and allies
+        // already switch every collider off in their own death code, but the player's root BoxCollider (the 0.7 x 2 x 0.7
+        // body box) was left solid: the bones go dynamic inside it, get shoved out through its faces (limbs flying
+        // outwards) and the joints then drag them back (the bounce). How hard depends on how far each limb happens to be
+        // inside the box at that instant, which is why it only happened sometimes. Triggers exert no force, so they stay.
+        var boneColliders = new HashSet<Collider>();
+        foreach (var rb in bones)
+        {
+            if (rb == null) continue;
+            foreach (var bc in rb.GetComponents<Collider>()) boneColliders.Add(bc);
+        }
+        foreach (var col in GetComponentsInChildren<Collider>(true))
+        {
+            if (col == null || col is CharacterController || col.isTrigger || boneColliders.Contains(col)) continue;
+            col.enabled = false;
+        }
 
         // Open the joints just wide enough to contain the animated pose, so nothing snaps on the first step.
         float[] startSwing = new float[joints.Length];

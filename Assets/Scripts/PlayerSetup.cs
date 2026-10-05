@@ -234,6 +234,7 @@ public class PlayerSetup : MonoBehaviour
             weapon.onAmmoChanged += playerHUD.UpdateAmmo;
             weapon.onReloadStart += playerHUD.ShowReloading;
             weapon.onReloadEnd += playerHUD.HideReloading;
+            playerHUD.SetAmmoVisible(!weapon.isMeleeWeapon);   // melee weapons have no ammo - no counter
             playerHUD.UpdateAmmo(weapon.GetCurrentAmmo(), weapon.GetMaxAmmo());
         }
 

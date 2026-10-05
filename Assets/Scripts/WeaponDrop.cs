@@ -11,6 +11,8 @@ public class WeaponDrop : MonoBehaviour
     public GameObject HummingbirdWorldPrefab;
     public GameObject ARWorldPrefab;
     public GameObject ARScopedWorldPrefab;
+    [Tooltip("The sledgehammer pickup (SledgehammerPickup prefab). Optional: the Sledgehammer prefab also carries its own pickup reference (MeleeWeapon.pickupPrefab), which is used when this is empty.")]
+    public GameObject SledgehammerWorldPrefab;
 
     private InputAction dropAction;
 
@@ -44,8 +46,17 @@ public class WeaponDrop : MonoBehaviour
         if (heldWeapon == null) return;
         Debug.Log($"Dropping: {heldWeapon.name}");
 
+        // A melee weapon carries its own pickup prefab (MeleeWeapon.pickupPrefab) - no need for a field per weapon here.
+        var melee = heldWeapon.GetComponent<MeleeWeapon>();
+        // Order: the slot on this component (so it can be overridden per player), then the pickup the weapon prefab itself
+        // points at, then the name lookup.
         GameObject worldPrefab = GetWorldPrefab(heldWeapon.name);
+        if (worldPrefab == null && melee != null) worldPrefab = melee.pickupPrefab;
         Debug.Log($"World prefab found: {worldPrefab != null}");
+        if (worldPrefab == null)
+            Debug.LogWarning(melee != null
+                ? $"Drop: {heldWeapon.name} has no pickup assigned - drag SledgehammerPickup into 'Sledgehammer World Prefab' on WeaponDrop (or set 'pickupPrefab' on the weapon's MeleeWeapon; if it is set, the pickup prefab failed to import), so nothing can be spawned and the weapon is just removed."
+                : $"Drop: no world prefab is assigned for {heldWeapon.name} (check the *WorldPrefab fields on WeaponDrop), so nothing can be spawned and the weapon is just removed.");
 
         if (worldPrefab != null)
         {
@@ -68,6 +79,7 @@ public class WeaponDrop : MonoBehaviour
 
     GameObject GetWorldPrefab(string weaponName)
     {
+        if (weaponName.Contains("Sledgehammer")) return SledgehammerWorldPrefab;
         if (weaponName.Contains("Mono19")) return Mono19WorldPrefab;
         if (weaponName.Contains("BreacherM4")) return BreacherM4WorldPrefab;
         if (weaponName.Contains("Hummingbird")) return HummingbirdWorldPrefab;

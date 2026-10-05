@@ -156,6 +156,35 @@ public static class AnimationSystemBuilder
         new ClipDef("rc_walk_back_l","Pro Rifle Pack", "walk crouching backward left", true),
         new ClipDef("rc_walk_back_r","Pro Rifle Pack", "walk crouching backward right", true),
 
+        // Female variant of the unarmed set (Female Locomotion Pack). Selected per character with the Animation Variant
+        // dropdown on CharacterAnimationDriver; everything is optional, so a missing pack just leaves the default set.
+        // Speeds measured from the FBX hips travel (walk 1.61, run 3.62, strafe walk 1.87, strafe run 3.47 m/s) - the run
+        // is ~14% slower than the default set's, which is why this has its own tuned blend tree. Backwards walk/run have
+        // no female clip and stay shared. Turn clips are about 85 degrees.
+        new ClipDef("f_idle",        "Female Locomotion Pack", "idle", true, optional: true),
+        new ClipDef("f_walk_fwd",    "Female Locomotion Pack", "walking", true, optional: true),
+        new ClipDef("f_run_fwd",     "Female Locomotion Pack", "running", true, optional: true),
+        new ClipDef("f_walk_left",   "Female Locomotion Pack", "left strafe walk", true, optional: true),
+        new ClipDef("f_walk_right",  "Female Locomotion Pack", "right strafe walk", true, optional: true),
+        new ClipDef("f_run_left",    "Female Locomotion Pack", "left strafe", true, optional: true),
+        new ClipDef("f_run_right",   "Female Locomotion Pack", "right strafe", true, optional: true),
+        new ClipDef("f_turn_l",      "Female Locomotion Pack", "left turn", true, optional: true),
+        new ClipDef("f_turn_r",      "Female Locomotion Pack", "right turn", true, optional: true),
+
+        // Two-handed sword - Great Sword Pack: ONLY the three swings are used (as upper-body overlays, see
+        // BuildUpperBodyLayer). The pack's own walk/run/strafe clips are deliberately not used: they are authored with the
+        // body twisted ~30 degrees off the travel direction and read as walking diagonally / backwards, so a sword
+        // carrier uses the unarmed locomotion for the legs and hips (same as the other melee props) and only the
+        // torso and arms are sword animation. The swings are the in-place ones that start from the ready pose
+        // (overhead chop, cross sweep, thrust).
+        new ClipDef("sw_slash1",     "Great Sword Pack", "great sword slash", false, optional: true),
+        new ClipDef("sw_slash2",     "Great Sword Pack", "great sword slash (3)", false, optional: true),
+        new ClipDef("sw_slash3",     "Great Sword Pack", "great sword attack", false, optional: true),
+        new ClipDef("sw_heavy",      "Great Sword Pack", "great sword high spin attack", false, optional: true),
+        // Axe-style melee (Pro Melee Axe pack): the light swings reuse act_melee / act_melee_b / act_melee_d (defined
+        // with the other melee clips below); the heavy is the 360 high swing.
+        new ClipDef("ax_heavy",      "Pro Melee Axe Pack", "standing melee attack 360 high", false, optional: true),
+
         // Cover - Action Adventure Pack. Enemies (and allies) use these to drop into and
         // rise from cover instead of just crouching where they stand.
         new ClipDef("cov_enter",     "Action Adventure Pack", "stand to cover", false),
@@ -507,7 +536,7 @@ public static class AnimationSystemBuilder
 
         controller.AddParameter("MoveX", AnimatorControllerParameterType.Float);
         controller.AddParameter("MoveY", AnimatorControllerParameterType.Float);
-        controller.AddParameter("WeaponClass", AnimatorControllerParameterType.Int); // 0 Unarmed 1 Pistol 2 Rifle
+        controller.AddParameter("WeaponClass", AnimatorControllerParameterType.Int); // 0 Unarmed 1 Pistol 2 Rifle 3 Sword
         controller.AddParameter("IsCrouching", AnimatorControllerParameterType.Bool);
         controller.AddParameter("IsGrounded", AnimatorControllerParameterType.Bool);
         // Real ground contact. IsGrounded is switched on early (landing prediction) to start the landing
@@ -536,10 +565,19 @@ public static class AnimationSystemBuilder
         // SIGN really matters to the blend tree below; TurnInPlace also drives this layer's
         // weight directly at runtime, so the exact magnitude scale here isn't load-bearing.
         controller.AddParameter("TurnSpeed", AnimatorControllerParameterType.Float);
+        // 0 = default animation set, 1 = female set (CharacterAnimationDriver.animationVariant). Blends the unarmed trees.
+        controller.AddParameter("AnimVariant", AnimatorControllerParameterType.Float);
+        // Melee swings (MeleeWeapon): Swing + SwingIndex pick a state from MeleeSwings; SwingSpeed (default 1) multiplies a
+        // heavy swing's playback speed, so 0 holds it at the top of the wind-up.
+        controller.AddParameter("Swing", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("SwingIndex", AnimatorControllerParameterType.Int);
+        controller.AddParameter(new AnimatorControllerParameter { name = "SwingSpeed", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
 
         BuildBaseLayer(controller);
         BuildUpperBodyLayer(controller, upperBodyMask);
-        BuildTurnLayer(controller, BuildLowerBodyMask());
+        var lowerMask = BuildLowerBodyMask();
+        BuildFemaleLegsLayer(controller, lowerMask);   // before the turn layer, so turning in place still wins
+        BuildTurnLayer(controller, lowerMask);
 
         // Turn on the IK pass so OnAnimatorIK() actually gets called - WeaponHandIK
         // uses it to snap the hand bones onto the weapon's grip points every frame,
@@ -553,6 +591,11 @@ public static class AnimationSystemBuilder
 
         return controller;
     }
+
+    // The ground speed everything walks at (PlayerMovement.walkSpeed / Enemy.walkSpeed / FriendlyAI.walkSpeed all default
+    // to this). Each tree gets a point here, using the walk clip slowed or sped to fit, so a normal walk is a pure walk
+    // cycle instead of a blend with idle or run. Keep in step with those if you change their walk speed.
+    const float PlayerWalk = 1.9f;
 
     // -- base (full body) layer --
     static void BuildBaseLayer(AnimatorController controller)
@@ -598,17 +641,17 @@ public static class AnimationSystemBuilder
         BlendTree pistol = Locomotion2D("Pistol", new (float x, float y, string key, float ts)[]
         {
             (0, 0, "pi_idle", 1f),
-            (0, 2.57f, "pi_walk_fwd", 1f), (0, 4.77f, "pi_run_fwd", 1f), (0, 6.96f, "ri_sprint_fwd", 1f),
+            (0, PlayerWalk, "pi_walk_fwd", PlayerWalk / 2.57f), (0, 2.57f, "pi_walk_fwd", 1f), (0, 4.77f, "pi_run_fwd", 1f), (0, 6.96f, "ri_sprint_fwd", 1f),
             (0, -1.41f, "pi_walk_back", 1f), (0, -3.32f, "pi_run_back", 1f),
-            (-2.16f, 0, "pi_left", 1f), (-4.6f, 0, "pi_left", 4.6f / 2.16f),
-            (2.43f, 0, "pi_right", 1f), (4.6f, 0, "pi_right", 4.6f / 2.43f),
+            (-PlayerWalk, 0, "pi_left", PlayerWalk / 2.16f), (-4.6f, 0, "pi_left", 4.6f / 2.16f),
+            (PlayerWalk, 0, "pi_right", PlayerWalk / 2.43f), (4.6f, 0, "pi_right", 4.6f / 2.43f),
         });
 
         // Unarmed: Locomotion Pack (backwards from the Melee pack, which is all there is).
         BlendTree unarmed = Locomotion2D("Unarmed", new (float x, float y, string key, float ts)[]
         {
             (0, 0, "un_idle", 1f),
-            (0, 1.60f, "un_walk_fwd", 1f), (0, 4.20f, "un_run_fwd", 1f),
+            (0, 1.60f, "un_walk_fwd", 1f), (0, PlayerWalk, "un_walk_fwd", PlayerWalk / 1.60f), (0, 4.20f, "un_run_fwd", 1f),
             (0, -0.86f, "un_walk_back", 1f), (0, -2.03f, "un_run_back", 1f),
             (-1.66f, 0, "un_walk_left", 1f), (-4.34f, 0, "un_run_left", 1f),
             (1.66f, 0, "un_walk_right", 1f), (4.34f, 0, "un_run_right", 1f),
@@ -616,12 +659,18 @@ public static class AnimationSystemBuilder
 
         // Crouch (rifle pack walk-crouch set, 8-way).
         const float CW = 1.97f, CWd = 1.39f;
+        const float CH = PlayerWalk * 0.5f, CHd = CH * 0.7071f;   // crouch walking speed (ring and per-axis diagonal)
         BlendTree rifleCrouch = Locomotion2D("RifleCrouch", new (float x, float y, string key, float ts)[]
         {
             (0, 0, "rc_idle", 1f),
             (0, CW, "rc_walk_fwd", 1f), (-CWd, CWd, "rc_walk_fwd_l", 1f), (CWd, CWd, "rc_walk_fwd_r", 1f),
             (-CW, 0, "rc_walk_left", 1f), (CW, 0, "rc_walk_right", 1f),
             (0, -CW, "rc_walk_back", 1f), (-CWd, -CWd, "rc_walk_back_l", 1f), (CWd, -CWd, "rc_walk_back_r", 1f),
+            // The player crouch-walks at PlayerWalk * 0.5 (PlayerMovement.crouchSpeedMultiplier) - about half the clips'
+            // 1.97 m/s - so without these the tree sat half way between idle and walk. Same clips, slowed to fit.
+            (0, CH, "rc_walk_fwd", CH / CW), (-CHd, CHd, "rc_walk_fwd_l", CH / CW), (CHd, CHd, "rc_walk_fwd_r", CH / CW),
+            (-CH, 0, "rc_walk_left", CH / CW), (CH, 0, "rc_walk_right", CH / CW),
+            (0, -CH, "rc_walk_back", CH / CW), (-CHd, -CHd, "rc_walk_back_l", CH / CW), (CHd, -CHd, "rc_walk_back_r", CH / CW),
         });
 
         // Male Injured Pack has no strafe clips - sideways reuses forward.
@@ -633,16 +682,24 @@ public static class AnimationSystemBuilder
             (-1.23f, 0, "inj_walk_fwd", 1f), (1.23f, 0, "inj_walk_fwd", 1f),
         });
 
+        // Female set: same shape, its own clips and measured speeds. The outer points repeat the run clips at the default
+        // set's top speeds with a matching time scale, so a sprint doesn't skate on the slower female run.
+        BlendTree unarmedFemale = Locomotion2D("UnarmedFemale", FemaleLocomotion());
+        Motion unarmedMotion = VariantMotion("UnarmedVariants", unarmed, unarmedFemale, controller);
+
         AssetDatabase.AddObjectToAsset(unarmed, controller);
         AssetDatabase.AddObjectToAsset(pistol, controller);
         AssetDatabase.AddObjectToAsset(rifle, controller);
         AssetDatabase.AddObjectToAsset(rifleCrouch, controller);
         AssetDatabase.AddObjectToAsset(injured, controller);
 
-        AnimatorState sUnarmed = AddMotionState(sm, "Unarmed", unarmed, new Vector3(0, 300, 0));
+        AnimatorState sUnarmed = AddMotionState(sm, "Unarmed", unarmedMotion, new Vector3(0, 300, 0));
         AnimatorState sPistol  = AddMotionState(sm, "Pistol", pistol, new Vector3(220, 300, 0));
         AnimatorState sRifle   = AddMotionState(sm, "Rifle", rifle, new Vector3(440, 300, 0));
         AnimatorState sCrouch  = AddMotionState(sm, "RifleCrouch", rifleCrouch, new Vector3(440, 460, 0));
+        // The sword stance's legs/hips ARE the unarmed locomotion (including the female variant); the sword-specific
+        // part is the upper-body overlay (swings) and the weapon IK. The state exists so WeaponClass 3 has a home.
+        AnimatorState sSword   = AddMotionState(sm, "Sword", unarmedMotion, new Vector3(0, 380, 0));
         // Jump chain: take-off -> loop -> landing (these clips were imported but never used;
         // it was one falling-idle pose for every jump and fall).
         AnimatorState sAir     = AddMotionState(sm, "JumpUp", C("ri_jump_up") != null ? C("ri_jump_up") : C("airborne_idle"), new Vector3(220, 460, 0));
@@ -732,7 +789,7 @@ public static class AnimationSystemBuilder
         AddDeathVariant(sm, "Death_StumbleLeft",  C("stumble_left"),   false, new Vector3(0,    dy + 400, 0));
         AddDeathVariant(sm, "Death_StumbleRight", C("stumble_right"),  false, new Vector3(220,  dy + 400, 0));
 
-        var weaponStates = new[] { sUnarmed, sPistol, sRifle };
+        var weaponStates = new[] { sUnarmed, sPistol, sRifle, sSword };
         for (int i = 0; i < weaponStates.Length; i++)
         for (int j = 0; j < weaponStates.Length; j++)
         {
@@ -754,9 +811,12 @@ public static class AnimationSystemBuilder
         // before deciding whether an unarmed-specific crouch pack is worth sourcing.
         AddInstantTransition(sUnarmed, sCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
         AddInstantTransition(sCrouch, sUnarmed, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
+        // The sword crouches on the same pose too (hands stay on the sword's grips, like the pistol).
+        AddInstantTransition(sSword, sCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
+        AddInstantTransition(sCrouch, sSword, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 3, "WeaponClass"));
 
         // Airborne in/out
-        foreach (var s in new[] { sUnarmed, sPistol, sRifle, sCrouch })
+        foreach (var s in new[] { sUnarmed, sPistol, sRifle, sSword, sCrouch })
             AddInstantTransition(s, sAir, AnimatorConditionMode.IfNot, 0, "IsGrounded");
         var toLoop = sAir.AddTransition(sAirLoop);
         toLoop.hasExitTime = true; toLoop.exitTime = 0.85f; toLoop.duration = 0.15f;
@@ -767,7 +827,7 @@ public static class AnimationSystemBuilder
         // Shove: from any grounded weapon pose (not while airborne, crouched or injured), plays out, then returns to
         // whichever pose matches the current weapon. Light (punch) and heavy (kick) are separate states chosen by
         // the ShoveHeavy bool, each wired in from and out to every weapon pose.
-        var weaponPoseStates = new[] { sUnarmed, sPistol, sRifle };
+        var weaponPoseStates = new[] { sUnarmed, sPistol, sRifle, sSword };
         foreach (var (shoveState, heavy) in new[] { (sShoveLight, false), (sShoveHeavy, true) })
         {
             if (shoveState == null) continue;
@@ -796,9 +856,9 @@ public static class AnimationSystemBuilder
         }
 
         // Landing plays out, then returns to whichever pose matches the weapon.
-        for (int wc = 0; wc < 3; wc++)
+        for (int wc = 0; wc < 4; wc++)
         {
-            var back = sLand.AddTransition(wc == 0 ? sUnarmed : (wc == 1 ? sPistol : sRifle));
+            var back = sLand.AddTransition(wc == 0 ? sUnarmed : (wc == 1 ? sPistol : (wc == 2 ? sRifle : sSword)));
             back.hasExitTime = true; back.exitTime = 0.8f; back.duration = 0.15f;
             back.AddCondition(AnimatorConditionMode.Equals, wc, "WeaponClass");
             back.AddCondition(AnimatorConditionMode.If, 0, "TouchingGround");
@@ -807,7 +867,7 @@ public static class AnimationSystemBuilder
         // Death from anywhere - added before the Injured wiring below so it's
         // evaluated first: Unity checks a state's transitions in the order
         // they were added, and Dead must win if both are true simultaneously.
-        var deathSources = new[] { sUnarmed, sPistol, sRifle, sCrouch, sAir, sAirLoop, sLand, sInjured }
+        var deathSources = new[] { sUnarmed, sPistol, sRifle, sSword, sCrouch, sAir, sAirLoop, sLand, sInjured }
             .Concat(shoveStates).Concat(oneShotStates).Concat(vaultStates.Select(v => v.state)).Concat(gestureStates).ToArray();
         foreach (var s in deathSources)
         {
@@ -832,12 +892,13 @@ public static class AnimationSystemBuilder
 
         // Injured (low health) overrides normal ground movement, and returns to
         // whichever weapon pose is currently active once health recovers.
-        var groundStates = new[] { sUnarmed, sPistol, sRifle, sCrouch };
+        var groundStates = new[] { sUnarmed, sPistol, sRifle, sSword, sCrouch };
         foreach (var s in groundStates)
             AddInstantTransition(s, sInjured, AnimatorConditionMode.If, 0, "Injured");
         AddInstantTransition(sInjured, sUnarmed, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
         AddInstantTransition(sInjured, sPistol, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
         AddInstantTransition(sInjured, sRifle, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
+        AddInstantTransition(sInjured, sSword, AnimatorConditionMode.IfNot, 0, "Injured", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 3, "WeaponClass"));
     }
 
     // Exit from a one-shot base-layer action back to whichever weapon pose is active (one transition per weapon
@@ -908,6 +969,20 @@ public static class AnimationSystemBuilder
         AnimatorState melee  = AddMotionState(sm, "UB_Melee", C("act_melee"), new Vector3(0, 140, 0));
         AnimatorState melee2 = C("act_melee_b") != null ? AddMotionState(sm, "UB_Melee2", C("act_melee_b"), new Vector3(-220, 140, 0)) : null;
         AnimatorState melee3 = C("act_melee_d") != null ? AddMotionState(sm, "UB_Melee3", C("act_melee_d"), new Vector3(-220, 220, 0)) : null;
+        // Melee swings (MeleeWeapon, Sword and Axe styles, light combo + heavy): the masked upper body only, so the legs
+        // keep walking underneath. Every state is reachable from idle AND from every other swing (see the transitions
+        // below) so one swing can cut straight into the next. Timing, speeds and start offsets: MeleeSwings in the driver.
+        var swingStates = new AnimatorState[MeleeSwings.All.Length];
+        for (int i = 0; i < MeleeSwings.All.Length; i++)
+        {
+            var d = MeleeSwings.All[i];
+            var swingClip = C(d.clipKey);
+            if (swingClip == null) continue;
+            var st = AddMotionState(sm, d.state, swingClip, new Vector3(-440 - 220 * (i / MeleeSwings.PerStyle), 140 + 80 * (i % MeleeSwings.PerStyle), 0));
+            st.speed = d.speed;
+            if (d.heavy) { st.speedParameterActive = true; st.speedParameter = "SwingSpeed"; }
+            swingStates[i] = st;
+        }
         melee.speed = 1.8f;
         if (melee2 != null) melee2.speed = 1.8f;
         if (melee3 != null) melee3.speed = 1.8f;
@@ -1007,6 +1082,33 @@ public static class AnimationSystemBuilder
         var backFromGrenade = grenade.AddTransition(idle);
         backFromGrenade.hasExitTime = true; backFromGrenade.exitTime = 0.95f; backFromGrenade.duration = 0.15f;
 
+        for (int i = 0; i < swingStates.Length; i++)
+        {
+            if (swingStates[i] == null) continue;
+            var d = MeleeSwings.All[i];
+            var backFromSwing = swingStates[i].AddTransition(idle);
+            backFromSwing.hasExitTime = true; backFromSwing.exitTime = d.exit / d.length;
+            backFromSwing.duration = 0.2f; backFromSwing.hasFixedDuration = true;
+        }
+
+        // Into a swing: from idle (and the other upper-body poses), and from every other swing. The offset skips the dead
+        // time at the start of the clip; the fixed fade is the blend-in.
+        var swingSources = new List<AnimatorState> { idle, aim, pistolPose };
+        swingSources.AddRange(swingStates.Where(x => x != null));
+        foreach (var src in swingSources)
+        for (int i = 0; i < swingStates.Length; i++)
+        {
+            if (swingStates[i] == null) continue;
+            var d = MeleeSwings.All[i];
+            var ts = src.AddTransition(swingStates[i]);
+            ts.hasExitTime = false;
+            ts.hasFixedDuration = true; ts.duration = d.fade;
+            ts.offset = d.offset / d.length;
+            ts.canTransitionToSelf = true;
+            ts.AddCondition(AnimatorConditionMode.If, 0, "Swing");
+            ts.AddCondition(AnimatorConditionMode.Equals, i, "SwingIndex");
+        }
+
         foreach (var m in new[] { melee, melee2, melee3 })
         {
             if (m == null) continue;
@@ -1027,6 +1129,31 @@ public static class AnimationSystemBuilder
     // is only for turning from a standstill). Layer weight starts at 0 for exactly that reason:
     // until TurnInPlace.cs raises it, this layer is fully transparent and the base layer's own
     // legs show through untouched.
+    // Female gait for characters carrying a PISTOL or RIFLE. The Female Locomotion Pack only has unarmed clips, so there is no
+    // female armed stance; instead this layer plays the female locomotion on the LEGS ONLY (lower-body mask) over the armed
+    // base layer, whose spine, arms and weapon pose stay as they are. Its weight is 0 and is driven by
+    // CharacterAnimationDriver (Animation Variant = Female, pistol/rifle class, standing, grounded, no full-body action).
+    static void BuildFemaleLegsLayer(AnimatorController controller, AvatarMask lowerBodyMask)
+    {
+        if (C("f_walk_fwd") == null) return;        // Female Locomotion Pack not imported: no layer, the dropdown just has less to switch
+
+        var layer = new AnimatorControllerLayer
+        {
+            name = "FemaleLegs",
+            defaultWeight = 0f,
+            avatarMask = lowerBodyMask,
+            blendingMode = AnimatorLayerBlendingMode.Override,
+            stateMachine = new AnimatorStateMachine { name = "FemaleLegs", hideFlags = HideFlags.HideInHierarchy }
+        };
+        AssetDatabase.AddObjectToAsset(layer.stateMachine, controller);
+        controller.AddLayer(layer);
+
+        BlendTree tree = Locomotion2D("FemaleLegs", FemaleLocomotion());
+        AssetDatabase.AddObjectToAsset(tree, controller);
+        var st = AddMotionState(layer.stateMachine, "FemaleLegs", tree, new Vector3(0, 0, 0));
+        layer.stateMachine.defaultState = st;
+    }
+
     static void BuildTurnLayer(AnimatorController controller, AvatarMask lowerBodyMask)
     {
         var layer = new AnimatorControllerLayer
@@ -1049,21 +1176,24 @@ public static class AnimationSystemBuilder
         BlendTree pistolTree  = Turn1D("TL_Pistol", "un_turn_l", "pi_idle", "un_turn_r"); // no pistol-specific turn clip yet, see the un_turn_l/r ClipDefs
         BlendTree rifleTree   = Turn1D("TL_Rifle", "ri_turn_l", "ri_idle", "ri_turn_r");
         BlendTree crouchTree  = Turn1D("TL_Crouch", "rc_turn_l", "rc_idle", "rc_turn_r");
+        BlendTree unarmedTreeFemale = Turn1D("TL_UnarmedFemale", "f_turn_l", "f_idle", "f_turn_r");
+        Motion unarmedTurnMotion = VariantMotion("TL_UnarmedVariants", unarmedTree, unarmedTreeFemale, controller);
         AssetDatabase.AddObjectToAsset(unarmedTree, controller);
         AssetDatabase.AddObjectToAsset(pistolTree, controller);
         AssetDatabase.AddObjectToAsset(rifleTree, controller);
         AssetDatabase.AddObjectToAsset(crouchTree, controller);
 
-        AnimatorState tUnarmed = AddMotionState(sm, "TL_Unarmed", unarmedTree, new Vector3(0, 0, 0));
+        AnimatorState tUnarmed = AddMotionState(sm, "TL_Unarmed", unarmedTurnMotion, new Vector3(0, 0, 0));
         AnimatorState tPistol  = AddMotionState(sm, "TL_Pistol", pistolTree, new Vector3(220, 0, 0));
         AnimatorState tRifle   = AddMotionState(sm, "TL_Rifle", rifleTree, new Vector3(440, 0, 0));
         AnimatorState tCrouch  = AddMotionState(sm, "TL_Crouch", crouchTree, new Vector3(440, 140, 0));
+        AnimatorState tSword   = AddMotionState(sm, "TL_Sword", unarmedTurnMotion, new Vector3(220, 140, 0));
         sm.defaultState = tUnarmed;
 
         // Same weapon-swap wiring as the base layer (see BuildBaseLayer) - kept identical on
         // purpose so this layer never disagrees with the base layer about which weapon's legs
         // should be showing.
-        var weaponStates = new[] { tUnarmed, tPistol, tRifle };
+        var weaponStates = new[] { tUnarmed, tPistol, tRifle, tSword };
         for (int i = 0; i < weaponStates.Length; i++)
         for (int j = 0; j < weaponStates.Length; j++)
         {
@@ -1076,9 +1206,11 @@ public static class AnimationSystemBuilder
         AddInstantTransition(tRifle, tCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
         AddInstantTransition(tPistol, tCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
         AddInstantTransition(tUnarmed, tCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
+        AddInstantTransition(tSword, tCrouch, AnimatorConditionMode.If, 1, "IsCrouching");
         AddInstantTransition(tCrouch, tRifle, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 2, "WeaponClass"));
         AddInstantTransition(tCrouch, tPistol, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 1, "WeaponClass"));
         AddInstantTransition(tCrouch, tUnarmed, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 0, "WeaponClass"));
+        AddInstantTransition(tCrouch, tSword, AnimatorConditionMode.IfNot, 0, "IsCrouching", extra: (t) => t.AddCondition(AnimatorConditionMode.Equals, 3, "WeaponClass"));
     }
 
     // ---- helpers ----------------------------------------------------------
@@ -1090,6 +1222,34 @@ public static class AnimationSystemBuilder
         return s;
     }
 
+    // Where in each locomotion clip's loop the RIGHT foot passes the left one while moving ahead in the direction the
+    // clip travels (0-1 of the cycle). Measured from the FBX skeletons (Python forward-kinematics over the Mixamo files:
+    // right-foot-minus-left-foot offset along the travel direction, first rising zero crossing). Every locomotion clip
+    // is exactly one step cycle long, but the packs were authored separately, so their cycles start at different foot
+    // phases: the handgun strafes are ~0.25-0.35 of a cycle out from its forward walk, the sword strafes up to half a
+    // cycle, the rifle sides ~0.13. A blend tree plays all of its clips from the same normalized time, so blending
+    // forward into a diagonal or a strafe mixed two clips with their legs in different parts of the step - the
+    // bouncy, mushy legs. Locomotion2D now gives every child a cycleOffset that lines each clip's step up with the
+    // tree's forward walk.
+    static readonly Dictionary<string, float> FootPhase = new Dictionary<string, float>
+    {
+            { "f_run_fwd", 0.531f }, { "f_run_left", 0.554f }, { "f_run_right", 0.547f }, { "f_walk_fwd", 0.533f },
+            { "f_walk_left", 0.590f }, { "f_walk_right", 0.549f }, { "pi_left", 0.841f }, { "pi_right", 0.244f },
+            { "pi_run_back", 0.486f }, { "pi_run_fwd", 0.458f }, { "pi_walk_back", 0.455f }, { "pi_walk_fwd", 0.494f },
+            { "rc_walk_back", 0.421f }, { "rc_walk_back_l", 0.427f }, { "rc_walk_back_r", 0.421f }, { "rc_walk_fwd", 0.568f },
+            { "rc_walk_fwd_l", 0.580f }, { "rc_walk_fwd_r", 0.513f }, { "rc_walk_left", 0.483f }, { "rc_walk_right", 0.498f },
+            { "ri_run_back", 0.527f }, { "ri_run_back_l", 0.526f }, { "ri_run_back_r", 0.450f }, { "ri_run_fwd", 0.584f },
+            { "ri_run_fwd_l", 0.570f }, { "ri_run_fwd_r", 0.520f }, { "ri_run_left", 0.575f }, { "ri_run_right", 0.470f },
+            { "ri_sprint_fwd", 0.532f }, { "ri_sprint_fwd_l", 0.504f }, { "ri_sprint_fwd_r", 0.493f },
+            { "ri_sprint_left", 0.550f }, { "ri_sprint_right", 0.466f }, { "ri_walk_back", 0.461f },
+            { "ri_walk_back_l", 0.449f }, { "ri_walk_back_r", 0.438f }, { "ri_walk_fwd", 0.552f }, { "ri_walk_fwd_l", 0.561f },
+            { "ri_walk_fwd_r", 0.545f }, { "ri_walk_left", 0.583f }, { "ri_walk_right", 0.424f }, { "sw_run_back", 0.429f },
+            { "sw_run_fwd", 0.478f }, { "sw_run_left", 0.989f }, { "sw_run_right", 0.005f }, { "sw_walk_back", 0.447f },
+            { "sw_walk_fwd", 0.531f }, { "sw_walk_left", 0.273f }, { "sw_walk_right", 0.754f }, { "un_run_back", 0.546f },
+            { "un_run_fwd", 0.504f }, { "un_run_left", 0.520f }, { "un_run_right", 0.569f }, { "un_walk_back", 0.535f },
+            { "un_walk_fwd", 0.510f }, { "un_walk_left", 0.536f }, { "un_walk_right", 0.481f },
+    };
+
     // Blend tree in velocity space: each point is (right m/s, forward m/s, clip key, child time scale).
     static BlendTree Locomotion2D(string name, (float x, float y, string key, float ts)[] points)
     {
@@ -1097,18 +1257,62 @@ public static class AnimationSystemBuilder
         tree.blendParameter = "MoveX";
         tree.blendParameterY = "MoveY";
         tree.hideFlags = HideFlags.HideInHierarchy;
-        var found = new List<(AnimationClip clip, Vector2 pos, float ts)>();
+        var found = new List<(AnimationClip clip, Vector2 pos, float ts, string key)>();
         foreach (var p in points)
         {
             var clip = C(p.key);
             if (clip == null) continue;
-            found.Add((clip, new Vector2(p.x, p.y), p.ts));
+            found.Add((clip, new Vector2(p.x, p.y), p.ts, p.key));
         }
+
+        // Reference step phase: the slowest straight-ahead walk in the tree that has a measurement.
+        float refPhase = -1f, refSpeed = float.MaxValue;
+        foreach (var f in found)
+            if (Mathf.Abs(f.pos.x) < 0.001f && f.pos.y > 0.1f && f.pos.y < refSpeed && FootPhase.ContainsKey(f.key))
+            { refSpeed = f.pos.y; refPhase = FootPhase[f.key]; }
+
         foreach (var f in found) tree.AddChild(f.clip, f.pos);
         var children = tree.children;
         for (int k = 0; k < children.Length && k < found.Count; k++)
+        {
             children[k].timeScale = found[k].ts;
+            if (refPhase >= 0f && FootPhase.TryGetValue(found[k].key, out float phase))
+                children[k].cycleOffset = Mathf.Repeat(phase - refPhase, 1f);
+        }
         tree.children = children;
+        return tree;
+    }
+
+    // The female unarmed locomotion points (right m/s, forward m/s, clip key, time scale): used by the unarmed tree AND by the
+    // FemaleLegs overlay layer that gives pistol/rifle carriers the female gait. Same shape as the default set, measured speeds;
+    // the outer points repeat the run clips at the default set's top speeds with a matching time scale so a sprint doesn't skate.
+    static (float x, float y, string key, float ts)[] FemaleLocomotion()
+    {
+        return new (float x, float y, string key, float ts)[]
+        {
+            (0, 0, "f_idle", 1f),
+            (0, 1.61f, "f_walk_fwd", 1f), (0, PlayerWalk, "f_walk_fwd", PlayerWalk / 1.61f), (0, 3.62f, "f_run_fwd", 1f), (0, 4.20f, "f_run_fwd", 4.20f / 3.62f),
+            (0, -0.86f, "un_walk_back", 1f), (0, -2.03f, "un_run_back", 1f),
+            (-1.87f, 0, "f_walk_left", 1f), (-3.47f, 0, "f_run_left", 1f), (-4.34f, 0, "f_run_left", 4.34f / 3.47f),
+            (1.87f, 0, "f_walk_right", 1f), (3.47f, 0, "f_run_right", 1f), (4.34f, 0, "f_run_right", 4.34f / 3.47f),
+        };
+    }
+
+    // Default / female pair on the AnimVariant parameter: 0 plays `defaultMotion`, 1 plays `femaleMotion`. The tree the
+    // parameter isn't pointing at has zero weight, so it costs nothing. With no female clips found (pack not imported)
+    // the default is returned untouched and the variant dropdown simply does nothing.
+    static Motion VariantMotion(string name, BlendTree defaultMotion, BlendTree femaleMotion, AnimatorController controller)
+    {
+        if (femaleMotion == null || femaleMotion.children.Length == 0) return defaultMotion;
+
+        AssetDatabase.AddObjectToAsset(femaleMotion, controller);
+        var tree = new BlendTree { name = name, blendType = BlendTreeType.Simple1D };
+        tree.blendParameter = "AnimVariant";
+        tree.useAutomaticThresholds = false;
+        tree.hideFlags = HideFlags.HideInHierarchy;
+        tree.AddChild(defaultMotion, 0f);
+        tree.AddChild(femaleMotion, 1f);
+        AssetDatabase.AddObjectToAsset(tree, controller);
         return tree;
     }
 

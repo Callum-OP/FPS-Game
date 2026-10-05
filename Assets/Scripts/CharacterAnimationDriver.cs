@@ -1,11 +1,80 @@
 using System.Collections;
 using UnityEngine;
 
+/// <summary>How a MeleeWeapon swings: which animation pack its attacks come from. Pick it per weapon with the Style dropdown.</summary>
+public enum MeleeStyle
+{
+    Sword = 0,   // Great Sword pack: chop -> sweep -> thrust, heavy spin
+    Axe = 1      // Pro Melee Axe pack: horizontal -> backhand -> downward, heavy 360
+}
+
+/// <summary>
+/// Timing for every melee swing, measured from the FBX hand motion (Python forward-kinematics over the Mixamo clips:
+/// right-hand speed relative to the hips). All the clip times below are RAW clip seconds; a swing plays at `speed`, and
+/// starts `offset` seconds into the clip (the dead time at the start, where the arm is only leaving its rest pose, is
+/// skipped - the same trick the unarmed melee uses). Index = (int)style * 4 + n, with n 0-2 the light combo and 3 the heavy.
+///   strike  the moment the blade connects (peak hand speed)
+///   apex    heavies only: the top of the wind-up, where the arm is drawn back - the swing freezes here while the
+///           attack button is held, and releases when it's let go
+///   exit    when the upper body starts blending back to idle (the arm has mostly returned)
+/// </summary>
+public static class MeleeSwings
+{
+    public class Def
+    {
+        public string state, clipKey;
+        public float length, speed, offset, fade, strike, apex, exit;
+        public bool heavy;
+        public Def(string state, string clipKey, float length, float speed, float offset, float fade, float strike, float apex, float exit, bool heavy)
+        { this.state = state; this.clipKey = clipKey; this.length = length; this.speed = speed; this.offset = offset; this.fade = fade; this.strike = strike; this.apex = apex; this.exit = exit; this.heavy = heavy; }
+    }
+
+    public const int PerStyle = 4;        // three lights + one heavy
+    public const int LightCount = 3;
+
+    public static readonly Def[] All =
+    {
+        // Sword (Great Sword pack, in-place swings that start from the ready pose)
+        new Def("Melee_Sword1",     "sw_slash1", 1.27f, 1.45f, 0.00f, 0.06f, 0.60f, 0f,    1.02f, false),   // overhead chop
+        new Def("Melee_Sword2",     "sw_slash2", 1.77f, 1.60f, 0.00f, 0.06f, 0.80f, 0f,    1.42f, false),   // cross sweep
+        new Def("Melee_Sword3",     "sw_slash3", 1.20f, 1.40f, 0.00f, 0.06f, 0.47f, 0f,    0.96f, false),   // thrust
+        new Def("Melee_SwordHeavy", "sw_heavy",  1.87f, 1.15f, 0.00f, 0.12f, 1.10f, 0.83f, 1.60f, true),    // high spin attack
+        // Axe (Pro Melee Axe pack: horizontal, backhand, downward, 360 high)
+        new Def("Melee_Axe1",       "act_melee",   2.13f, 1.90f, 0.30f, 0.06f, 0.93f, 0f,   1.48f, false),
+        new Def("Melee_Axe2",       "act_melee_b", 3.03f, 1.90f, 0.35f, 0.06f, 1.07f, 0f,   1.62f, false),
+        new Def("Melee_Axe3",       "act_melee_d", 2.27f, 1.90f, 0.20f, 0.06f, 0.83f, 0f,   1.38f, false),
+        new Def("Melee_AxeHeavy",   "ax_heavy",    2.90f, 1.25f, 0.30f, 0.12f, 1.10f, 0.67f, 1.75f, true),
+    };
+
+    public static int Light(MeleeStyle style, int n) => (int)style * PerStyle + n;
+    public static int Heavy(MeleeStyle style) => (int)style * PerStyle + (PerStyle - 1);
+
+    /// <summary>Seconds from starting the swing to the blade connecting (a light swing).</summary>
+    public static float StrikeDelay(int i) => All[i].fade + (All[i].strike - All[i].offset) / All[i].speed;
+    /// <summary>Seconds from starting a swing until the upper body is handed back to idle (a light swing).</summary>
+    public static float Duration(int i) => All[i].fade + (All[i].exit - All[i].offset) / All[i].speed;
+    /// <summary>Heavy: seconds from starting the swing until the wind-up reaches its apex and can hold.</summary>
+    public static float ApexDelay(int i) => All[i].fade + (All[i].apex - All[i].offset) / All[i].speed;
+    /// <summary>Heavy: seconds from letting go (at the apex) to the blade connecting.</summary>
+    public static float ReleaseToStrike(int i) => (All[i].strike - All[i].apex) / All[i].speed;
+    /// <summary>Heavy: seconds from letting go (at the apex) to the upper body being handed back.</summary>
+    public static float ReleaseToExit(int i) => (All[i].exit - All[i].apex) / All[i].speed;
+}
+
+/// <summary>Which animation set a character uses for the poses/animations that have variants (the unarmed idle, walk, run,
+/// strafes and turn-in-place). Only the animations change, never the model.</summary>
+public enum AnimationVariant
+{
+    Default = 0,
+    Female = 1
+}
+
 public enum CharacterWeaponClass
 {
     Unarmed = 0,
     Pistol = 1,
-    Rifle = 2
+    Rifle = 2,
+    Sword = 3   // two-handed melee weapon (MeleeWeapon): the Great Sword pack's stance and locomotion
 }
 
 /// <summary>What Ragdoll asks the driver for when a character dies.</summary>
@@ -68,8 +137,10 @@ public class CharacterAnimationDriver : MonoBehaviour
     CharacterMotionPolish polish;
     Ragdoll ragdollOwner;
     int upperBodyLayer = -1;
+    int femaleLegsLayer = -1;
 
     static readonly int WeaponClassHash = Animator.StringToHash("WeaponClass");
+    static readonly int AnimVariantHash = Animator.StringToHash("AnimVariant");
     static readonly int IsCrouchingHash = Animator.StringToHash("IsCrouching");
     static readonly int IsGroundedHash = Animator.StringToHash("IsGrounded");
     static readonly int AimingHash = Animator.StringToHash("Aiming");
@@ -104,6 +175,102 @@ public class CharacterAnimationDriver : MonoBehaviour
     // How long each shove takes to play out (raw clip length / speed) - hand follow is released around then.
     const float ShoveLightDuration = 1.00f / ShoveLightSpeed;
     const float ShoveHeavyDuration = 1.43f / ShoveHeavySpeed;
+
+    // ---- melee swings (Sword / Axe style, light combo + heavy; upper-body states built by AnimationSystemBuilder) ----
+    // Timing and speeds live in MeleeSwings. They play on the masked UPPER body, so the legs keep doing whatever the
+    // locomotion is doing. The swing is picked with the Swing trigger + SwingIndex int; the graph transitions carry the
+    // start offset, and every swing state can cut straight into the next. A heavy has SwingSpeed wired in as its state
+    // speed multiplier, so setting it to 0 holds the arm at the top of the wind-up and 1 lets it go.
+    static readonly int SwingHash = Animator.StringToHash("Swing");
+    static readonly int SwingIndexHash = Animator.StringToHash("SwingIndex");
+    static readonly int SwingSpeedHash = Animator.StringToHash("SwingSpeed");
+    Coroutine swingRelease;
+
+    /// <summary>Starts melee swing `swingIndex` (see MeleeSwings). Both arms are handed to the clip while it plays, the weapon
+    /// rides in the right hand (WeaponHandFollow) and the left hand stays on its grip. A light swing gives the arms back by
+    /// itself when it's done; a heavy waits for FinishMeleeSwing. False if the controller has no swing states yet (run
+    /// Tools/FPS Game/Build Animation System).</summary>
+    public bool PlayMeleeSwing(int swingIndex)
+    {
+        if (!CanAnimate() || upperBodyLayer < 0 || swingIndex < 0 || swingIndex >= MeleeSwings.All.Length) return false;
+        var def = MeleeSwings.All[swingIndex];
+        if (!HasParam(SwingHash) || !animator.HasState(upperBodyLayer, Animator.StringToHash(def.state))) return false;
+
+        if (upperFade != null) { StopCoroutine(upperFade); upperFade = null; }
+        if (animator.GetLayerWeight(upperBodyLayer) < 0.99f) animator.SetLayerWeight(upperBodyLayer, 1f);
+        animator.SetFloat(SwingSpeedHash, 1f);
+        animator.SetInteger(SwingIndexHash, swingIndex);
+        animator.SetTrigger(SwingHash);
+        StartCoroutine(ResetSwingTrigger());
+
+        Hands?.SetAnimationFollow(1f, 0f);
+        SetWeaponFollowsHand(true);
+        if (swingRelease != null) { StopCoroutine(swingRelease); swingRelease = null; }
+        if (!def.heavy) swingRelease = StartCoroutine(SwingReleaseRoutine(MeleeSwings.Duration(swingIndex)));
+        if (polish != null && !def.heavy) StartCoroutine(LungeAfter(MeleeSwings.StrikeDelay(swingIndex) * 0.5f));
+        return true;
+    }
+
+    bool HasParam(int hash)
+    {
+        foreach (var p in animator.parameters) if (p.nameHash == hash) return true;
+        return false;
+    }
+
+    // The trigger is only consumed if a transition takes it; if the layer was busy it must not linger and fire a swing later.
+    IEnumerator ResetSwingTrigger()
+    {
+        yield return null; yield return null; yield return null;
+        if (animator != null) animator.ResetTrigger(SwingHash);
+    }
+
+    /// <summary>Heavy swing: true freezes the arm where it is (the apex of the wind-up), false lets it swing.</summary>
+    public void SetSwingHold(bool hold)
+    {
+        if (CanAnimate()) animator.SetFloat(SwingSpeedHash, hold ? 0f : 1f);
+    }
+
+    /// <summary>Heavy swing: hands the arms back to the weapon grips after `seconds` (call when the swing is let go).</summary>
+    public void FinishMeleeSwing(float seconds)
+    {
+        if (swingRelease != null) StopCoroutine(swingRelease);
+        swingRelease = StartCoroutine(SwingReleaseRoutine(seconds));
+    }
+
+    IEnumerator SwingReleaseRoutine(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        swingRelease = null;
+        ReleaseSwingHands();
+    }
+
+    // Hands back to the weapon grips - unless a full-body action (a shove) has meanwhile taken the arms for itself.
+    void ReleaseSwingHands()
+    {
+        if (fullBodyAction) return;
+        Hands?.ClearAnimationFollow();
+        SetWeaponFollowsHand(false);
+    }
+
+    /// <summary>Cuts a swing short (weapon put away, dropped, player died): the upper body goes back to idle and the hands to the grips.</summary>
+    public void CancelMeleeSwing()
+    {
+        if (!CanAnimate()) return;
+        bool wasActive = swingRelease != null;
+        if (swingRelease != null) { StopCoroutine(swingRelease); swingRelease = null; }
+        animator.SetFloat(SwingSpeedHash, 1f);
+        animator.ResetTrigger(SwingHash);
+        if (upperBodyLayer >= 0 && IsInSwingState()) animator.CrossFadeInFixedTime(Animator.StringToHash("UB_Idle"), 0.1f, upperBodyLayer);
+        if (wasActive || IsInSwingState()) ReleaseSwingHands();
+    }
+
+    bool IsInSwingState()
+    {
+        if (upperBodyLayer < 0) return false;
+        var st = animator.GetCurrentAnimatorStateInfo(upperBodyLayer);
+        foreach (var d in MeleeSwings.All) if (st.shortNameHash == Animator.StringToHash(d.state)) return true;
+        return false;
+    }
 
     /// <summary>True when the controller was built with the velocity-space (m/s) blend trees. False for a controller
     /// that hasn't been rebuilt yet, which still expects the old 0-3 tier values.</summary>
@@ -166,6 +333,17 @@ public class CharacterAnimationDriver : MonoBehaviour
 
     bool[] deathStateExists;
 
+    [Header("Animation Set")]
+    [Tooltip("Which set of animations this character uses where there are variants (unarmed idle/walk/run/strafes/turns). Pick it per prefab or per instance - it can also be flipped at runtime. Only the animations change, never the model. Pistol and rifle carriers get the female gait on the legs only (there is no female armed stance); the arms and weapon pose stay as they are.")]
+    public AnimationVariant animationVariant = AnimationVariant.Default;
+    [Tooltip("Seconds to ease between the sets when the variant changes while playing (0 = instant).")]
+    public float variantBlendTime = 0.2f;
+    bool hasVariantParam;
+
+    /// <summary>Switches this character's animation set (a toggle/dropdown/UI can call this).</summary>
+    public void SetAnimationVariant(AnimationVariant variant) { animationVariant = variant; }
+    public AnimationVariant CurrentAnimationVariant => animationVariant;
+
     public bool IsCrouching { get; private set; }
     public Animator BodyAnimator => animator;
     public CharacterMotionPolish Polish => polish;
@@ -206,6 +384,7 @@ public class CharacterAnimationDriver : MonoBehaviour
             foreach (var p in animator.parameters)
             {
                 if (p.nameHash == HitHash) hasHitParam = true;
+                if (p.nameHash == AnimVariantHash) hasVariantParam = true;
                 if (p.nameHash == TouchHash) hasTouchParam = true;
                 if (p.nameHash == MeleeIndexHash) hasMeleeIndexParam = true;
                 if (p.nameHash == ShoveHash) hasShoveParam = true;
@@ -213,7 +392,9 @@ public class CharacterAnimationDriver : MonoBehaviour
                 if (p.name == "MoveInMetres") UsesVelocityBlend = true;
             }
             animator.SetInteger(WeaponClassHash, (int)currentWeaponClass);
+            if (hasVariantParam) animator.SetFloat(AnimVariantHash, (float)animationVariant);   // no blend on spawn
             upperBodyLayer = animator.GetLayerIndex("UpperBody");
+            femaleLegsLayer = animator.GetLayerIndex("FemaleLegs");   // -1 if the female pack wasn't imported when the controller was built
             if (hasMeleeIndexParam && upperBodyLayer >= 0)
             {
                 meleeVariants = 1;
@@ -279,7 +460,14 @@ public class CharacterAnimationDriver : MonoBehaviour
     /// <summary>Convenience used by PlayerSetup/WeaponController - infers weapon class from the gun.</summary>
     public void SetWeaponFrom(WeaponController weapon)
     {
-        if (weapon == null || weapon.isMeleeWeapon) { SetWeaponClass(CharacterWeaponClass.Unarmed); return; }
+        if (weapon == null) { SetWeaponClass(CharacterWeaponClass.Unarmed); return; }
+        // A melee weapon with a MeleeWeapon component is a proper two-handed sword (own stance and slashes); any
+        // other melee prop stays a held prop with the unarmed locomotion.
+        if (weapon.isMeleeWeapon)
+        {
+            SetWeaponClass(weapon.GetComponent<MeleeWeapon>() != null ? CharacterWeaponClass.Sword : CharacterWeaponClass.Unarmed);
+            return;
+        }
         SetWeaponClass(weapon.isAutomatic || weapon.isShotgun ? CharacterWeaponClass.Rifle : CharacterWeaponClass.Pistol);
     }
 
@@ -403,7 +591,8 @@ public class CharacterAnimationDriver : MonoBehaviour
     {
         if (!CanAnimate()) return false;
         string state = currentWeaponClass == CharacterWeaponClass.Rifle ? "Rifle"
-                     : currentWeaponClass == CharacterWeaponClass.Pistol ? "Pistol" : "Unarmed";
+                     : currentWeaponClass == CharacterWeaponClass.Pistol ? "Pistol"
+                     : currentWeaponClass == CharacterWeaponClass.Sword ? "Sword" : "Unarmed";
         if (!HasState(state)) return false;
         animator.CrossFadeInFixedTime(Animator.StringToHash(state), Mathf.Max(0.01f, fade), 0);
         return true;
@@ -536,6 +725,37 @@ public class CharacterAnimationDriver : MonoBehaviour
     [Header("Hit Reaction")]
     [Tooltip("Minimum seconds between flinches so sustained fire doesn't lock the upper body into one.")]
     public float hitReactionCooldown = 0.8f;
+
+    // Eases the animator's AnimVariant parameter to the chosen set. Polled, so changing the dropdown in the Inspector
+    // during Play, or calling SetAnimationVariant, both take effect straight away.
+    void Update()
+    {
+        if (animator == null) return;
+
+        if (hasVariantParam)
+        {
+            float target = (float)animationVariant;
+            float current = animator.GetFloat(AnimVariantHash);
+            if (!Mathf.Approximately(current, target))
+            {
+                if (variantBlendTime <= 0f || Mathf.Abs(current - target) < 0.002f) animator.SetFloat(AnimVariantHash, target);
+                else animator.SetFloat(AnimVariantHash, target, variantBlendTime, Time.deltaTime);
+            }
+        }
+
+        // Pistol / rifle carriers have no female stance (the pack is unarmed only), so the female gait goes on the legs alone:
+        // the FemaleLegs layer fades in under the armed pose. It is off whenever the base layer owns the legs for a reason of
+        // its own - crouching, in the air, injured, or a full-body action (shove, vault, death).
+        if (femaleLegsLayer >= 0 && CanAnimate())
+        {
+            bool armed = currentWeaponClass == CharacterWeaponClass.Pistol || currentWeaponClass == CharacterWeaponClass.Rifle;
+            bool on = animationVariant == AnimationVariant.Female && armed && !IsCrouching && !fullBodyAction
+                      && animator.GetBool(IsGroundedHash) && !animator.GetBool(InjuredHash);
+            float step = variantBlendTime > 0.01f ? Time.deltaTime / variantBlendTime : 1f;
+            float w = Mathf.MoveTowards(animator.GetLayerWeight(femaleLegsLayer), on ? 1f : 0f, step);
+            animator.SetLayerWeight(femaleLegsLayer, w);
+        }
+    }
 
     void Start()
     {

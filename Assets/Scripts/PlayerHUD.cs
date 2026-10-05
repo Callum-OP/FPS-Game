@@ -69,6 +69,15 @@ public class PlayerHUD : MonoBehaviour
 
     // Ammo
     private (int current, int max)? lastAmmo;
+    bool ammoHidden;                         // a melee weapon is out: it has no ammo, so the counter stays off
+
+    /// <summary>Shows or hides the ammo counter (PlayerSetup hides it while a melee weapon is equipped). It stays that way until a
+    /// gun is equipped, through holstering, reloading and grenades; a grenade in hand still shows its own count.</summary>
+    public void SetAmmoVisible(bool visible)
+    {
+        ammoHidden = !visible;
+        if (ammoText != null) ammoText.gameObject.SetActive(visible);
+    }
 
     public void UpdateAmmo(int current, int max)
     {
@@ -91,6 +100,7 @@ public class PlayerHUD : MonoBehaviour
     public void RestoreAmmo()
     {
         if (lastAmmo.HasValue) UpdateAmmo(lastAmmo.Value.current, lastAmmo.Value.max);
+        if (ammoText != null) ammoText.gameObject.SetActive(!ammoHidden);
     }
 
     public void ShowReloading()
@@ -102,7 +112,7 @@ public class PlayerHUD : MonoBehaviour
     public void HideReloading()
     {
         if (reloadText != null) reloadText.gameObject.SetActive(false);
-        ammoText.gameObject.SetActive(true);   // show ammo text again
+        ammoText.gameObject.SetActive(!ammoHidden);   // show ammo text again (unless a melee weapon has it switched off)
         if (lastAmmo.HasValue)
             UpdateAmmo(lastAmmo.Value.current, lastAmmo.Value.max);
     }
